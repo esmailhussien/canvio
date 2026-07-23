@@ -18,14 +18,9 @@ export function HomePage() {
   }, [theme]);
 
   const handleCreateWorld = () => {
-    setIsCreating(true);
-    createBoard()
-      .then((board) => {
-        navigate(board.url || `/w/${board.id}`);
-      })
-      .catch(() => {
-        navigate(`/w/${nanoid(10)}`);
-      });
+    const newId = nanoid(10);
+    createBoard().catch(() => {});
+    navigate(`/w/${newId}`);
   };
 
   return (
@@ -37,6 +32,12 @@ export function HomePage() {
           <span className="home-logo__text">Canvio</span>
         </div>
         <div className="home-nav__links">
+          <button className="home-nav__link" onClick={handleCreateWorld} disabled={isCreating}>
+            Workspace
+          </button>
+          <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
+            {isCreating ? 'Creating...' : '+ Launch Canvas'}
+          </button>
           <button
             className="home-theme-btn"
             onClick={toggleTheme}
@@ -44,12 +45,6 @@ export function HomePage() {
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             <IconTheme size={18} />
-          </button>
-          <button className="home-nav__link" onClick={handleCreateWorld} disabled={isCreating}>
-            Workspace
-          </button>
-          <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
-            {isCreating ? 'Creating...' : '+ Launch Canvas'}
           </button>
         </div>
       </nav>

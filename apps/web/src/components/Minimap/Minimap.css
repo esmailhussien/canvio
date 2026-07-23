@@ -25,3 +25,13 @@
   cursor: pointer;
   display: block;
 }
+
+@media (max-width: 768px) {
+  .minimap-container {
+    bottom: 70px;
+    right: 12px;
+    width: 110px;
+    height: 75px;
+    opacity: 0.85;
+  }
+}

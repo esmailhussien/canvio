@@ -436,42 +436,39 @@
   }
 }
 
-@media (max-width: 760px) {
-  .world-page__top-left {
-    top: 8px;
-    left: 8px;
-    right: 8px;
-    max-width: none;
-    padding-right: 0;
-    gap: 7px;
+@media (max-width: 768px) {
+  .world-header {
+    padding: 0 8px;
+    height: 52px;
   }
 
-  .template-trigger-btn,
-  .ai-trigger-btn {
-    height: 38px;
-    padding: 0 11px;
-    font-size: 12px;
+  .world-header__center {
+    display: none;
   }
 
-  .template-trigger-btn--icon {
-    width: 38px;
-    padding: 0;
+  .world-header__left {
+    gap: 6px;
   }
 
-  .canvas-appearance {
-    order: 3;
-    width: 100%;
+  .canvio-brand-btn {
+    padding: 4px 6px;
+    font-size: 1.05rem;
+    gap: 6px;
   }
 
-  .canvas-bg-swatches {
-    max-width: calc(100vw - 56px);
-    overflow-x: auto;
+  .world-header__right {
+    gap: 4px;
   }
 
-  .connection-status {
-    right: 8px;
-    bottom: 74px;
-    max-width: 116px;
+  .presence-avatar-stack {
+    margin-left: 4px;
+  }
+
+  .presence-avatar {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    margin-left: -8px;
   }
 
   .world-page__starter-panel {
@@ -480,21 +477,8 @@
   }
 
   .world-page__starter-card {
-    min-height: 64px;
+    min-height: 60px;
     flex-direction: row;
-  }
-}
-
-@media (max-width: 520px) {
-  .ai-trigger-btn,
-  .world-page__top-left > .template-trigger-btn:not(.template-trigger-btn--icon) {
-    width: 38px;
-    padding: 0;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .world-page__control-label {
-    display: none;
+    padding: 12px 16px;
   }
 }

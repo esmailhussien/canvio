@@ -54,12 +54,12 @@
 }
 
 .home-theme-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
-  background: var(--glass-bg, rgba(255, 255, 255, 0.05));
-  color: var(--text-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -69,7 +69,7 @@
 
 .home-theme-btn:hover {
   background: var(--bg-hover);
-  transform: scale(1.08);
+  color: var(--text-primary);
 }
 
 .home-nav__link {

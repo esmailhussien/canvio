@@ -252,13 +252,16 @@ export function NodeRenderer({ node }: Props) {
 
   useEffect(() => {
     if (isDragging) {
+      window.addEventListener('pointermove', handleMouseMove);
+      window.addEventListener('pointerup', handleMouseUp);
+      window.addEventListener('pointercancel', handleMouseUp);
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
-    } else {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
     }
     return () => {
+      window.removeEventListener('pointermove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -266,13 +269,16 @@ export function NodeRenderer({ node }: Props) {
 
   useEffect(() => {
     if (resizeDir) {
+      window.addEventListener('pointermove', handleResizeMove);
+      window.addEventListener('pointerup', handleResizeEnd);
+      window.addEventListener('pointercancel', handleResizeEnd);
       window.addEventListener('mousemove', handleResizeMove);
       window.addEventListener('mouseup', handleResizeEnd);
-    } else {
-      window.removeEventListener('mousemove', handleResizeMove);
-      window.removeEventListener('mouseup', handleResizeEnd);
     }
     return () => {
+      window.removeEventListener('pointermove', handleResizeMove);
+      window.removeEventListener('pointerup', handleResizeEnd);
+      window.removeEventListener('pointercancel', handleResizeEnd);
       window.removeEventListener('mousemove', handleResizeMove);
       window.removeEventListener('mouseup', handleResizeEnd);
     };
@@ -343,6 +349,7 @@ export function NodeRenderer({ node }: Props) {
         zIndex: node.zIndex,
       }}
       onMouseDown={handleMouseDown}
+      onPointerDown={handleMouseDown}
       onMouseEnter={handleNodeEnter}
       onMouseMove={updateRelationTargetForNode}
       onMouseLeave={handleNodeLeave}

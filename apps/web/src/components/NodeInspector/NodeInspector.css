@@ -1,12 +1,12 @@
 .node-inspector {
   position: absolute;
-  top: -50px;
+  top: -54px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 260;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: var(--toolbar-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -17,7 +17,13 @@
   user-select: none;
   pointer-events: auto;
   white-space: nowrap;
-  max-width: min(92vw, 620px);
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.node-inspector::-webkit-scrollbar {
+  display: none;
 }
 
 .node-inspector__colors {
