@@ -1,0 +1,22 @@
+{
+  "name": "@canvio/collaboration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "y-websocket": "^2.1.0",
+    "yjs": "^13.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.8.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

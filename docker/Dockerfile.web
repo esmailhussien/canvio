@@ -1,0 +1,23 @@
+# Stage 1: Build the React application
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY turbo.json ./
+COPY packages packages
+COPY apps/web apps/web
+
+# Install all dependencies (including dev) and build
+RUN npm install
+# Vite builds static assets into apps/web/dist by default
+RUN npm run build -w apps/web
+
+# Stage 2: Serve the React application with Nginx
+FROM nginx:alpine AS runner
+# Copy build files from builder stage
+COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+COPY docker/web-entrypoint.sh /docker-entrypoint-canvio.sh
+RUN chmod +x /docker-entrypoint-canvio.sh
+# Nginx default configuration listens on port 80, which matches docker-compose.yml
+EXPOSE 80
+CMD ["/docker-entrypoint-canvio.sh"]

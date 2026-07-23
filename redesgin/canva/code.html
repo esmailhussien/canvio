@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Canvio Whiteboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Outfit:wght@100..900&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-lowest": "#0d0d15",
+                        "on-surface": "#e4e1ed",
+                        "on-primary-fixed": "#07006c",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#13131b",
+                        "outline-variant": "#464554",
+                        "surface-container": "#1f1f27",
+                        "tertiary-fixed": "#6bff8f",
+                        "background": "#13131b",
+                        "surface-bright": "#393841",
+                        "on-secondary-fixed-variant": "#6900b3",
+                        "on-primary-container": "#0d0096",
+                        "surface-variant": "#34343d",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-tertiary": "#003915",
+                        "on-tertiary-fixed": "#002109",
+                        "on-secondary-fixed": "#2c0051",
+                        "primary": "#c0c1ff",
+                        "on-secondary-container": "#d6a9ff",
+                        "inverse-on-surface": "#303038",
+                        "surface-container-low": "#1b1b23",
+                        "outline": "#908fa0",
+                        "inverse-primary": "#494bd6",
+                        "error-container": "#93000a",
+                        "secondary": "#ddb7ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "on-secondary": "#490080",
+                        "surface-container-high": "#292932",
+                        "tertiary": "#4ae176",
+                        "secondary-fixed": "#f0dbff",
+                        "on-primary": "#1000a9",
+                        "secondary-container": "#6f00be",
+                        "primary-fixed": "#e1e0ff",
+                        "surface-tint": "#c0c1ff",
+                        "surface-container-highest": "#34343d",
+                        "on-surface-variant": "#c7c4d7",
+                        "tertiary-container": "#00a74b",
+                        "surface-dim": "#13131b",
+                        "on-tertiary-container": "#003111",
+                        "error": "#ffb4ab",
+                        "primary-container": "#8083ff",
+                        "inverse-surface": "#e4e1ed",
+                        "tertiary-fixed-dim": "#4ae176",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "on-error": "#690005",
+                        "on-background": "#e4e1ed"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "40px",
+                        "md": "16px",
+                        "xs": "4px",
+                        "unit": "4px",
+                        "toolbar-height": "48px",
+                        "sm": "8px",
+                        "container-margin": "24px",
+                        "canvas-gutter": "32px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Outfit"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Outfit"],
+                        "headline-lg": ["Outfit"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-md": ["13px", { "lineHeight": "1", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "body-md": ["15px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-sm": ["11px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .dot-grid {
+            background-size: 24px 24px;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+        }
+        .glass-panel {
+            background: rgba(31, 31, 39, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .neon-glow-primary {
+            box-shadow: 0 0 20px rgba(192, 193, 255, 0.2);
+        }
+        .neon-glow-tertiary {
+            box-shadow: 0 0 20px rgba(74, 225, 118, 0.2);
+        }
+        
+        .sticky-yellow { background-color: #fef08a; color: #1f2937; }
+        .sticky-blue { background-color: #bfdbfe; color: #1e3a8a; }
+        .sticky-green { background-color: #bbf7d0; color: #14532d; }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface h-screen w-screen overflow-hidden font-body-md relative dot-grid cursor-crosshair">
+<!-- Canvas Nodes Layer -->
+<div class="absolute inset-0 z-0">
+<!-- Reference Image -->
+<img alt="Canvas Reference" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20 pointer-events-none mix-blend-screen scale-150" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYeAgCwDymxLbZ5bCFFvbJcefn_cl3yGxJWfTqNdtZpLpoYlffUcbtAiAxOF0UntOfg24Lx521-U7CXP7PGi9QcB51_sDkOLxIuzes677zdm4jKLlL_oNe-llBsjHPFnG34CF4G36LqYw-e5MHZ7DEzYF01xHFGor5ESzqczn4zqhZqARSQCwgs2BpPQnjagKCIbGeSXmZU0KEh9Lh_ih8ffAyx3I7hj_xS96ArJjf8OAXk_iPfIvZ4uzdkrUeRPq0-DvicNSQ9g8b"/>
+<!-- Node: Sticky Yellow -->
+<div class="absolute top-1/4 left-1/4 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 sticky-yellow p-4 rounded shadow-lg rotate-[-2deg] transition-transform hover:scale-105 cursor-grab">
+<p class="font-label-md font-bold mb-2">Project Vision: Spatial AI</p>
+<p class="font-label-sm opacity-80">Focus on seamless interactions and infinite canvas capabilities.</p>
+</div>
+<!-- Node: Sticky Blue -->
+<div class="absolute top-[35%] left-[60%] transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 sticky-blue p-4 rounded shadow-lg rotate-[3deg] transition-transform hover:scale-105 cursor-grab">
+<p class="font-label-md font-bold">Team Sync @ 10am</p>
+<p class="font-label-sm opacity-80 mt-2">Discuss component hierarchy.</p>
+</div>
+<!-- Node: Sticky Green -->
+<div class="absolute top-[60%] left-[30%] transform -translate-x-1/2 -translate-y-1/2 w-48 h-56 sticky-green p-4 rounded shadow-lg rotate-[-1deg] transition-transform hover:scale-105 cursor-grab">
+<p class="font-label-md font-bold mb-3">Tasks</p>
+<ul class="font-label-sm space-y-2 opacity-80 list-none">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px]">check_box</span> Design System</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px]">check_box_outline_blank</span> Toolbar UI</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px]">check_box_outline_blank</span> Animations</li>
+</ul>
+</div>
+<!-- Node: Shape Rectangle -->
+<div class="absolute top-[30%] left-[80%] transform -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-secondary-container text-on-secondary-container border border-secondary flex items-center justify-center rounded-lg shadow-lg cursor-grab">
+<p class="font-label-md font-bold">Frontend</p>
+</div>
+<!-- Node: Shape Circle -->
+<div class="absolute top-[70%] left-[75%] transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-tertiary-container text-on-tertiary-container border border-tertiary flex items-center justify-center rounded-full shadow-lg cursor-grab">
+<p class="font-label-md font-bold">Backend</p>
+</div>
+<!-- SVG Connections (Simulated) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: -1;">
+<path d="M 500 300 Q 800 400 1200 350" fill="none" stroke="rgba(255,255,255,0.2)" stroke-dasharray="5,5" stroke-width="2"></path>
+<path d="M 600 600 C 800 600, 900 800, 1100 750" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"></path>
+<!-- Neon Ink Stroke -->
+<path d="M 200 600 Q 300 500 400 700 T 600 650" fill="none" stroke="#ff00ff" stroke-linecap="round" stroke-width="4" style="filter: drop-shadow(0 0 8px rgba(255,0,255,0.8));"></path>
+</svg>
+</div>
+<!-- UI Overlay Layer: TopNavBar -->
+<header class="fixed top-0 left-0 w-full z-[500] flex justify-between items-center px-lg py-md bg-transparent">
+<!-- Brand & Nav Links -->
+<div class="flex items-center gap-lg">
+<div class="font-headline-md font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">widgets</span>
+                Canvio
+            </div>
+<nav class="flex items-center gap-md">
+<!-- Active Item Example -->
+<button class="text-on-surface-variant font-body-md hover:bg-white/10 transition-colors px-3 py-1.5 rounded-md scale-95 active:scale-90 duration-200">Export</button>
+</nav>
+</div>
+<!-- Center: AI Navigator Pill -->
+<div class="absolute left-1/2 transform -translate-x-1/2">
+<button class="glass-panel text-primary font-label-md px-4 py-2 rounded-full flex items-center gap-2 neon-glow-primary hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined text-[18px]">magic_button</span>
+                ✨ AI Navigator (Ctrl+K)
+            </button>
+</div>
+<!-- Trailing Actions & Profile -->
+<div class="flex items-center gap-md">
+<div class="flex gap-2">
+<button class="text-on-surface-variant p-2 rounded-full hover:bg-white/10 transition-colors scale-95 active:scale-90 duration-200" title="Undo">
+<span class="material-symbols-outlined">undo</span>
+</button>
+<button class="text-on-surface-variant p-2 rounded-full hover:bg-white/10 transition-colors scale-95 active:scale-90 duration-200" title="Redo">
+<span class="material-symbols-outlined">redo</span>
+</button>
+</div>
+<div class="w-px h-6 bg-white/10 mx-2"></div>
+<button class="text-primary p-2 rounded-full hover:bg-white/10 transition-colors scale-95 active:scale-90 duration-200 bg-primary/10">
+<span class="material-symbols-outlined">smart_toy</span>
+</button>
+<!-- Multiplayer Stack -->
+<div class="flex items-center -space-x-2 ml-4">
+<img class="w-8 h-8 rounded-full border-2 border-surface-container-lowest object-cover z-30" data-alt="A small circular avatar of a professional designer wearing glasses, neutral background, studio lighting, high resolution." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2jfuIHk3tr79zwluz3AXhVBl7piXklkgKq6Pa8YdHKPB9_YwnDQ3n-Zg_X-baSqogpO7yHp-fnDvcpncFuWDidb7ZuTZe97BhNgUV2zjyZ4pMJLwxO9YelSsuIg6dCql1A-xYfCHbCmhguzjPqKrDBDsUt8jnowPvJX007LbuPtWkkqPwFB8tvhZ_cD_95cYi8Ssr90YZLWqkakrIwSluQngLQepuD8x6enl-m0s1w6T1aDhGEaY6f-9Wx0IIa0zdO1aTtdZ9a9hj"/>
+<img class="w-8 h-8 rounded-full border-2 border-surface-container-lowest object-cover z-20" data-alt="A small circular avatar of a software developer, casual attire, dark background, sharp focus, high resolution." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaLnwIFImkSU6CsGCGN8pfzGUfYy-1QTNVyyhzDsRJMm_F9I3eJpPfzPknypHqfHcWeeRRzSZ6QkX6HX5ii36x9lMkrTQlvRtuRdy6wg7WN5C2XU3cUpTIJqmmIIqRV5nC62alVlbFuLK8gpumVisnJ17VfFdFQkST4aN-I1ZdYH6VHNMpXSLGmkQn0XUzVyNk0tDcMV4K4ps1x5NQW_hukArckcpNT5Prc0ZFmvFPVxMOx-QYZmOKj0MZfO99R4M4sGb1x1NgeVA1"/>
+<div class="w-8 h-8 rounded-full border-2 border-surface-container-lowest bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-sm z-10">
+                    +1
+                 </div>
+</div>
+</div>
+</header>
+<!-- Minimap (Bottom Right) -->
+<div class="fixed bottom-container-margin right-container-margin z-[400] w-48 h-32 glass-panel rounded-xl shadow-lg overflow-hidden border border-white/5">
+<div class="w-full h-full relative p-2">
+<div class="absolute inset-2 border border-primary/30 rounded bg-white/5"></div>
+<!-- Mock tiny nodes for minimap -->
+<div class="absolute top-[20%] left-[20%] w-3 h-3 bg-yellow-400 rounded-sm"></div>
+<div class="absolute top-[40%] left-[60%] w-2 h-2 bg-blue-400 rounded-sm"></div>
+<div class="absolute top-[60%] left-[30%] w-3 h-4 bg-green-400 rounded-sm"></div>
+</div>
+</div>
+<!-- UI Overlay Layer: SideNavBar (Repurposed as Pen Inspector above dock) -->
+<div class="fixed bottom-[100px] left-1/2 -translate-x-1/2 z-[400] flex flex-col items-center gap-xs">
+<div class="bg-surface-container/40 backdrop-blur-lg border border-white/5 shadow-md rounded-xl px-md py-xs flex flex-row items-center gap-md">
+<div class="flex gap-2">
+<button class="w-6 h-6 rounded-full bg-white border border-white/20 hover:scale-110 transition-transform"></button>
+<button class="w-6 h-6 rounded-full bg-red-500 border border-white/20 hover:scale-110 transition-transform"></button>
+<button class="w-6 h-6 rounded-full bg-yellow-400 border border-white/20 hover:scale-110 transition-transform"></button>
+<button class="w-6 h-6 rounded-full bg-green-500 border border-white/20 hover:scale-110 transition-transform"></button>
+<button class="w-6 h-6 rounded-full bg-cyan-400 border border-white/20 hover:scale-110 transition-transform"></button>
+<button class="w-6 h-6 rounded-full bg-blue-500 border border-white/20 hover:scale-110 transition-transform"></button>
+<button class="w-6 h-6 rounded-full bg-purple-500 border border-white/20 hover:scale-110 transition-transform ring-2 ring-primary ring-offset-2 ring-offset-transparent"></button>
+<button class="w-6 h-6 rounded-full bg-pink-500 border border-white/20 hover:scale-110 transition-transform"></button>
+</div>
+<div class="w-px h-4 bg-white/10 mx-2"></div>
+<button class="flex items-center gap-1 font-label-md text-tertiary hover:text-on-surface transition-transform duration-200">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                ✨ Ink-to-Shape ON
+            </button>
+</div>
+</div>
+<!-- UI Overlay Layer: BottomNavBar (Main Tool Dock) -->
+<nav class="fixed bottom-container-margin left-1/2 -translate-x-1/2 z-[500] flex items-center gap-xs px-md py-sm bg-surface-container/60 backdrop-blur-xl pill-shaped rounded-full border border-white/10 shadow-[0_0_20px_rgba(192,193,255,0.1)]">
+<button class="text-on-surface-variant p-2 hover:bg-white/5 transition-all duration-300 ease-out hover:-translate-y-1 rounded-full group" title="Select (V)">
+<span class="material-symbols-outlined group-hover:text-primary">near_me</span>
+</button>
+<button class="text-on-surface-variant p-2 hover:bg-white/5 transition-all duration-300 ease-out hover:-translate-y-1 rounded-full group" title="Pan (Space)">
+<span class="material-symbols-outlined group-hover:text-primary">pan_tool</span>
+</button>
+<!-- Active Draw Tool -->
+<button class="bg-primary/20 text-primary rounded-full p-2 shadow-[0_0_15px_rgba(192,193,255,0.3)] transition-all duration-300 ease-out hover:-translate-y-1" title="Draw (P)">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">draw</span>
+</button>
+<button class="text-on-surface-variant p-2 hover:bg-white/5 transition-all duration-300 ease-out hover:-translate-y-1 rounded-full group" title="Text (T)">
+<span class="material-symbols-outlined group-hover:text-primary">title</span>
+</button>
+<button class="text-on-surface-variant p-2 hover:bg-white/5 transition-all duration-300 ease-out hover:-translate-y-1 rounded-full group" title="Sticky (S)">
+<span class="material-symbols-outlined group-hover:text-primary">sticky_note_2</span>
+</button>
+<button class="text-on-surface-variant p-2 hover:bg-white/5 transition-all duration-300 ease-out hover:-translate-y-1 rounded-full group" title="Shape (R)">
+<span class="material-symbols-outlined group-hover:text-primary">category</span>
+</button>
+</nav>
+</body></html>

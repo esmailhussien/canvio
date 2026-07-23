@@ -1,0 +1,26 @@
+{
+  "name": "canvio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Operating System for Ideas — build ideas the way you build cities.",
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "smoke": "node scripts/smoke-check.mjs",
+    "e2e:smoke": "npm run build && node scripts/e2e-smoke.mjs",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "packageManager": "npm@11.9.0"
+}

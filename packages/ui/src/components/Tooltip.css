@@ -1,0 +1,73 @@
+.canvio-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.canvio-tooltip {
+  position: absolute;
+  background: var(--glass-bg, rgba(19, 19, 26, 0.95));
+  color: var(--text-primary, #ffffff);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.18));
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(99, 102, 241, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.canvio-tooltip-wrapper:hover .canvio-tooltip {
+  opacity: 1;
+}
+
+.canvio-tooltip-top {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px) scale(0.92);
+  margin-bottom: 8px;
+}
+
+.canvio-tooltip-wrapper:hover .canvio-tooltip-top {
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.canvio-tooltip-bottom {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.92);
+  margin-top: 8px;
+}
+
+.canvio-tooltip-wrapper:hover .canvio-tooltip-bottom {
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.canvio-tooltip-left {
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(-6px) scale(0.92);
+  margin-right: 8px;
+}
+
+.canvio-tooltip-wrapper:hover .canvio-tooltip-left {
+  transform: translateY(-50%) translateX(0) scale(1);
+}
+
+.canvio-tooltip-right {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(6px) scale(0.92);
+  margin-left: 8px;
+}
+
+.canvio-tooltip-wrapper:hover .canvio-tooltip-right {
+  transform: translateY(-50%) translateX(0) scale(1);
+}

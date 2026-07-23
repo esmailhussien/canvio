@@ -1,0 +1,37 @@
+.relation-group {
+  transition: opacity var(--transition-fast);
+}
+
+.relation-line-core,
+.relation-line-rim,
+.relation-line-casing,
+.relation-line-glow {
+  transition:
+    stroke-width var(--transition-fast),
+    stroke-opacity var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.relation-line-core {
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.1));
+}
+
+.relation-animated {
+  stroke-dasharray: 8 7;
+  animation: relationFlow 1.1s linear infinite;
+}
+
+.relation-group--hovered .relation-line-core,
+.relation-group--selected .relation-line-core {
+  filter: drop-shadow(0 0 7px var(--relation-active-soft));
+}
+
+.relation-group--eraser:hover .relation-line-core {
+  stroke: var(--accent-danger) !important;
+  stroke-width: 4px !important;
+}
+
+.relation-group--eraser:hover .relation-line-casing {
+  stroke: var(--relation-casing);
+  stroke-width: 10px;
+}

@@ -1,0 +1,44 @@
+services:
+  web:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+    environment:
+      - VITE_API_URL=http://localhost:4000
+      - VITE_WS_URL=ws://localhost:4001
+
+  server:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.server
+    ports:
+      - "4000:4000"
+      - "4001:4001"
+    environment:
+      - PORT=4000
+      - WS_PORT=4001
+      - CANVIO_DATA_DIR=/app/data
+      - DATABASE_URL=postgresql://canvio:canvio@postgres:5432/canvio
+    depends_on:
+      - postgres
+    volumes:
+      - canvio-data:/app/data
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=canvio
+      - POSTGRES_PASSWORD=canvio
+      - POSTGRES_DB=canvio
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+  canvio-data:

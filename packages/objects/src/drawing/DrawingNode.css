@@ -1,0 +1,25 @@
+.drawing-node {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.drawing-node svg {
+  display: block;
+  pointer-events: none;
+}
+
+.drawing-node path {
+  pointer-events: visiblePainted;
+}
+
+.drawing-node__hit-path {
+  cursor: pointer;
+}
+
+.drawing-node__ink-path,
+.drawing-node__arrow-ink {
+  transition: filter 0.16s ease;
+}

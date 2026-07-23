@@ -1,0 +1,31 @@
+{
+  "name": "@canvio/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"tsx watch src/index.ts\" \"tsx watch src/ws-server.ts\"",
+    "dev:api": "tsx watch src/index.ts",
+    "dev:ws": "tsx watch src/ws-server.ts",
+    "build": "tsc",
+    "start": "concurrently \"node dist/index.js\" \"node dist/ws-server.js\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/websocket": "^11.3.0",
+    "concurrently": "^9.1.2",
+    "dotenv": "^16.5.0",
+    "fastify": "^5.3.0",
+    "nanoid": "^5.1.0",
+    "ws": "^8.18.0",
+    "y-websocket": "^2.1.0",
+    "yjs": "^13.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
