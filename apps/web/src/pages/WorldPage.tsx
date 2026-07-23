@@ -77,6 +77,45 @@ export function WorldPage() {
     document.documentElement.setAttribute('data-theme', activeTheme);
   }, [activeTheme]);
 
+  const handleFitToWorld = () => {
+    const allNodes = Object.values(nodes);
+    if (allNodes.length > 0) {
+      fitViewportToNodes(allNodes, { maxZoom: 1.05, minZoom: 0.35, paddingX: 220, paddingY: 220 });
+    } else {
+      setViewport({ x: 0, y: 0, zoom: 1 });
+    }
+  };
+
+  const handleStartFromScratch = (reset = false) => {
+    if (reset && Object.keys(nodes).length > 0) {
+      const confirmed = window.confirm('Start with a blank canvas? Current canvas content will be cleared.');
+      if (!confirmed) return;
+      replaceWorld({
+        nodes: {},
+        relations: {},
+        viewport: { x: 0, y: 0, zoom: 1 },
+        appearance: { theme, canvasBackground },
+      });
+    }
+
+    const noteId = nanoid(10);
+    addNode({
+      id: noteId,
+      type: 'sticky',
+      position: { x: -120, y: -80 },
+      size: { width: 240, height: 150 },
+      rotation: 0,
+      zIndex: nextZIndex(),
+      locked: false,
+      data: { text: 'Untitled idea', color: 'yellow' },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    selectNode(noteId);
+    setActiveTool('select');
+    setViewport({ x: 0, y: 0, zoom: 1 });
+  };
+
   useEffect(() => {
     if (!worldId || !boardAppearanceLoadedRef.current) return;
     if (saveAppearanceTimerRef.current !== null) {
