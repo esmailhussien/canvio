@@ -134,44 +134,47 @@ export function NodeRenderer({ node }: Props) {
     }
   }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationSourcePort, relationTargetId, relationTargetPort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode]);
 
+  const rafIdRef = useRef<number | null>(null);
+
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging && dragStartRef.current) {
       const zoom = useCanvasStore.getState().viewport.zoom;
       const dx = (e.clientX - dragStartRef.current.x) / zoom;
       const dy = (e.clientY - dragStartRef.current.y) / zoom;
-
-      if (node.type === 'frame') {
-        const allNodes = useCanvasStore.getState().nodes;
-        const fx1 = node.position.x;
-        const fy1 = node.position.y;
-        const fx2 = node.position.x + node.size.width;
-        const fy2 = node.position.y + node.size.height;
-
-        // Move frame itself
-        updateNode(node.id, {
-          position: { x: node.position.x + dx, y: node.position.y + dy }
-        });
-
-        // Move all child nodes inside frame
-        Object.values(allNodes).forEach((child) => {
-          if (child.id === node.id || child.type === 'frame') return;
-          const cx = child.position.x + child.size.width / 2;
-          const cy = child.position.y + child.size.height / 2;
-          if (cx >= fx1 && cx <= fx2 && cy >= fy1 && cy <= fy2) {
-            updateNode(child.id, {
-              position: { x: child.position.x + dx, y: child.position.y + dy }
-            });
-          }
-        });
-      } else {
-        updateNode(node.id, {
-          position: {
-            x: node.position.x + dx,
-            y: node.position.y + dy
-          }
-        });
-      }
       dragStartRef.current = { x: e.clientX, y: e.clientY };
+
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = requestAnimationFrame(() => {
+        if (node.type === 'frame') {
+          const allNodes = useCanvasStore.getState().nodes;
+          const fx1 = node.position.x;
+          const fy1 = node.position.y;
+          const fx2 = node.position.x + node.size.width;
+          const fy2 = node.position.y + node.size.height;
+
+          updateNode(node.id, {
+            position: { x: node.position.x + dx, y: node.position.y + dy }
+          });
+
+          Object.values(allNodes).forEach((child) => {
+            if (child.id === node.id || child.type === 'frame') return;
+            const cx = child.position.x + child.size.width / 2;
+            const cy = child.position.y + child.size.height / 2;
+            if (cx >= fx1 && cx <= fx2 && cy >= fy1 && cy <= fy2) {
+              updateNode(child.id, {
+                position: { x: child.position.x + dx, y: child.position.y + dy }
+              });
+            }
+          });
+        } else {
+          updateNode(node.id, {
+            position: {
+              x: node.position.x + dx,
+              y: node.position.y + dy
+            }
+          });
+        }
+      });
     }
   }, [isDragging, node.id, node.position.x, node.position.y, node.size.width, node.size.height, node.type, updateNode]);
 

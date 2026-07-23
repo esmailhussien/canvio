@@ -28,6 +28,21 @@
 
 .export-menu__trigger-btn:hover {
   background: var(--bg-hover);
+}
+
+@media (max-width: 768px) {
+  .export-menu__trigger-btn {
+    padding: 0 8px;
+    height: 34px;
+    gap: 0;
+  }
+
+  .export-menu__trigger-btn > span:not(.material-symbols-outlined) {
+    display: none;
+  }
+}
+
+.export-menu__trigger-btn:hover {
   color: var(--accent-primary);
 }
 

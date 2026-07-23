@@ -30,3 +30,17 @@
 .share-btn:active {
   transform: scale(0.97);
 }
+
+@media (max-width: 768px) {
+  .share-btn {
+    height: 34px;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 11px;
+    gap: 0;
+  }
+
+  .share-btn > span:not(.material-symbols-outlined) {
+    display: none;
+  }
+}

@@ -324,23 +324,28 @@ export function useCollaboration(worldId: string) {
       handleSelectionChange
     );
 
+    let saveTimeout: number | null = null;
     const saveLocalState = () => {
-      try {
-        const store = useCanvasStore.getState();
-        localStorage.setItem(storageKey, JSON.stringify({
-          nodes: store.nodes,
-          relations: store.relations,
-          viewport: store.viewport,
-          savedAt: Date.now(),
-        }));
-      } catch (err) {
-        // Ignore storage quota errors
-      }
+      if (saveTimeout !== null) window.clearTimeout(saveTimeout);
+      saveTimeout = window.setTimeout(() => {
+        try {
+          const store = useCanvasStore.getState();
+          localStorage.setItem(storageKey, JSON.stringify({
+            nodes: store.nodes,
+            relations: store.relations,
+            viewport: store.viewport,
+            savedAt: Date.now(),
+          }));
+        } catch (err) {
+          // Ignore storage quota errors
+        }
+      }, 400);
     };
 
     const unsubscribeLocalSave = useCanvasStore.subscribe(saveLocalState);
 
     return () => {
+      if (saveTimeout !== null) window.clearTimeout(saveTimeout);
       unsubscribeNodes();
       unsubscribeRelations();
       unsubscribeSelection();
