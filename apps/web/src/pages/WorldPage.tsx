@@ -55,8 +55,10 @@ export function WorldPage() {
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isCanvioMenuOpen, setIsCanvioMenuOpen] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [autoShapeEnabled, setAutoShapeEnabled] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const boardAppearanceLoadedRef = useRef(false);
   const saveAppearanceTimerRef = useRef<number | null>(null);
 
@@ -133,18 +135,22 @@ export function WorldPage() {
     };
   }, [worldId, theme, canvasBackground]);
 
-  // Close Canvio menu when clicking anywhere outside
+  // Close menus when clicking anywhere outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setIsCanvioMenuOpen(false);
       }
+      if (exportMenuRef.current && !exportMenuRef.current.contains(target)) {
+        setIsExportMenuOpen(false);
+      }
     };
-    if (isCanvioMenuOpen) {
+    if (isCanvioMenuOpen || isExportMenuOpen) {
       window.addEventListener('pointerdown', handleClickOutside);
     }
     return () => window.removeEventListener('pointerdown', handleClickOutside);
-  }, [isCanvioMenuOpen]);
+  }, [isCanvioMenuOpen, isExportMenuOpen]);
 
   // Ctrl+K shortcut for Spatial AI Navigator
   useEffect(() => {
@@ -198,7 +204,10 @@ export function WorldPage() {
         <div className="world-header__left" ref={menuRef}>
           <button
             className="canvio-brand-btn"
-            onClick={() => setIsCanvioMenuOpen((prev) => !prev)}
+            onClick={() => {
+              setIsCanvioMenuOpen((prev) => !prev);
+              setIsExportMenuOpen(false);
+            }}
             aria-label="Canvio Workspace Menu"
           >
             <CanvioLogoIcon size={24} />
@@ -272,7 +281,16 @@ export function WorldPage() {
             </div>
           )}
 
-          <ExportMenu worldId={worldId || ''} />
+          <ExportMenu
+            worldId={worldId || ''}
+            isOpen={isExportMenuOpen}
+            onToggle={() => {
+              setIsExportMenuOpen((prev) => !prev);
+              setIsCanvioMenuOpen(false);
+            }}
+            onClose={() => setIsExportMenuOpen(false)}
+            containerRef={exportMenuRef}
+          />
         </div>
 
         {/* Center: ✨ AI Navigator (Ctrl+K) */}

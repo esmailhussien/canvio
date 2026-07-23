@@ -8,6 +8,7 @@
   display: flex;
   flex-direction: column;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  touch-action: none;
 }
 
 .sticky-note--selected {
@@ -28,6 +29,34 @@
   box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.05);
 }
 
+.sticky-note__drag-handle {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 42px;
+  height: 32px;
+  border-radius: 16px;
+  cursor: grab;
+  touch-action: none;
+  z-index: 3;
+  opacity: 0.42;
+  background:
+    radial-gradient(circle, rgba(26, 26, 26, 0.54) 1.5px, transparent 1.8px) 10px 10px / 8px 8px,
+    rgba(26, 26, 26, 0.08);
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  transition: opacity 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+.sticky-note__drag-handle:hover,
+.sticky-note--selected .sticky-note__drag-handle {
+  opacity: 0.86;
+}
+
+.sticky-note__drag-handle:active {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
 .sticky-note__text, .sticky-note__textarea {
   flex: 1;
   width: 100%;
@@ -45,8 +74,13 @@
   background: transparent;
   border: none;
   resize: none;
-  padding: 0;
+  padding: 0 42px 0 0;
   margin: 0;
+  box-sizing: border-box;
+}
+
+.sticky-note__textarea {
+  touch-action: manipulation;
 }
 
 .sticky-note__placeholder {

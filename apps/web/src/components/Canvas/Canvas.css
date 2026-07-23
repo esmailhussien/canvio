@@ -4,6 +4,8 @@
   position: relative;
   overflow: hidden;
   background: var(--bg-canvas);
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .canvas--relation-ready {

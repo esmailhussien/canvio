@@ -6,12 +6,16 @@ import './ExportMenu.css';
 
 interface ExportMenuProps {
   worldId: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function ExportMenu({ worldId }: ExportMenuProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }: ExportMenuProps) {
+  const localRef = useRef<HTMLDivElement | null>(null);
+  const refToUse = containerRef || localRef;
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [exporting, setExporting] = useState<'png' | 'json' | 'import' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -24,19 +28,6 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
   const nextZIndex = useCanvasStore((s) => s.nextZIndex);
   const viewport = useCanvasStore((s) => s.viewport);
   const replaceWorld = useCanvasStore((s) => s.replaceWorld);
-
-  // Close Export menu on click outside anywhere
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
 
   useEffect(() => {
     if (!exportStatus && !exportError) return;
@@ -51,7 +42,6 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
     const preset = PRESET_TEMPLATES.find((p) => p.id === presetId);
     if (!preset) return;
 
-    // Spawn around center of current viewport
     const centerX = -viewport.x;
     const centerY = -viewport.y;
 
@@ -60,7 +50,7 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
     newNodes.forEach((n) => addNode(n));
     newRelations.forEach((r) => addRelation(r));
     setShowPresets(false);
-    setIsOpen(false);
+    onClose();
   };
 
   const handleExportPNG = async () => {
@@ -70,7 +60,7 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
       setExportStatus(null);
       await exportAsPNG(worldId);
       setExportStatus('PNG export ready');
-      setIsOpen(false);
+      onClose();
     } catch {
       setExportError('PNG export failed');
     } finally {
@@ -85,7 +75,7 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
       setExportStatus(null);
       exportAsJSON(nodes, relations, worldId);
       setExportStatus('JSON backup ready');
-      setIsOpen(false);
+      onClose();
     } catch {
       setExportError('JSON export failed');
     } finally {
@@ -105,7 +95,7 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
       replaceWorld(backup);
       setExportStatus(`Restored ${Object.keys(backup.nodes).length} nodes`);
       setShowPresets(false);
-      setIsOpen(false);
+      onClose();
     } catch {
       setExportError('Import failed: choose a Canvio JSON backup');
     } finally {
@@ -115,10 +105,10 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
   };
 
   return (
-    <div className="export-menu-container" ref={containerRef}>
+    <div className="export-menu-container" ref={refToUse}>
       <button
         className="export-menu__trigger-btn"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={onToggle}
         title="Export & Import Options"
       >
         <span className="material-symbols-outlined text-sm">ios_share</span>
@@ -132,76 +122,72 @@ export function ExportMenu({ worldId }: ExportMenuProps) {
       )}
 
       {isOpen && (
-        <div className="export-menu__popover export-menu-enter">
-          <div className="export-menu__header">
-            <span>Workspace Export & Backup</span>
-          </div>
+        <div className="canvio-dropdown-menu export-menu__popover">
+          <button
+            className="canvio-menu-item"
+            onClick={() => setShowPresets(!showPresets)}
+          >
+            <span className="material-symbols-outlined text-sm">auto_awesome</span>
+            <span>Spawn Diagram Preset</span>
+            <span className="material-symbols-outlined text-xs" style={{ marginLeft: 'auto' }}>
+              {showPresets ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
 
-          <div className="export-menu__section">
-            <span className="export-menu__label">Templates & Presets</span>
-            <button
-              className="export-menu__action-btn primary"
-              onClick={() => setShowPresets(!showPresets)}
-            >
-              ✨ Spawn Diagram Preset
-            </button>
+          {showPresets && (
+            <div className="export-menu__preset-list">
+              {PRESET_TEMPLATES.map((p) => (
+                <button
+                  key={p.id}
+                  className="export-menu__preset-item"
+                  onClick={() => handleSpawnPreset(p.id)}
+                >
+                  <span className="export-menu__preset-icon">{p.icon}</span>
+                  <div className="export-menu__preset-info">
+                    <div className="export-menu__preset-title">{p.name}</div>
+                    <div className="export-menu__preset-desc">{p.description}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
 
-            {showPresets && (
-              <div className="export-menu__preset-list">
-                {PRESET_TEMPLATES.map((p) => (
-                  <button
-                    key={p.id}
-                    className="export-menu__preset-item"
-                    onClick={() => handleSpawnPreset(p.id)}
-                  >
-                    <span className="export-menu__preset-icon">{p.icon}</span>
-                    <div className="export-menu__preset-info">
-                      <div className="export-menu__preset-title">{p.name}</div>
-                      <div className="export-menu__preset-desc">{p.description}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <div className="canvio-menu-divider" />
 
-          <div className="export-menu__divider" />
+          <button
+            className="canvio-menu-item"
+            disabled={exporting !== null}
+            onClick={handleExportPNG}
+          >
+            <span className="material-symbols-outlined text-sm">image</span>
+            <span>{exporting === 'png' ? 'Exporting PNG...' : 'Export Image (PNG)'}</span>
+          </button>
 
-          <div className="export-menu__section">
-            <span className="export-menu__label">Export Canvas</span>
-            {exportError && <span className="export-menu__message export-menu__message--error">{exportError}</span>}
-            {exportStatus && <span className="export-menu__message">{exportStatus}</span>}
-            <button
-              className="export-menu__action-btn"
-              disabled={exporting !== null}
-              onClick={handleExportPNG}
-            >
-              {exporting === 'png' ? 'Exporting PNG...' : '🖼️ Export Image (PNG)'}
-            </button>
+          <button
+            className="canvio-menu-item"
+            disabled={exporting !== null}
+            onClick={handleExportJSON}
+          >
+            <span className="material-symbols-outlined text-sm">code</span>
+            <span>{exporting === 'json' ? 'Exporting JSON...' : 'Export Backup (JSON)'}</span>
+          </button>
 
-            <button
-              className="export-menu__action-btn"
-              disabled={exporting !== null}
-              onClick={handleExportJSON}
-            >
-              {exporting === 'json' ? 'Exporting JSON...' : '📄 Export Backup (JSON)'}
-            </button>
+          <button
+            className="canvio-menu-item"
+            disabled={exporting !== null}
+            onClick={() => importInputRef.current?.click()}
+          >
+            <span className="material-symbols-outlined text-sm">history_toggle_off</span>
+            <span>{exporting === 'import' ? 'Restoring Backup...' : 'Restore Backup (JSON)'}</span>
+          </button>
 
-            <button
-              className="export-menu__action-btn"
-              disabled={exporting !== null}
-              onClick={() => importInputRef.current?.click()}
-            >
-              {exporting === 'import' ? 'Restoring Backup...' : '↩ Restore Backup (JSON)'}
-            </button>
-            <input
-              ref={importInputRef}
-              className="export-menu__file-input"
-              type="file"
-              accept="application/json,.json"
-              onChange={(event) => void handleImportJSON(event.currentTarget.files?.[0] || null)}
-            />
-          </div>
+          <input
+            ref={importInputRef}
+            className="export-menu__file-input"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => void handleImportJSON(event.currentTarget.files?.[0] || null)}
+          />
         </div>
       )}
     </div>

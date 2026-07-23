@@ -75,11 +75,12 @@ export function NodeRenderer({ node }: Props) {
   }, [addRelation, node.id, relationSourceId, relationSourcePort, relations, selectRelation, setRelationSourceId]);
 
   // Dragging handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     // If clicking a resize handle or connection port, do not start node dragging
-    if ((e.target as HTMLElement).classList.contains('resize-handle') || (e.target as HTMLElement).classList.contains('node-port')) return;
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('resize-handle') || target.classList.contains('node-port')) return;
 
-    if (activeTool === 'relation' && node.type === 'map' && (e.target as HTMLElement).closest('.leaflet-marker-icon')) {
+    if (activeTool === 'relation' && node.type === 'map' && target.closest('.leaflet-marker-icon')) {
       return;
     }
 
@@ -87,7 +88,7 @@ export function NodeRenderer({ node }: Props) {
     // the wrapper so invisible drawing boxes do not block nodes underneath.
     if (
       node.type === 'drawing' &&
-      !(e.target as HTMLElement).closest('.drawing-node__hit-path, .drawing-node__ink-path, .drawing-node__arrow-ink')
+      !target.closest('.drawing-node__hit-path, .drawing-node__ink-path, .drawing-node__arrow-ink')
     ) {
       return;
     }
@@ -113,22 +114,25 @@ export function NodeRenderer({ node }: Props) {
     }
 
     // If clicking an input or textarea, let the element handle focus and selection
-    const targetTag = (e.target as HTMLElement).tagName.toLowerCase();
-    if (targetTag === 'textarea' || targetTag === 'input') {
+    const isDragHandle = Boolean(target.closest('[data-node-drag-handle]'));
+    const targetTag = target.tagName.toLowerCase();
+    if ((targetTag === 'textarea' || targetTag === 'input') && !isDragHandle) {
       selectNode(node.id, e.shiftKey);
       return;
     }
     
     // If clicking inside an interactive map, do not start node dragging
-    if (node.type === 'map' && node.data?.interactive && (e.target as HTMLElement).closest('.leaflet-container')) {
+    if (node.type === 'map' && node.data?.interactive && target.closest('.leaflet-container')) {
       // Still select the node on click
       selectNode(node.id, e.shiftKey);
       return;
     }
     
     e.stopPropagation();
+    e.preventDefault();
     selectNode(node.id, e.shiftKey);
     if (!node.locked) {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
       setIsDragging(true);
       dragStartRef.current = { x: e.clientX, y: e.clientY };
     }
@@ -136,7 +140,7 @@ export function NodeRenderer({ node }: Props) {
 
   const rafIdRef = useRef<number | null>(null);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handlePointerMove = useCallback((e: PointerEvent) => {
     if (isDragging && dragStartRef.current) {
       const zoom = useCanvasStore.getState().viewport.zoom;
       const dx = (e.clientX - dragStartRef.current.x) / zoom;
@@ -178,15 +182,16 @@ export function NodeRenderer({ node }: Props) {
     }
   }, [isDragging, node.id, node.position.x, node.position.y, node.size.width, node.size.height, node.type, updateNode]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsDragging(false);
     dragStartRef.current = null;
   }, []);
 
   // Resizing handlers
-  const handleResizeStart = useCallback((dir: 'tl' | 'tr' | 'bl' | 'br') => (e: React.MouseEvent) => {
+  const handleResizeStart = useCallback((dir: 'tl' | 'tr' | 'bl' | 'br') => (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     setResizeDir(dir);
     resizeStartRef.current = {
       x: e.clientX,
@@ -198,7 +203,7 @@ export function NodeRenderer({ node }: Props) {
     };
   }, [node.size.width, node.size.height, node.position.x, node.position.y]);
 
-  const handleResizeMove = useCallback((e: MouseEvent) => {
+  const handleResizeMove = useCallback((e: PointerEvent) => {
     if (resizeDir && resizeStartRef.current) {
       const zoom = useCanvasStore.getState().viewport.zoom;
       const dx = (e.clientX - resizeStartRef.current.x) / zoom;
@@ -255,35 +260,27 @@ export function NodeRenderer({ node }: Props) {
 
   useEffect(() => {
     if (isDragging) {
-      window.addEventListener('pointermove', handleMouseMove);
-      window.addEventListener('pointerup', handleMouseUp);
-      window.addEventListener('pointercancel', handleMouseUp);
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
     }
     return () => {
-      window.removeEventListener('pointermove', handleMouseMove);
-      window.removeEventListener('pointerup', handleMouseUp);
-      window.removeEventListener('pointercancel', handleMouseUp);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   useEffect(() => {
     if (resizeDir) {
       window.addEventListener('pointermove', handleResizeMove);
       window.addEventListener('pointerup', handleResizeEnd);
       window.addEventListener('pointercancel', handleResizeEnd);
-      window.addEventListener('mousemove', handleResizeMove);
-      window.addEventListener('mouseup', handleResizeEnd);
     }
     return () => {
       window.removeEventListener('pointermove', handleResizeMove);
       window.removeEventListener('pointerup', handleResizeEnd);
       window.removeEventListener('pointercancel', handleResizeEnd);
-      window.removeEventListener('mousemove', handleResizeMove);
-      window.removeEventListener('mouseup', handleResizeEnd);
     };
   }, [resizeDir, handleResizeMove, handleResizeEnd]);
 
@@ -308,7 +305,7 @@ export function NodeRenderer({ node }: Props) {
     setRelationTarget(node.id, markerPort);
   }, [activeTool, node.id, relationSourceId, relationSourcePort, relationTargetId, setRelationTarget]);
 
-  const handlePortStart = (portPos: 'top' | 'right' | 'bottom' | 'left') => (e: React.MouseEvent) => {
+  const handlePortStart = (portPos: 'top' | 'right' | 'bottom' | 'left') => (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
     if (!relationSourceId) {
@@ -351,8 +348,7 @@ export function NodeRenderer({ node }: Props) {
         height: node.size.height,
         zIndex: node.zIndex,
       }}
-      onMouseDown={handleMouseDown}
-      onPointerDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
       onMouseEnter={handleNodeEnter}
       onMouseMove={updateRelationTargetForNode}
       onMouseLeave={handleNodeLeave}
@@ -382,10 +378,10 @@ export function NodeRenderer({ node }: Props) {
       {/* Interactive Connection Ports (rendered on hover, selection, or relation mode) */}
       {(isHovered || isSelected || activeTool === 'relation') && (
         <>
-          <div className={`node-port top ${relationSourcePort === 'top' || (isRelationTarget && relationTargetPort === 'top') ? 'active' : ''}`} title="Top connection" onMouseEnter={handlePortEnter('top')} onMouseDown={handlePortStart('top')} />
-          <div className={`node-port right ${relationSourcePort === 'right' || (isRelationTarget && relationTargetPort === 'right') ? 'active' : ''}`} title="Right connection" onMouseEnter={handlePortEnter('right')} onMouseDown={handlePortStart('right')} />
-          <div className={`node-port bottom ${relationSourcePort === 'bottom' || (isRelationTarget && relationTargetPort === 'bottom') ? 'active' : ''}`} title="Bottom connection" onMouseEnter={handlePortEnter('bottom')} onMouseDown={handlePortStart('bottom')} />
-          <div className={`node-port left ${relationSourcePort === 'left' || (isRelationTarget && relationTargetPort === 'left') ? 'active' : ''}`} title="Left connection" onMouseEnter={handlePortEnter('left')} onMouseDown={handlePortStart('left')} />
+          <div className={`node-port top ${relationSourcePort === 'top' || (isRelationTarget && relationTargetPort === 'top') ? 'active' : ''}`} title="Top connection" onMouseEnter={handlePortEnter('top')} onPointerDown={handlePortStart('top')} />
+          <div className={`node-port right ${relationSourcePort === 'right' || (isRelationTarget && relationTargetPort === 'right') ? 'active' : ''}`} title="Right connection" onMouseEnter={handlePortEnter('right')} onPointerDown={handlePortStart('right')} />
+          <div className={`node-port bottom ${relationSourcePort === 'bottom' || (isRelationTarget && relationTargetPort === 'bottom') ? 'active' : ''}`} title="Bottom connection" onMouseEnter={handlePortEnter('bottom')} onPointerDown={handlePortStart('bottom')} />
+          <div className={`node-port left ${relationSourcePort === 'left' || (isRelationTarget && relationTargetPort === 'left') ? 'active' : ''}`} title="Left connection" onMouseEnter={handlePortEnter('left')} onPointerDown={handlePortStart('left')} />
         </>
       )}
 
@@ -394,10 +390,10 @@ export function NodeRenderer({ node }: Props) {
 
       {isSelected && !node.locked && (
         <>
-          <div className="resize-handle tl" onMouseDown={handleResizeStart('tl')} />
-          <div className="resize-handle tr" onMouseDown={handleResizeStart('tr')} />
-          <div className="resize-handle bl" onMouseDown={handleResizeStart('bl')} />
-          <div className="resize-handle br" onMouseDown={handleResizeStart('br')} />
+          <div className="resize-handle tl" onPointerDown={handleResizeStart('tl')} />
+          <div className="resize-handle tr" onPointerDown={handleResizeStart('tr')} />
+          <div className="resize-handle bl" onPointerDown={handleResizeStart('bl')} />
+          <div className="resize-handle br" onPointerDown={handleResizeStart('br')} />
         </>
       )}
     </div>

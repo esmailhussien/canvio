@@ -80,6 +80,7 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
       style={{ transform: `rotate(${baseRotation}deg)` }}
       onDoubleClick={handleDoubleClick}
     >
+      <div className="sticky-note__drag-handle" data-node-drag-handle title="Move note" aria-hidden="true" />
       <div className="sticky-note__fold"></div>
       {isEditing ? (
         <textarea
