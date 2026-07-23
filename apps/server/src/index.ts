@@ -10,7 +10,22 @@ const app = Fastify({
 });
 
 app.register(cors, {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: true,
+});
+
+app.get('/', async () => {
+  return {
+    name: 'Canvio API',
+    status: 'online',
+    version: '1.0.0',
+    endpoints: {
+      boards: '/api/boards',
+    },
+  };
+});
+
+app.get('/health', async () => {
+  return { status: 'healthy', timestamp: new Date().toISOString() };
 });
 
 app.register(boardRoutes, { prefix: '/api/boards' });
