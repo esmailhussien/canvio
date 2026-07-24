@@ -131,6 +131,8 @@ export function NodeInspector({ node }: NodeInspectorProps) {
       className="node-inspector canvio-toolbar-enter"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
     >
       {/* Color picker for sticky notes */}
       {isSticky && (

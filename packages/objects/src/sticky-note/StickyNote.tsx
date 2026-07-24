@@ -32,43 +32,29 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     color: typeof rawData.color === 'string' ? rawData.color : 'yellow',
     fontSize: typeof rawData.fontSize === 'number' ? rawData.fontSize : 16,
   };
-  const [isEditing, setIsEditing] = useState(false);
-  const [text, setText] = useState(data.text || '');
   const textRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (!data.text && Date.now() - node.createdAt < 1000) {
-      setIsEditing(true);
-    }
-  }, [data.text, node.createdAt]);
-
-  // Sync local state when prop changes (e.g., from remote Yjs updates)
-  useEffect(() => {
-    if (!isEditing) {
-      setText(data.text || '');
-    }
-  }, [data.text, isEditing]);
 
   const baseRotation = useMemo(() => getRotationOffset(node.id), [node.id]);
 
   useEffect(() => {
-    if (isEditing && textRef.current) {
+    if (!data.text && Date.now() - node.createdAt < 1000 && textRef.current) {
       textRef.current.focus();
-      const len = textRef.current.value.length;
-      textRef.current.setSelectionRange(len, len);
     }
-  }, [isEditing]);
+  }, [data.text, node.createdAt]);
 
-  const handleStartEdit = (e: React.SyntheticEvent) => {
-    e.stopPropagation();
-    setIsEditing(true);
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newText = e.target.value;
+    if (onChange) {
+      onChange(node.id, { data: { ...data, text: newText } });
+    }
   };
 
-  const handleBlur = () => {
-    setIsEditing(false);
-    if (onChange) {
-      onChange(node.id, { data: { ...data, text } });
-    }
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -81,35 +67,21 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     <div 
       className={`sticky-note ${colorClass} ${selected ? 'sticky-note--selected' : ''}`}
       style={{ transform: `rotate(${baseRotation}deg)` }}
-      onClick={handleStartEdit}
+      onDoubleClick={() => textRef.current?.focus()}
+      onClick={() => textRef.current?.focus()}
     >
       <div className="sticky-note__fold"></div>
-      {isEditing ? (
-        <textarea
-          ref={textRef}
-          className="sticky-note__textarea"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: `${data.fontSize || 16}px` }}
-          placeholder="Type something..."
-        />
-      ) : (
-        <div
-          className="sticky-note__text"
-          style={{ fontSize: `${data.fontSize || 16}px` }}
-          onClick={handleStartEdit}
-        >
-          {data.text || ''}
-        </div>
-      )}
-      
-      {!isEditing && !data.text && (
-        <div className="sticky-note__placeholder">Type something...</div>
-      )}
+      <textarea
+        ref={textRef}
+        className="sticky-note__textarea"
+        value={data.text || ''}
+        onChange={handleTextChange}
+        onKeyDown={handleKeyDown}
+        onPointerDown={handlePointerDown}
+        onMouseDown={handleMouseDown}
+        style={{ fontSize: `${data.fontSize || 16}px` }}
+        placeholder="Type something..."
+      />
     </div>
   );
 };

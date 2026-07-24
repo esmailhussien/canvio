@@ -14,7 +14,7 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
     id: 'mindmap',
     name: 'Mind Map',
     description: 'Central concept connected to 4 radial topic nodes',
-    icon: '💡',
+    icon: 'hub',
     create: (cx, cy, nextZ) => {
       const mainId = nanoid(10);
       const branch1Id = nanoid(10);
@@ -101,7 +101,7 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
     id: 'flowchart',
     name: 'Flowchart Process',
     description: 'Sequential process diagram with start, decision, and step nodes',
-    icon: '⚡',
+    icon: 'schema',
     create: (cx, cy, nextZ) => {
       const startId = nanoid(10);
       const step1Id = nanoid(10);
@@ -173,7 +173,7 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
     id: 'cityplan',
     name: 'Location Planning Map',
     description: 'Interactive map board surrounded by planning cards',
-    icon: '🗺️',
+    icon: 'map',
     create: (cx, cy, nextZ) => {
       const mapId = nanoid(10);
       const dist1Id = nanoid(10);

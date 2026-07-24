@@ -142,7 +142,7 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
                   className="export-menu__preset-item"
                   onClick={() => handleSpawnPreset(p.id)}
                 >
-                  <span className="export-menu__preset-icon">{p.icon}</span>
+                  <span className="material-symbols-outlined text-sm">{p.icon}</span>
                   <div className="export-menu__preset-info">
                     <div className="export-menu__preset-title">{p.name}</div>
                     <div className="export-menu__preset-desc">{p.description}</div>

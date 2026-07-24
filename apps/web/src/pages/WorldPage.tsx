@@ -56,6 +56,7 @@ export function WorldPage() {
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isCanvioMenuOpen, setIsCanvioMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isStarterDismissed, setIsStarterDismissed] = useState(false);
   const [autoShapeEnabled, setAutoShapeEnabled] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -89,31 +90,18 @@ export function WorldPage() {
   };
 
   const handleStartFromScratch = (reset = false) => {
+    setIsStarterDismissed(true);
     if (reset && Object.keys(nodes).length > 0) {
       const confirmed = window.confirm('Start with a blank canvas? Current canvas content will be cleared.');
       if (!confirmed) return;
-      replaceWorld({
-        nodes: {},
-        relations: {},
-        viewport: { x: 0, y: 0, zoom: 1 },
-        appearance: { theme, canvasBackground },
-      });
     }
 
-    const noteId = nanoid(10);
-    addNode({
-      id: noteId,
-      type: 'sticky',
-      position: { x: -120, y: -80 },
-      size: { width: 240, height: 150 },
-      rotation: 0,
-      zIndex: nextZIndex(),
-      locked: false,
-      data: { text: 'Untitled idea', color: 'yellow' },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+    replaceWorld({
+      nodes: {},
+      relations: {},
+      viewport: { x: 0, y: 0, zoom: 1 },
+      appearance: { theme, canvasBackground },
     });
-    selectNode(noteId);
     setActiveTool('select');
     setViewport({ x: 0, y: 0, zoom: 1 });
   };
@@ -171,18 +159,30 @@ export function WorldPage() {
     <div className="world-page" data-tool={activeTool} style={worldStyle}>
       <Canvas worldId={worldId || ''} autoShapeEnabled={autoShapeEnabled} />
 
-      {Object.keys(nodes).length === 0 && (
+      {Object.keys(nodes).length === 0 && !isStarterDismissed && (
         <div className="world-page__empty-launcher" aria-label="Start canvas">
           <div className="world-page__starter-panel">
             <button className="world-page__starter-card primary" onClick={() => handleStartFromScratch(false)}>
               <IconSticky size={22} />
               <span>Start from scratch</span>
             </button>
-            <button className="world-page__starter-card" onClick={() => setIsTemplateOpen(true)}>
+            <button
+              className="world-page__starter-card"
+              onClick={() => {
+                setIsTemplateOpen(true);
+                setIsStarterDismissed(true);
+              }}
+            >
               <IconMap size={22} />
               <span>Choose a model</span>
             </button>
-            <button className="world-page__starter-card" onClick={() => setIsAIOpen(true)}>
+            <button
+              className="world-page__starter-card"
+              onClick={() => {
+                setIsAIOpen(true);
+                setIsStarterDismissed(true);
+              }}
+            >
               <span aria-hidden="true">✨</span>
               <span>Ask AI</span>
             </button>
