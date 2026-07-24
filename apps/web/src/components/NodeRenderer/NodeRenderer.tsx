@@ -114,9 +114,8 @@ export function NodeRenderer({ node }: Props) {
     }
 
     // If clicking an input or textarea, let the element handle focus and selection
-    const isDragHandle = Boolean(target.closest('[data-node-drag-handle]'));
     const targetTag = target.tagName.toLowerCase();
-    if ((targetTag === 'textarea' || targetTag === 'input') && !isDragHandle) {
+    if (targetTag === 'textarea' || targetTag === 'input' || target.closest('.sticky-note__textarea')) {
       selectNode(node.id, e.shiftKey);
       return;
     }

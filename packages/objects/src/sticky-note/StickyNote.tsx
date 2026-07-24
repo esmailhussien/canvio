@@ -54,10 +54,13 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
   useEffect(() => {
     if (isEditing && textRef.current) {
       textRef.current.focus();
+      const len = textRef.current.value.length;
+      textRef.current.setSelectionRange(len, len);
     }
   }, [isEditing]);
 
-  const handleDoubleClick = () => {
+  const handleStartEdit = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
     setIsEditing(true);
   };
 
@@ -78,9 +81,8 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     <div 
       className={`sticky-note ${colorClass} ${selected ? 'sticky-note--selected' : ''}`}
       style={{ transform: `rotate(${baseRotation}deg)` }}
-      onDoubleClick={handleDoubleClick}
+      onClick={handleStartEdit}
     >
-      <div className="sticky-note__drag-handle" data-node-drag-handle title="Move note" aria-hidden="true" />
       <div className="sticky-note__fold"></div>
       {isEditing ? (
         <textarea
@@ -90,6 +92,8 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
           onChange={(e) => setText(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{ fontSize: `${data.fontSize || 16}px` }}
           placeholder="Type something..."
         />
@@ -97,6 +101,7 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
         <div
           className="sticky-note__text"
           style={{ fontSize: `${data.fontSize || 16}px` }}
+          onClick={handleStartEdit}
         >
           {data.text || ''}
         </div>
