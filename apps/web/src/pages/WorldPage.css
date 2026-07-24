@@ -7,14 +7,37 @@
   cursor: crosshair;
 }
 
-.world-page[data-tool="select"] { cursor: default; }
-.world-page[data-tool="pan"] { cursor: grab; }
-.world-page[data-tool="pan"]:active { cursor: grabbing; }
-.world-page[data-tool="draw"] { cursor: crosshair; }
-.world-page[data-tool="highlighter"] { cursor: crosshair; }
-.world-page[data-tool="arrow"] { cursor: crosshair; }
-.world-page[data-tool="text"] { cursor: text; }
-.world-page[data-tool="eraser"] { cursor: cell; }
+.world-page[data-tool="select"] {
+  cursor: default;
+}
+
+.world-page[data-tool="pan"] {
+  cursor: grab;
+}
+
+.world-page[data-tool="pan"]:active {
+  cursor: grabbing;
+}
+
+.world-page[data-tool="draw"] {
+  cursor: crosshair;
+}
+
+.world-page[data-tool="highlighter"] {
+  cursor: crosshair;
+}
+
+.world-page[data-tool="arrow"] {
+  cursor: crosshair;
+}
+
+.world-page[data-tool="text"] {
+  cursor: text;
+}
+
+.world-page[data-tool="eraser"] {
+  cursor: cell;
+}
 
 .world-page__empty-launcher {
   position: fixed;
@@ -112,7 +135,7 @@
   pointer-events: none;
 }
 
-.world-header > * {
+.world-header>* {
   pointer-events: auto;
 }
 
@@ -219,7 +242,7 @@
   position: absolute;
   top: 52px;
   left: 0;
-  width: 260px;
+  width: 285px;
   background: var(--glass-bg, rgba(19, 19, 26, 0.92));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -235,8 +258,15 @@
 }
 
 @keyframes canvio-menu-enter {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .canvio-menu-item {
@@ -253,7 +283,18 @@
   font-weight: 500;
   border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
+}
+
+.canvio-menu-item .material-symbols-outlined {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .canvio-menu-item:hover {

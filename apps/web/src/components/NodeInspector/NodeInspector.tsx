@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useCanvasStore, LivingNode } from '../../store/canvasStore';
+import { expandNodeWithAIAsync } from '../../utils/spatialAIEngine';
 import {
   IconCopy,
   IconLock,
@@ -53,12 +54,32 @@ interface NodeInspectorProps {
 }
 
 export function NodeInspector({ node }: NodeInspectorProps) {
+  const [isExpanding, setIsExpanding] = useState(false);
+  const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const bringToFront = useCanvasStore((s) => s.bringToFront);
   const sendToBack = useCanvasStore((s) => s.sendToBack);
   const toggleLockNode = useCanvasStore((s) => s.toggleLockNode);
   const removeNode = useCanvasStore((s) => s.removeNode);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const addRelation = useCanvasStore((s) => s.addRelation);
+
+  const handleAIExpand = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isExpanding) return;
+    setIsExpanding(true);
+
+    try {
+      const res = await expandNodeWithAIAsync(node);
+      res.nodes.forEach((n) => addNode(n));
+      res.relations.forEach((r) => addRelation(r));
+    } catch (err) {
+      console.error('AI expand failed:', err);
+    } finally {
+      setIsExpanding(false);
+    }
+  };
 
   const isSticky = node.type === 'sticky';
   const isText = node.type === 'text';
@@ -66,6 +87,35 @@ export function NodeInspector({ node }: NodeInspectorProps) {
   const isFrame = node.type === 'frame';
   const isImage = node.type === 'image';
   const isDrawing = node.type === 'drawing';
+
+  const setFramePagePreset = (preset: 'a4-portrait' | 'a4-landscape' | 'slide' | 'letter') => {
+    let width = 500;
+    let height = 350;
+    let label = 'Frame';
+
+    if (preset === 'a4-portrait') {
+      width = 595;
+      height = 842;
+      label = 'Page (A4 Portrait)';
+    } else if (preset === 'a4-landscape') {
+      width = 842;
+      height = 595;
+      label = 'Page (A4 Landscape)';
+    } else if (preset === 'slide') {
+      width = 960;
+      height = 540;
+      label = 'Slide (16:9)';
+    } else if (preset === 'letter') {
+      width = 612;
+      height = 792;
+      label = 'Page (US Letter)';
+    }
+
+    updateNode(node.id, {
+      size: { width, height },
+      data: { ...node.data, title: label, pagePreset: preset },
+    });
+  };
   const drawingKind = (node.data?.kind as string) || 'freehand';
   const drawingStrokes = Array.isArray(node.data?.strokes) ? node.data.strokes as Array<Record<string, any>> : [];
   const drawingArrow = node.data?.arrow as Record<string, any> | undefined;
@@ -268,23 +318,55 @@ export function NodeInspector({ node }: NodeInspectorProps) {
         </>
       )}
 
-      {/* Frame header color picker */}
+      {/* Frame header color picker & Page Presets */}
       {isFrame && (
-        <div className="node-inspector__colors">
-          {SHAPE_COLORS.map((c) => (
+        <>
+          <div className="node-inspector__segments">
             <button
-              key={c.id}
-              className={`node-inspector__color-btn ${(node.data?.color as string) === c.stroke ? 'selected' : ''}`}
-              style={{ backgroundColor: c.stroke }}
-              onClick={(e) => {
-                e.stopPropagation();
-                updateNodeData(node.id, { color: c.stroke });
-              }}
-              title={`Change frame color to ${c.id}`}
-            />
-          ))}
-          <div className="node-inspector__divider" />
-        </div>
+              className={`node-inspector__segment ${node.data?.pagePreset === 'a4-portrait' ? 'selected' : ''}`}
+              onClick={(e) => { e.stopPropagation(); setFramePagePreset('a4-portrait'); }}
+              title="A4 Portrait Page (595x842)"
+            >
+              A4 📄
+            </button>
+            <button
+              className={`node-inspector__segment ${node.data?.pagePreset === 'a4-landscape' ? 'selected' : ''}`}
+              onClick={(e) => { e.stopPropagation(); setFramePagePreset('a4-landscape'); }}
+              title="A4 Landscape Page (842x595)"
+            >
+              A4 🖼️
+            </button>
+            <button
+              className={`node-inspector__segment ${node.data?.pagePreset === 'slide' ? 'selected' : ''}`}
+              onClick={(e) => { e.stopPropagation(); setFramePagePreset('slide'); }}
+              title="16:9 Presentation Slide (960x540)"
+            >
+              16:9 🖥️
+            </button>
+            <button
+              className={`node-inspector__segment ${node.data?.pagePreset === 'letter' ? 'selected' : ''}`}
+              onClick={(e) => { e.stopPropagation(); setFramePagePreset('letter'); }}
+              title="US Letter Page (612x792)"
+            >
+              Letter
+            </button>
+          </div>
+          <div className="node-inspector__colors">
+            {SHAPE_COLORS.map((c) => (
+              <button
+                key={c.id}
+                className={`node-inspector__color-btn ${(node.data?.color as string) === c.stroke ? 'selected' : ''}`}
+                style={{ backgroundColor: c.stroke }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateNodeData(node.id, { color: c.stroke });
+                }}
+                title={`Change frame color to ${c.id}`}
+              />
+            ))}
+            <div className="node-inspector__divider" />
+          </div>
+        </>
       )}
 
       {isImage && (
@@ -362,6 +444,17 @@ export function NodeInspector({ node }: NodeInspectorProps) {
 
       {/* Action Buttons */}
       <div className="node-inspector__actions">
+        <button
+          className={`node-inspector__btn node-inspector__btn--ai ${isExpanding ? 'spinning' : ''}`}
+          onClick={handleAIExpand}
+          disabled={isExpanding}
+          title="✨ AI Expand: Generate related sub-topics & connect with relations"
+        >
+          <span className="material-symbols-outlined text-sm" style={{ color: '#a855f7', fontSize: 16 }}>
+            {isExpanding ? 'sync' : 'auto_awesome'}
+          </span>
+        </button>
+
         <button
           className="node-inspector__btn"
           onClick={(e) => { e.stopPropagation(); duplicateNode(node.id); }}

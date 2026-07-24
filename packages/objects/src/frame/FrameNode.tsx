@@ -67,6 +67,23 @@ export const FrameNode: React.FC<FrameNodeProps> = ({ node, selected, onChange }
             {title}
           </span>
         )}
+        {Boolean((node.data as any)?.pagePreset) && (
+          <span
+            style={{
+              marginLeft: 8,
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: 4,
+              background: 'rgba(99, 102, 241, 0.15)',
+              color: accentColor,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {(node.data as any).pagePreset.replace('-', ' ')}
+          </span>
+        )}
       </div>
 
       {/* Frame Background Container */}

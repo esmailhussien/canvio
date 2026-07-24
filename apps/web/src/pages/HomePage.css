@@ -147,6 +147,47 @@
   margin: 0 auto;
 }
 
+.home-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  margin-bottom: 24px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-primary, #a855f7);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.home-hero__badge:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);
+  transform: translateY(-1px);
+}
+
+.home-hero__badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6366f1;
+  box-shadow: 0 0 8px #6366f1;
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
 .home-hero__title {
   font-family: var(--font-display);
   font-size: clamp(2.5rem, 5vw, 4rem);
@@ -454,3 +495,49 @@
     justify-content: center;
   }
 }
+
+/* Home Footer */
+.home-footer {
+  width: 100%;
+  max-width: 100%;
+  margin: 4rem 0 0 0;
+  padding: 1.5rem 24px;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.home-footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.home-footer__links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-footer__link {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: color 0.15s ease;
+}
+
+.home-footer__link:hover {
+  color: var(--text-primary);
+}
+
+.home-footer__divider {
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+}
+

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LivingNode, Relation, Viewport, useCanvasStore } from '../../store/canvasStore';
-import { exportAsJSON, exportAsPNG } from '../../utils/exportUtils';
+import { exportAsJSON, exportAsPDF, exportAsPNG } from '../../utils/exportUtils';
 import { PRESET_TEMPLATES } from '../../utils/presetTemplates';
 import './ExportMenu.css';
 
@@ -17,7 +17,7 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
   const refToUse = containerRef || localRef;
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [showPresets, setShowPresets] = useState(false);
-  const [exporting, setExporting] = useState<'png' | 'json' | 'import' | null>(null);
+  const [exporting, setExporting] = useState<'png' | 'pdf' | 'json' | 'import' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
@@ -63,6 +63,21 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       onClose();
     } catch {
       setExportError('PNG export failed');
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      setExporting('pdf');
+      setExportError(null);
+      setExportStatus(null);
+      await exportAsPDF(worldId);
+      setExportStatus('PDF document ready');
+      onClose();
+    } catch {
+      setExportError('PDF export failed');
     } finally {
       setExporting(null);
     }
@@ -161,6 +176,15 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
           >
             <span className="material-symbols-outlined text-sm">image</span>
             <span>{exporting === 'png' ? 'Exporting PNG...' : 'Export Image (PNG)'}</span>
+          </button>
+
+          <button
+            className="canvio-menu-item"
+            disabled={exporting !== null}
+            onClick={handleExportPDF}
+          >
+            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+            <span>{exporting === 'pdf' ? 'Exporting PDF...' : 'Export Document (PDF)'}</span>
           </button>
 
           <button

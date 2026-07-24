@@ -232,4 +232,161 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
       return { nodes: [mapNode, dist1, dist2], relations };
     },
   },
+  {
+    id: 'a4-document',
+    name: 'A4 Report Page',
+    description: 'Print-ready A4 Page Frame formatted with header, summary, and sticky notes',
+    icon: 'description',
+    create: (cx, cy, nextZ) => {
+      const pageId = nanoid(10);
+      const headerId = nanoid(10);
+      const sticky1Id = nanoid(10);
+      const sticky2Id = nanoid(10);
+
+      const pageFrame: LivingNode = {
+        id: pageId,
+        type: 'frame',
+        position: { x: cx - 297, y: cy - 421 },
+        size: { width: 595, height: 842 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { title: 'Executive Summary Page', color: '#6366f1', pagePreset: 'a4-portrait' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const headerText: LivingNode = {
+        id: headerId,
+        type: 'text',
+        position: { x: cx - 250, y: cy - 370 },
+        size: { width: 500, height: 60 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { content: 'Spatial Analysis Report\nPrepared for Team Briefing', fontSize: 24, fontWeight: 'bold', color: 'var(--text-primary)' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const note1: LivingNode = {
+        id: sticky1Id,
+        type: 'sticky',
+        position: { x: cx - 250, y: cy - 270 },
+        size: { width: 230, height: 160 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { text: 'Key Findings\n1. High priority zones mapped\n2. Spatial relations verified\n3. Export ready for PDF', color: 'yellow' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const note2: LivingNode = {
+        id: sticky2Id,
+        type: 'sticky',
+        position: { x: cx + 20, y: cy - 270 },
+        size: { width: 230, height: 160 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { text: 'Action Items\n- Review map coordinates\n- Share board URL with team\n- Download PDF copy', color: 'green' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      return { nodes: [pageFrame, headerText, note1, note2], relations: [] };
+    },
+  },
+  {
+    id: 'kanban-board',
+    name: 'Kanban Task Board',
+    description: '3 Column Agile Task Board (To Do, In Progress, Done)',
+    icon: 'view_kanban',
+    create: (cx, cy, nextZ) => {
+      const todoFrameId = nanoid(10);
+      const inProgFrameId = nanoid(10);
+      const doneFrameId = nanoid(10);
+
+      const todoFrame: LivingNode = {
+        id: todoFrameId,
+        type: 'frame',
+        position: { x: cx - 460, y: cy - 250 },
+        size: { width: 280, height: 500 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { title: '📌 To Do', color: '#f59e0b' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const inProgFrame: LivingNode = {
+        id: inProgFrameId,
+        type: 'frame',
+        position: { x: cx - 140, y: cy - 250 },
+        size: { width: 280, height: 500 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { title: '⚡ In Progress', color: '#3b82f6' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const doneFrame: LivingNode = {
+        id: doneFrameId,
+        type: 'frame',
+        position: { x: cx + 180, y: cy - 250 },
+        size: { width: 280, height: 500 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { title: '✅ Done', color: '#22c55e' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const task1: LivingNode = {
+        id: nanoid(10),
+        type: 'sticky',
+        position: { x: cx - 430, y: cy - 180 },
+        size: { width: 220, height: 120 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { text: 'Setup spatial AI prompt models', color: 'orange' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const task2: LivingNode = {
+        id: nanoid(10),
+        type: 'sticky',
+        position: { x: cx - 110, y: cy - 180 },
+        size: { width: 220, height: 120 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { text: 'Test PDF multi-page export', color: 'blue' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const task3: LivingNode = {
+        id: nanoid(10),
+        type: 'sticky',
+        position: { x: cx + 210, y: cy - 180 },
+        size: { width: 220, height: 120 },
+        rotation: 0,
+        zIndex: nextZ(),
+        locked: false,
+        data: { text: 'Fix Leaflet view sync loop', color: 'green' },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      return { nodes: [todoFrame, inProgFrame, doneFrame, task1, task2, task3], relations: [] };
+    },
+  },
 ];

@@ -95,29 +95,18 @@ const TILE_LAYERS: Record<TileLayerType, { url: string; attribution: string }> =
   }
 };
 
-// Component to handle map interaction state changes
-const MapEffect: React.FC<{ interactive: boolean }> = ({ interactive }) => {
-  const map = useMap();
-  
-  React.useEffect(() => {
-    if (interactive) {
-      map.dragging.enable();
-      map.touchZoom.enable();
-      map.doubleClickZoom.enable();
-      map.scrollWheelZoom.enable();
-      map.boxZoom.enable();
-      map.keyboard.enable();
-      if ((map as any).tap) (map as any).tap.enable();
-    } else {
-      map.dragging.disable();
-      map.touchZoom.disable();
-      map.doubleClickZoom.disable();
-      map.scrollWheelZoom.disable();
-      map.boxZoom.disable();
-      map.keyboard.disable();
-      if ((map as any).tap) (map as any).tap.disable();
+// Component to watch map move/zoom and save center/zoom back to store
+const MapEvents: React.FC<{ onChangeCenterZoom: (center: [number, number], zoom: number) => void }> = ({ onChangeCenterZoom }) => {
+  const map = useMapEvents({
+    moveend: () => {
+      const center = map.getCenter();
+      onChangeCenterZoom([center.lat, center.lng], map.getZoom());
+    },
+    zoomend: () => {
+      const center = map.getCenter();
+      onChangeCenterZoom([center.lat, center.lng], map.getZoom());
     }
-  }, [map, interactive]);
+  });
 
   React.useEffect(() => {
     // Force Leaflet to recalculate its internal size if the wrapper node resizes
@@ -134,22 +123,6 @@ const MapEffect: React.FC<{ interactive: boolean }> = ({ interactive }) => {
   return null;
 };
 
-// Component to watch map move/zoom and save center/zoom back to store
-const MapEvents: React.FC<{ onChangeCenterZoom: (center: [number, number], zoom: number) => void }> = ({ onChangeCenterZoom }) => {
-  const map = useMapEvents({
-    moveend: () => {
-      const center = map.getCenter();
-      onChangeCenterZoom([center.lat, center.lng], map.getZoom());
-    },
-    zoomend: () => {
-      const center = map.getCenter();
-      onChangeCenterZoom([center.lat, center.lng], map.getZoom());
-    }
-  });
-
-  return null;
-};
-
 const MapClickEvents: React.FC<{ enabled: boolean; onAddMarker: (position: [number, number]) => void }> = ({ enabled, onAddMarker }) => {
   useMapEvents({
     dblclick: (event) => {
@@ -161,7 +134,12 @@ const MapClickEvents: React.FC<{ enabled: boolean; onAddMarker: (position: [numb
   return null;
 };
 
-const MapViewSync: React.FC<{ center: [number, number]; zoom: number; markers: MapMarker[] }> = ({ center, zoom, markers }) => {
+const MapController: React.FC<{ 
+  center: [number, number]; 
+  zoom: number; 
+  markers: MapMarker[];
+  onChangeCenterZoom: (center: [number, number], zoom: number) => void;
+}> = ({ center, zoom, markers, onChangeCenterZoom }) => {
   const map = useMap();
   const lastMarkerSignatureRef = React.useRef('');
 
@@ -180,8 +158,39 @@ const MapViewSync: React.FC<{ center: [number, number]; zoom: number; markers: M
     }
 
     lastMarkerSignatureRef.current = markerSignature;
-    map.setView(center, zoom, { animate: false });
+
+    const currentCenter = map.getCenter();
+    const currentZoom = map.getZoom();
+    const dist = currentCenter.distanceTo(L.latLng(center[0], center[1]));
+    
+    // Only update Leaflet if the incoming center is actually different
+    if (dist > 1 || currentZoom !== zoom) {
+      map.setView(center, zoom, { animate: false });
+    }
   }, [center, zoom, markers, map]);
+
+  useMapEvents({
+    moveend: () => {
+      const newCenter = map.getCenter();
+      const newZoom = map.getZoom();
+      const dist = newCenter.distanceTo(L.latLng(center[0], center[1]));
+      
+      // Prevent infinite loop: only sync to store if the user physically moved the map
+      // further than a tiny floating point error, not if setView just moved it here.
+      if (dist > 1 || newZoom !== zoom) {
+        onChangeCenterZoom([newCenter.lat, newCenter.lng], newZoom);
+      }
+    },
+    zoomend: () => {
+      const newCenter = map.getCenter();
+      const newZoom = map.getZoom();
+      const dist = newCenter.distanceTo(L.latLng(center[0], center[1]));
+      
+      if (dist > 1 || newZoom !== zoom) {
+        onChangeCenterZoom([newCenter.lat, newCenter.lng], newZoom);
+      }
+    }
+  });
 
   return null;
 };
@@ -238,36 +247,16 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
     tileLayer: rawData.tileLayer === 'hybrid' ? 'hybrid' : 'satellite',
     markers: Array.isArray(rawData.markers) ? rawData.markers : [],
     markerAnchors: typeof rawData.markerAnchors === 'object' && rawData.markerAnchors ? rawData.markerAnchors as Record<string, MapMarkerAnchor> : {},
-    interactive: typeof rawData.interactive === 'boolean' ? rawData.interactive : true,
+    interactive: true,
   };
   const layer = (data.tileLayer && TILE_LAYERS[data.tileLayer]) ? data.tileLayer : 'satellite';
-  const interactive = data.interactive ?? true;
   
   // Use a stable key so MapContainer doesn't unmount unless necessary
   const mapKey = useMemo(() => `map-${node.id}`, [node.id]);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    // If map is interactive, stop event propagation so canvas doesn't pan
-    if (interactive) {
-      e.stopPropagation();
-    }
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (interactive) {
-      e.stopPropagation();
-    }
-  };
-
   const setLayer = (l: TileLayerType) => {
     if (onChange) {
       onChange(node.id, { data: { ...data, tileLayer: l } });
-    }
-  };
-
-  const setInteractive = (val: boolean) => {
-    if (onChange) {
-      onChange(node.id, { data: { ...data, interactive: val } });
     }
   };
 
@@ -339,34 +328,48 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
   };
 
   return (
-    <div 
-      className={`map-node ${selected ? 'map-node--selected' : ''}`}
-      onPointerDown={handlePointerDown}
-      onWheel={handleWheel}
-    >
+    <div className={`map-node ${selected ? 'map-node--selected' : ''}`}>
+      {/* Floating Action Buttons */}
+      <div className="map-node__controls" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+        <button 
+          type="button"
+          className={`map-node__action-btn ${layer === 'hybrid' ? 'active' : ''}`}
+          onClick={() => setLayer(layer === 'satellite' ? 'hybrid' : 'satellite')}
+          title={layer === 'satellite' ? 'Show Roads & Labels' : 'Satellite Only'}
+        >
+          <IconLayers size={16} />
+        </button>
+        <button
+          type="button"
+          className="map-node__action-btn"
+          onClick={() => addMarkerAtCenter()}
+          title="Add Pin at Map Center"
+        >
+          <IconPin size={16} />
+        </button>
+      </div>
+
       <MapContainer 
         key={mapKey}
         center={data.center || WORLD_MAP_CENTER} 
         zoom={data.zoom || 4} 
         style={{ width: '100%', height: '100%' }}
-        zoomControl={interactive}
+        zoomControl={true}
         attributionControl={false}
       >
         <TileLayer
           url={TILE_LAYERS[layer].url}
           attribution={TILE_LAYERS[layer].attribution}
         />
-        <MapEffect interactive={interactive} />
-        <MapViewSync center={data.center} zoom={data.zoom} markers={data.markers} />
+        <MapController center={data.center} zoom={data.zoom} markers={data.markers} onChangeCenterZoom={handleCenterZoomChange} />
         <MarkerAnchorTracker markers={data.markers} onAnchorsChange={updateMarkerAnchors} />
-        <MapEvents onChangeCenterZoom={handleCenterZoomChange} />
-        <MapClickEvents enabled={Boolean(selected && interactive)} onAddMarker={addMarker} />
+        <MapClickEvents enabled={true} onAddMarker={addMarker} />
         
         {data.markers?.map(marker => (
           <Marker
             key={marker.id}
             position={marker.position}
-            draggable={Boolean(selected && interactive && !relationMode)}
+            draggable={!relationMode}
             title={relationMode ? `Connect relation to ${marker.label || 'marker'}` : marker.label}
             eventHandlers={{
               mousedown: (event) => {
@@ -396,37 +399,8 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
         ))}
       </MapContainer>
 
-      {selected && (
-        <div className="map-node__controls">
-          <button 
-            className={`map-node__layer-btn ${layer === 'hybrid' ? 'active' : ''}`}
-            onClick={() => setLayer(layer === 'satellite' ? 'hybrid' : 'satellite')}
-            title={layer === 'satellite' ? 'Show Roads Overlay' : 'Satellite Only'}
-          >
-            <IconLayers size={16} />
-          </button>
-          <button 
-            className={`map-node__toggle-btn ${!interactive ? 'active' : ''}`}
-            onClick={() => setInteractive(!interactive)}
-            title={interactive ? 'Lock map interaction to pan canvas' : 'Unlock map interaction'}
-          >
-            {interactive ? <IconUnlock size={16} /> : <IconLock size={16} />}
-          </button>
-          <button
-            className="map-node__toggle-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              addMarkerAtCenter();
-            }}
-            title="Add marker at map center"
-          >
-            <IconPin size={16} />
-          </button>
-        </div>
-      )}
-
-      {selected && data.markers.length > 0 && (
-        <div className="map-node__marker-panel" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+      {data.markers.length > 0 && (
+        <div className="map-node__marker-panel" onMouseDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
           {data.markers.slice(-4).map((marker, index) => (
             <div
               className={`map-node__marker-row ${relationSourcePort === `marker:${marker.id}` ? 'active-anchor' : ''}`}

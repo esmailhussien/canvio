@@ -22,7 +22,7 @@
 >
 > One World. Everything connected. Nothing scattered.
 >
-> ***Build ideas the way you build cities.***
+> ***Connect ideas. Create knowledge.***
 
 ---
 

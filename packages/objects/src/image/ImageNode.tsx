@@ -33,6 +33,19 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
   const opacity = data.opacity ?? 1;
   const borderRadius = data.borderRadius ?? 0;
 
+  const triggerFileInput = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    inputRef.current?.click();
+  };
+
+  React.useEffect(() => {
+    if (!src && Date.now() - node.createdAt < 1000 && inputRef.current) {
+      inputRef.current.click();
+    }
+  }, [src, node.createdAt]);
+
   const applyFile = (file?: File | null) => {
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
@@ -86,9 +99,13 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onPaste={handlePaste}
+      onClick={(e) => {
+        if (!src) {
+          triggerFileInput(e);
+        }
+      }}
       onDoubleClick={(e) => {
-        e.stopPropagation();
-        inputRef.current?.click();
+        triggerFileInput(e);
       }}
       tabIndex={0}
     >
@@ -119,8 +136,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
               className="image-node__replace-btn"
               type="button"
               onClick={(e) => {
-                e.stopPropagation();
-                inputRef.current?.click();
+                triggerFileInput(e);
               }}
             >
               Replace
@@ -132,8 +148,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
           className="image-node__placeholder"
           type="button"
           onClick={(e) => {
-            e.stopPropagation();
-            inputRef.current?.click();
+            triggerFileInput(e);
           }}
         >
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

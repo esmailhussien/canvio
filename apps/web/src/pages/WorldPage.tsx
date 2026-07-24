@@ -112,7 +112,7 @@ export function WorldPage() {
       window.clearTimeout(saveAppearanceTimerRef.current);
     }
     saveAppearanceTimerRef.current = window.setTimeout(() => {
-      updateBoardAppearance(worldId, { theme, canvasBackground }).catch(() => {});
+      updateBoardAppearance(worldId, { theme, canvasBackground }).catch(() => { });
     }, 350);
 
     return () => {
@@ -243,6 +243,17 @@ export function WorldPage() {
               >
                 <span className="material-symbols-outlined text-sm">fit_screen</span>
                 <span>Fit Viewport to Canvas</span>
+              </button>
+
+              <button
+                className="canvio-menu-item"
+                onClick={() => {
+                  navigate('/support');
+                  setIsCanvioMenuOpen(false);
+                }}
+              >
+                <span className="material-symbols-outlined text-sm" style={{ color: '#ef4444' }}>favorite</span>
+                <span>Support Canvio (Open Source)</span>
               </button>
 
               <div className="canvio-menu-divider" />

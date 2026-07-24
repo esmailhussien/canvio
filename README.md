@@ -1,6 +1,6 @@
 # Canvio
 
-### *Build ideas the way you build cities.*
+### *Connect ideas. Create knowledge.*
 
 > The first collaborative workspace built on maps. Free. Open source. No signup.
 

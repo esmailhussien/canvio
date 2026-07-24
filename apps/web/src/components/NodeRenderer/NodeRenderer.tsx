@@ -125,14 +125,24 @@ export function NodeRenderer({ node }: Props) {
       return;
     }
 
-    // Text fields (sticky notes, text nodes): don't decide select-vs-edit-vs-drag
-    // yet based on which element was hit — on mobile a fingertip almost always
-    // lands on the textarea since it fills the note. Defer the decision to
-    // pointerup/pointermove instead: real movement past a small threshold moves
-    // the node; a stationary tap enters edit mode (see handlePointerUp).
+    // For Map nodes: The Top Header is the drag handle for the node.
+    // Clicking inside the Leaflet map container allows native map tile panning.
+    if (
+      node.type === 'map' &&
+      target.closest('.leaflet-container') &&
+      !target.closest('.map-node__marker-panel')
+    ) {
+      selectNode(node.id, e.shiftKey);
+      return;
+    }
+
+    // Text fields and clickable node controls (image placeholders, replace buttons, sticky notes):
+    // Don't swallow action on pointerdown — defer to pointerup/pointermove to differentiate static tap from drag.
     const targetTag = target.tagName.toLowerCase();
-    const isTextField = targetTag === 'textarea' || targetTag === 'input' || Boolean(target.closest('.sticky-note__textarea'));
-    if (isTextField) {
+    const isTextField = targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file') || Boolean(target.closest('.sticky-note__textarea'));
+    const isClickableTarget = Boolean(target.closest('.image-node__placeholder, .image-node__replace-btn, .image-node--empty'));
+
+    if (isTextField || isClickableTarget) {
       e.preventDefault(); // suppress the browser's native focus-on-pointerdown
       pendingTapEditTargetRef.current = target;
     } else {
@@ -165,8 +175,8 @@ export function NodeRenderer({ node }: Props) {
         }
         hasExceededDragThresholdRef.current = true;
         // The gesture turned into a real drag — cancel the pending "focus this
-        // text field" action (and dismiss the mobile keyboard if it already
-        // opened) so dragging a note never fights with editing it.
+        // text field or click this action" action (and dismiss the mobile keyboard if it already
+        // opened) so dragging a note never fights with editing/interacting.
         if (pendingTapEditTargetRef.current) {
           pendingTapEditTargetRef.current.blur?.();
           pendingTapEditTargetRef.current = null;
@@ -218,9 +228,14 @@ export function NodeRenderer({ node }: Props) {
     dragStartRef.current = null;
     dragOriginRef.current = null;
     if (!hasExceededDragThresholdRef.current && pendingTapEditTargetRef.current) {
-      // A genuine stationary tap on a text field (no meaningful movement) —
-      // enter edit mode now.
-      pendingTapEditTargetRef.current.focus();
+      // A genuine stationary tap (no drag) — focus text field or click action control now.
+      const target = pendingTapEditTargetRef.current;
+      const targetTag = target.tagName.toLowerCase();
+      if (targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file')) {
+        target.focus();
+      } else {
+        target.click();
+      }
     }
     pendingTapEditTargetRef.current = null;
     hasExceededDragThresholdRef.current = false;

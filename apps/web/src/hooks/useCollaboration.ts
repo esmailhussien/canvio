@@ -109,6 +109,7 @@ export function useCollaboration(worldId: string) {
     const wsProvider = new WebsocketProvider(wsUrl, worldId, doc);
     setProvider(wsProvider);
     let remoteSynced = false;
+    let isReceivingRemote = false;
 
     const yNodes = doc.getMap<Y.Map<any>>('nodes');
     const yRelations = doc.getMap<Y.Map<any>>('relations');
@@ -118,32 +119,42 @@ export function useCollaboration(worldId: string) {
     const handleNodesObserve = (event: Y.YMapEvent<Y.Map<any>>) => {
       if (event.transaction.origin === 'local-transaction') return;
 
-      event.changes.keys.forEach((change, key) => {
-        if (change.action === 'add' || change.action === 'update') {
-          const yNode = yNodes.get(key);
-          if (yNode) {
-            const node = yMapToNode(yNode);
-            upsertNodeRemote(node);
+      isReceivingRemote = true;
+      try {
+        event.changes.keys.forEach((change, key) => {
+          if (change.action === 'add' || change.action === 'update') {
+            const yNode = yNodes.get(key);
+            if (yNode) {
+              const node = yMapToNode(yNode);
+              upsertNodeRemote(node);
+            }
+          } else if (change.action === 'delete') {
+            removeNodeRemote(key);
           }
-        } else if (change.action === 'delete') {
-          removeNodeRemote(key);
-        }
-      });
+        });
+      } finally {
+        isReceivingRemote = false;
+      }
     };
 
     const handleRelationsObserve = (event: Y.YMapEvent<Y.Map<any>>) => {
       if (event.transaction.origin === 'local-transaction') return;
 
-      event.changes.keys.forEach((change, key) => {
-        if (change.action === 'add' || change.action === 'update') {
-          const yRelation = yRelations.get(key);
-          if (yRelation) {
-            upsertRelationRemote(yMapToRelation(yRelation));
+      isReceivingRemote = true;
+      try {
+        event.changes.keys.forEach((change, key) => {
+          if (change.action === 'add' || change.action === 'update') {
+            const yRelation = yRelations.get(key);
+            if (yRelation) {
+              upsertRelationRemote(yMapToRelation(yRelation));
+            }
+          } else if (change.action === 'delete') {
+            removeRelationRemote(key);
           }
-        } else if (change.action === 'delete') {
-          removeRelationRemote(key);
-        }
-      });
+        });
+      } finally {
+        isReceivingRemote = false;
+      }
     };
 
     yNodes.observe(handleNodesObserve);
@@ -174,15 +185,20 @@ export function useCollaboration(worldId: string) {
     }
 
     // ─── Initial State Loading ─────────────────────────────────────────
-    yNodes.forEach((yNode) => {
-      const node = yMapToNode(yNode);
-      if (node && node.id) upsertNodeRemote(node);
-    });
+    isReceivingRemote = true;
+    try {
+      yNodes.forEach((yNode) => {
+        const node = yMapToNode(yNode);
+        if (node && node.id) upsertNodeRemote(node);
+      });
 
-    yRelations.forEach((yRelation) => {
-      const rel = yMapToRelation(yRelation);
-      if (rel && rel.id) upsertRelationRemote(rel);
-    });
+      yRelations.forEach((yRelation) => {
+        const rel = yMapToRelation(yRelation);
+        if (rel && rel.id) upsertRelationRemote(rel);
+      });
+    } finally {
+      isReceivingRemote = false;
+    }
 
     // ─── Awareness (user presence) ────────────────────────────────────
     const userName = getRandomName();
@@ -239,6 +255,8 @@ export function useCollaboration(worldId: string) {
     const unsubscribeNodes = useCanvasStore.subscribe(
       (s) => s.nodes,
       (nodes) => {
+        if (isReceivingRemote) return;
+
         doc.transact(() => {
           const localNodeIds = new Set(Object.keys(nodes));
 
@@ -268,6 +286,8 @@ export function useCollaboration(worldId: string) {
     const unsubscribeRelations = useCanvasStore.subscribe(
       (s) => s.relations,
       (relations) => {
+        if (isReceivingRemote) return;
+
         doc.transact(() => {
           const localRelIds = new Set(Object.keys(relations));
 

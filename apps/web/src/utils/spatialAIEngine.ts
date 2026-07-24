@@ -7,6 +7,348 @@ export interface SpatialAIResult {
   relations: Relation[];
 }
 
+export async function generateSpatialBoardAsync(
+  prompt: string,
+  provider?: string,
+  apiKey?: string,
+  model?: string
+): Promise<SpatialAIResult> {
+  if (!apiKey || !apiKey.trim()) {
+    return generateSpatialBoard(prompt);
+  }
+
+  try {
+    const existingNodes = Object.values(useCanvasStore.getState().nodes);
+    let boardContext = '';
+    if (existingNodes.length > 0) {
+      boardContext = `\n\nExisting Canvas Board Context:\n` + existingNodes.map((n) => {
+        const text = n.data?.text || n.data?.content || n.data?.title || n.data?.label || '';
+        return `- [${n.type.toUpperCase()}] "${text.slice(0, 150)}"`;
+      }).join('\n');
+    }
+
+    const fullUserPrompt = `User Request: ${prompt}${boardContext}`;
+
+    const systemPrompt = `You are Spatial AI for Canvio, an infinite canvas knowledge workspace.
+Generate a structured spatial knowledge graph for the given user request.
+Return ONLY raw JSON with this exact schema (no markdown block wrapper):
+{
+  "title": "Short title",
+  "nodes": [
+    {
+      "id": "node1",
+      "type": "sticky",
+      "position": { "x": 0, "y": 0 },
+      "size": { "width": 260, "height": 140 },
+      "data": {
+        "title": "Title (if frame)",
+        "color": "blue",
+        "text": "Card text content...",
+        "label": "Shape label...",
+        "shape": "rectangle"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "sourceId": "node1",
+      "targetId": "node2",
+      "label": "relationship label",
+      "relationship": "depends_on"
+    }
+  ]
+}
+Types allowed: "sticky", "shape", "text", "frame".
+Sticky colors: "blue", "yellow", "green", "pink", "orange", "purple".
+Relationships: "depends_on", "leads_to", "enables", "based_on", "contradicts", "part_of", "related_to".
+Arrange nodes spatially with sensible X/Y offsets (e.g. 280px apart horizontally, 180px vertically).`;
+
+    let jsonText = '';
+
+    if (provider === 'gemini') {
+      const targetModel = model || 'gemini-2.5-flash';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: systemPrompt },
+                { text: fullUserPrompt }
+              ]
+            }
+          ]
+        })
+      });
+
+      if (!resp.ok) throw new Error(`Gemini API HTTP ${resp.status}`);
+      const data = await resp.json();
+      jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } else if (provider === 'openai') {
+      const targetModel = model || 'gpt-4o-mini';
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`
+        },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: fullUserPrompt }
+          ],
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (!resp.ok) throw new Error(`OpenAI API HTTP ${resp.status}`);
+      const data = await resp.json();
+      jsonText = data.choices?.[0]?.message?.content || '';
+    } else if (provider === 'anthropic') {
+      const targetModel = model || 'claude-3-5-sonnet';
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey.trim(),
+          'anthropic-version': '2023-06-01',
+          'dangerously-allow-browser': 'true'
+        },
+        body: JSON.stringify({
+          model: targetModel,
+          max_tokens: 2500,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: fullUserPrompt }]
+        })
+      });
+
+      if (!resp.ok) throw new Error(`Anthropic API HTTP ${resp.status}`);
+      const data = await resp.json();
+      jsonText = data.content?.[0]?.text || '';
+    }
+
+    const cleanJson = jsonText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+
+    const createdAt = Date.now();
+    const formattedNodes: LivingNode[] = (parsed.nodes || []).map((n: any, idx: number) => ({
+      id: n.id || nanoid(10),
+      type: n.type || 'sticky',
+      position: n.position || { x: (idx % 3) * 280, y: Math.floor(idx / 3) * 180 },
+      size: n.size || { width: 260, height: 140 },
+      rotation: 0,
+      zIndex: idx + 1,
+      locked: false,
+      data: {
+        color: n.data?.color || 'blue',
+        text: n.data?.text || n.data?.label || '',
+        title: n.data?.title || '',
+        label: n.data?.label || '',
+        shape: n.data?.shape || 'rectangle',
+        fill: n.data?.fill || 'rgba(128, 131, 255, 0.12)',
+        stroke: n.data?.stroke || '#8083ff',
+      },
+      createdAt,
+      updatedAt: createdAt,
+    }));
+
+    const formattedRelations: Relation[] = (parsed.relations || []).map((r: any) => ({
+      id: nanoid(10),
+      sourceId: r.sourceId,
+      targetId: r.targetId,
+      label: r.label || 'relates to',
+      color: '#8083ff',
+      relationship: r.relationship || 'related_to',
+    }));
+
+    return {
+      title: parsed.title || `AI World: ${prompt.slice(0, 24)}`,
+      nodes: formattedNodes,
+      relations: formattedRelations,
+    };
+  } catch (err) {
+    console.warn('Real AI generation failed or key was invalid. Falling back to spatial heuristic template.', err);
+    return generateSpatialBoard(prompt);
+  }
+}
+
+export async function expandNodeWithAIAsync(
+  targetNode: LivingNode,
+): Promise<SpatialAIResult> {
+  const provider = (localStorage.getItem('CANVIO_AI_PROVIDER') as string) || 'gemini';
+  const keyStorageKey = provider === 'gemini' ? 'CANVIO_GEMINI_KEY' : provider === 'openai' ? 'CANVIO_OPENAI_KEY' : 'CANVIO_ANTHROPIC_KEY';
+  const apiKey = localStorage.getItem(keyStorageKey) || localStorage.getItem('CANVIO_AI_API_KEY') || '';
+  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+
+  const nodeContent = targetNode.data?.text || targetNode.data?.content || targetNode.data?.title || targetNode.data?.label || 'Concept';
+  const prompt = `Given this central node idea: "${nodeContent}", generate 3 distinct sub-topics or logical next steps. Connect each new sub-topic node to this central node (sourceId: "${targetNode.id}").`;
+
+  if (apiKey && apiKey.trim()) {
+    try {
+      const res = await generateSpatialBoardAsync(prompt, provider, apiKey, model);
+      if (res.nodes.length > 0) {
+        // Adjust positions relative to target node
+        const cx = targetNode.position.x;
+        const cy = targetNode.position.y;
+        res.nodes.forEach((n, idx) => {
+          n.position = {
+            x: cx + 320,
+            y: cy + (idx - 1) * 160,
+          };
+        });
+
+        // Ensure relations link back to targetNode.id
+        res.nodes.forEach((n) => {
+          if (!res.relations.some((r) => r.sourceId === targetNode.id && r.targetId === n.id)) {
+            res.relations.push(relation(targetNode.id, n.id, 'expands into', '#8083ff', 'leads_to'));
+          }
+        });
+      }
+      return res;
+    } catch {
+      // Fallback below
+    }
+  }
+
+  // Fallback heuristic expand
+  const cx = targetNode.position.x;
+  const cy = targetNode.position.y;
+  const child1Id = nanoid(10);
+  const child2Id = nanoid(10);
+  const child3Id = nanoid(10);
+
+  return {
+    title: `Expanded: ${nodeContent.slice(0, 20)}`,
+    nodes: [
+      sticky(child1Id, cx + 320, cy - 140, 260, 130, `Key Insights & Analysis\nDeep dive details for ${nodeContent.slice(0, 22)}.`, 'blue', targetNode.zIndex + 1),
+      sticky(child2Id, cx + 320, cy + 20, 260, 130, `Action Items & Implementation\nSteps and owner assignments.`, 'green', targetNode.zIndex + 2),
+      sticky(child3Id, cx + 320, cy + 180, 260, 130, `Risks & Mitigation Plan\nPotential bottlenecks and quality gates.`, 'orange', targetNode.zIndex + 3),
+    ],
+    relations: [
+      relation(targetNode.id, child1Id, 'informs', '#38bdf8', 'based_on'),
+      relation(targetNode.id, child2Id, 'enables', '#22c55e', 'leads_to'),
+      relation(targetNode.id, child3Id, 'identifies risk', '#ef4444', 'depends_on'),
+    ],
+  };
+}
+
+export async function summarizeBoardWithAIAsync(
+  nodes: LivingNode[],
+  relations: Relation[]
+): Promise<SpatialAIResult> {
+  const provider = (localStorage.getItem('CANVIO_AI_PROVIDER') as string) || 'gemini';
+  const keyStorageKey = provider === 'gemini' ? 'CANVIO_GEMINI_KEY' : provider === 'openai' ? 'CANVIO_OPENAI_KEY' : 'CANVIO_ANTHROPIC_KEY';
+  const apiKey = localStorage.getItem(keyStorageKey) || localStorage.getItem('CANVIO_AI_API_KEY') || '';
+  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+
+  const viewport = useCanvasStore.getState().viewport;
+  const zoom = viewport.zoom || 1;
+  const cx = -viewport.x / zoom + (window.innerWidth / (2 * zoom));
+  const cy = -viewport.y / zoom + (window.innerHeight / (2 * zoom));
+
+  const graphSummary = nodes.map((n) => {
+    const text = n.data?.text || n.data?.content || n.data?.title || n.data?.label || '';
+    return `- [${n.type.toUpperCase()}] "${text.slice(0, 80)}"`;
+  }).join('\n');
+
+  const prompt = `Analyze this entire canvas whiteboard graph:\n${graphSummary}\n\nGenerate an executive AI Summary Board with 4 summary cards covering: 1. Core Summary, 2. Key Decisions, 3. Critical Risks, 4. Action Plan.`;
+
+  if (apiKey && apiKey.trim()) {
+    try {
+      const res = await generateSpatialBoardAsync(prompt, provider, apiKey, model);
+      if (res.nodes.length > 0) {
+        // Offset generated summary nodes to current viewport center
+        res.nodes.forEach((n, idx) => {
+          n.position = {
+            x: cx - 400 + (idx % 2) * 420,
+            y: cy - 200 + Math.floor(idx / 2) * 200,
+          };
+        });
+      }
+      return res;
+    } catch {
+      // Fallback below
+    }
+  }
+
+  // Fallback heuristic summary
+  const frameId = nanoid(10);
+  const s1 = nanoid(10);
+  const s2 = nanoid(10);
+  const s3 = nanoid(10);
+  const s4 = nanoid(10);
+
+  return {
+    title: '✨ AI Executive Summary',
+    nodes: [
+      frame(frameId, cx - 450, cy - 250, 900, 500, '✨ AI Executive Canvas Summary', '#8083ff'),
+      sticky(s1, cx - 410, cy - 180, 400, 180, '📌 Core Vision & Context\n' + (nodes[0]?.data?.text || 'Central whiteboard overview and key goals.'), 'purple', 2),
+      sticky(s2, cx + 20, cy - 180, 400, 180, '⚡ Key Decisions & Milestones\nIdentified high-impact trade-offs and approvals.', 'green', 3),
+      sticky(s3, cx - 410, cy + 30, 400, 180, '🚨 Critical Risks & Dependencies\nOperational bottlenecks and quality gates to monitor.', 'pink', 4),
+      sticky(s4, cx + 20, cy + 30, 400, 180, '🎯 Next Action Plan\nAssigned owners, immediate deliverables, and review dates.', 'blue', 5),
+    ],
+    relations: [
+      relation(s1, s2, 'leads to', '#8b5cf6', 'leads_to'),
+      relation(s3, s2, 'constrains', '#ef4444', 'contradicts'),
+      relation(s2, s4, 'enables', '#22c55e', 'enables'),
+    ],
+  };
+}
+
+export async function organizeAndClusterWithAIAsync(
+  nodes: LivingNode[],
+  updateNode: (id: string, patch: Partial<LivingNode>) => void,
+  addNode: (node: LivingNode) => void
+): Promise<{ clustersCount: number }> {
+  if (nodes.length === 0) return { clustersCount: 0 };
+
+  const provider = (localStorage.getItem('CANVIO_AI_PROVIDER') as string) || 'gemini';
+  const keyStorageKey = provider === 'gemini' ? 'CANVIO_GEMINI_KEY' : provider === 'openai' ? 'CANVIO_OPENAI_KEY' : 'CANVIO_ANTHROPIC_KEY';
+  const apiKey = localStorage.getItem(keyStorageKey) || localStorage.getItem('CANVIO_AI_API_KEY') || '';
+
+  // Group nodes into 3 columns (clusters)
+  const CLUSTER_PRESETS = [
+    { title: '💡 Strategy & Ideas', color: '#8b5cf6', stickyColor: 'purple' },
+    { title: '⚡ Execution & Tasks', color: '#22c55e', stickyColor: 'green' },
+    { title: '🚨 Risks & Review', color: '#f59e0b', stickyColor: 'orange' },
+  ];
+
+  const total = nodes.length;
+  const nodesPerCluster = Math.ceil(total / 3);
+
+  nodes.forEach((n, idx) => {
+    const clusterIdx = Math.min(2, Math.floor(idx / nodesPerCluster));
+    const inClusterPos = idx % nodesPerCluster;
+    const colX = (clusterIdx - 1) * 380;
+    const rowY = inClusterPos * 180;
+
+    updateNode(n.id, {
+      position: { x: colX, y: rowY },
+      ...(n.type === 'sticky' ? { data: { ...n.data, color: CLUSTER_PRESETS[clusterIdx].stickyColor } } : {}),
+    });
+  });
+
+  // Create 3 Frame clusters around them
+  CLUSTER_PRESETS.forEach((cp, idx) => {
+    const colX = (idx - 1) * 380 - 20;
+    const frameNode = frame(
+      nanoid(10),
+      colX,
+      -60,
+      340,
+      Math.max(300, nodesPerCluster * 180 + 80),
+      cp.title,
+      cp.color
+    );
+    addNode(frameNode);
+  });
+
+  return { clustersCount: 3 };
+}
+
 const markerPort = (id: string) => `marker:${id}`;
 const now = () => Date.now();
 
@@ -111,6 +453,31 @@ export function generateSpatialBoard(prompt: string): SpatialAIResult {
   const store = useCanvasStore.getState();
   const cx = Math.round(-store.viewport.x);
   const cy = Math.round(-store.viewport.y);
+
+  if (p.includes('pdf') || p.includes('report') || p.includes('document') || p.includes('page') || p.includes('print')) {
+    const pageId = nanoid(10);
+    const titleId = nanoid(10);
+    const summaryId = nanoid(10);
+    const findingsId = nanoid(10);
+    const actionsId = nanoid(10);
+
+    const nodes: LivingNode[] = [
+      frame(pageId, cx - 297, cy - 421, 595, 842, 'AI Document Page (A4)', '#6366f1'),
+      textBlock(titleId, cx - 250, cy - 370, 500, 50, prompt.slice(0, 50) || 'Spatial Executive Summary', 1, 24),
+      sticky(summaryId, cx - 250, cy - 280, 230, 160, 'Executive Overview\nKey strategic insights & spatial relationships assembled for publication.', 'blue', 2),
+      sticky(findingsId, cx + 20, cy - 280, 230, 160, 'Core Findings\n- Verified coordinates\n- Linked operational notes\n- Ready for PDF export', 'yellow', 3),
+      sticky(actionsId, cx - 250, cy - 90, 500, 140, 'Recommended Next Actions\n1. Review spatial relations\n2. Share live collaboration URL\n3. Export multi-page PDF document', 'green', 4),
+    ];
+
+    return {
+      title: 'AI Document Page World',
+      nodes,
+      relations: [
+        relation(summaryId, findingsId, 'supports', '#3b82f6', 'based_on'),
+        relation(findingsId, actionsId, 'drives', '#22c55e', 'leads_to'),
+      ],
+    };
+  }
 
   if (p.includes('field') || p.includes('site') || p.includes('emergency') || p.includes('incident') || p.includes('map') || p.includes('logistics')) {
     const frameId = nanoid(10);

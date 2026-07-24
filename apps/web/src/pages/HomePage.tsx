@@ -35,6 +35,12 @@ export function HomePage() {
           <button className="home-nav__link" onClick={handleCreateWorld} disabled={isCreating}>
             Workspace
           </button>
+          <button className="home-nav__link" onClick={() => navigate('/how-it-works')}>
+            How It Works
+          </button>
+          <button className="home-nav__link" onClick={() => navigate('/support')}>
+            Support
+          </button>
           <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
             {isCreating ? 'Creating...' : '+ Launch Canvas'}
           </button>
@@ -51,8 +57,12 @@ export function HomePage() {
 
       {/* Hero Section */}
       <section className="home-hero">
+        <div className="home-hero__badge">
+          <span className="home-hero__badge-dot" />
+          <span className="home-hero__badge-text">A Visual Knowledge Workspace</span>
+        </div>
         <h1 className="home-hero__title">
-          Build ideas the way you <span>build cities</span>.
+          Connect ideas. <span>Create knowledge.</span>
         </h1>
         <p className="home-hero__subtitle">
           An infinite collaborative canvas powered by spatial AI, freehand drawing, vector shape recognition, and real-time multiplayer.
@@ -110,34 +120,24 @@ export function HomePage() {
 
       {/* Features Grid */}
       <section className="home-features">
-        <div className="home-features__grid">
+        <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-card__icon feature-card__icon--edit">
+            <div className="feature-card__icon feature-card__icon--draw">
               <span className="material-symbols-outlined">edit</span>
             </div>
-            <h3 className="feature-card__title">Pure Freehand & Ink-to-Shape</h3>
+            <h3 className="feature-card__title">Vector Freehand & Gesture Drawing</h3>
             <p className="feature-card__desc">
-              Hand-drawn shapes auto-convert into crisp vector geometry for perfectly clean diagrams instantly.
+              Draw smooth pressure-sensitive strokes, arrows, and shapes with instant gesture detection and automatic shape recognition.
             </p>
           </div>
 
           <div className="feature-card">
-            <div className="feature-card__icon feature-card__icon--arrow">
-              <span className="material-symbols-outlined">arrow_right_alt</span>
-            </div>
-            <h3 className="feature-card__title">Smart Connection Arrows</h3>
-            <p className="feature-card__desc">
-              Draw a gesture line between objects to auto-connect with dynamic routing that stays neat as you move nodes.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-card__icon feature-card__icon--group">
+            <div className="feature-card__icon feature-card__icon--collab">
               <span className="material-symbols-outlined">group</span>
             </div>
-            <h3 className="feature-card__title">Real-Time Collaboration</h3>
+            <h3 className="feature-card__title">Real-Time Multiplayer & PDF Engine</h3>
             <p className="feature-card__desc">
-              Multiplayer cursors, instant sync, and presence awareness make remote teamwork feel physical and alive.
+              Collaborate live with zero signup, instant URL sharing, and multi-page A4 PDF document export.
             </p>
           </div>
 
@@ -145,7 +145,7 @@ export function HomePage() {
             <div className="feature-card__icon feature-card__icon--map">
               <span className="material-symbols-outlined">map</span>
             </div>
-            <h3 className="feature-card__title">Spatial AI & Widgets</h3>
+            <h3 className="feature-card__title">Spatial AI & Living Maps</h3>
             <p className="feature-card__desc">
               Embed interactive Leaflet maps, code snippets, frames, and spatial AI navigators directly onto your workspace.
             </p>
@@ -189,6 +189,21 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="home-footer">
+        <div className="home-footer__brand">
+          <CanvioLogoIcon size={20} />
+          <span>Canvio — Connect ideas. Create knowledge.</span>
+        </div>
+        <div className="home-footer__links">
+          <button className="home-footer__link" onClick={() => navigate('/support')}>Support Canvio</button>
+          <span className="home-footer__divider">•</span>
+          <span className="home-footer__link">AGPL-3.0 License</span>
+          <span className="home-footer__divider">•</span>
+          <span className="home-footer__link">Privacy</span>
+        </div>
+      </footer>
     </div>
   );
 }
