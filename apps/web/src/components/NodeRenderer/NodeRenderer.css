@@ -168,30 +168,6 @@
 .node-port.left:hover,
 .node-port.left.active { transform: translateY(-50%) scale(1.4); }
 
-@media (pointer: coarse) {
-  .resize-handle {
-    width: 18px;
-    height: 18px;
-    border-width: 3px;
-  }
-
-  .resize-handle.tl { top: -10px; left: -10px; }
-  .resize-handle.tr { top: -10px; right: -10px; }
-  .resize-handle.bl { bottom: -10px; left: -10px; }
-  .resize-handle.br { bottom: -10px; right: -10px; }
-
-  .node-port {
-    width: 20px;
-    height: 20px;
-    border-width: 3px;
-  }
-
-  .node-port.top { top: -12px; }
-  .node-port.right { right: -12px; }
-  .node-port.bottom { bottom: -12px; }
-  .node-port.left { left: -12px; }
-}
-
 [data-theme="light"] .node-renderer.selected {
   box-shadow:
     0 0 0 1px var(--selection-ring-soft),

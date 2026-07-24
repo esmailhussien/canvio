@@ -117,9 +117,8 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     }
   }, [panBy, zoomAtPoint, viewport.zoom]);
 
-  // Handle pointer down
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.isPrimary) return;
+  // Handle mouse down
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const isCanvasSurface =
       target === canvasRef.current ||
@@ -127,11 +126,9 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       target.classList.contains('canvas__grid');
     if (!isCanvasSurface) return;
 
-    e.currentTarget.setPointerCapture?.(e.pointerId);
     const worldPos = screenToWorld(e.clientX, e.clientY);
 
     if (activeTool === 'pan' || e.button === 1) {
-      e.preventDefault();
       setIsPanning(true);
       setLastMousePos({ x: e.clientX, y: e.clientY });
       return;
@@ -144,7 +141,6 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     }
 
     if (activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow') {
-      e.preventDefault();
       setIsDrawing(true);
       setCurrentStroke([[worldPos.x, worldPos.y, 0.5]]);
       return;
@@ -181,7 +177,6 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     }
 
     if (activeTool === 'frame') {
-      e.preventDefault();
       setIsDrawingFrame(true);
       setFrameStartPos(worldPos);
       setFrameCurrentPos(worldPos);
@@ -189,7 +184,6 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     }
 
     if (activeTool === 'select') {
-      e.preventDefault();
       // Start marquee selection
       setMarqueeStart(worldPos);
       setMarqueeEnd(worldPos);
@@ -198,9 +192,8 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     }
   }, [activeTool, screenToWorld, clearSelection, stickyColor, setRelationSourceId, createNodeFromPlugin]);
 
-  // Pointer move for panning and drawing
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.isPrimary) return;
+  // Mouse move for panning and drawing
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const worldPos = screenToWorld(e.clientX, e.clientY);
     setCursorWorldPos(worldPos);
 
@@ -232,13 +225,8 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     }
   }, [activeTool, isPanning, lastMousePos, isDrawing, currentStroke, isMarqueeActive, isDrawingFrame, viewport.zoom, panBy, screenToWorld, strokeWidth]);
 
-  // Pointer up
-  const handlePointerUp = useCallback((e?: React.PointerEvent<HTMLDivElement>) => {
-    if (e && !e.isPrimary) return;
-    if (e?.currentTarget.hasPointerCapture?.(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-
+  // Mouse up
+  const handleMouseUp = useCallback(() => {
     if (isPanning) {
       setIsPanning(false);
       setLastMousePos(null);
@@ -694,10 +682,10 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     <div
       ref={canvasRef}
       className={`canvas ${relationStateClass}`}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
       onDragOver={handleDragOver}
       onDrop={handleDrop}

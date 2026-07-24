@@ -305,7 +305,7 @@ export function NodeRenderer({ node }: Props) {
     setRelationTarget(node.id, markerPort);
   }, [activeTool, node.id, relationSourceId, relationSourcePort, relationTargetId, setRelationTarget]);
 
-  const handlePortStart = (portPos: 'top' | 'right' | 'bottom' | 'left') => (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePortStart = (portPos: 'top' | 'right' | 'bottom' | 'left') => (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (!relationSourceId) {
@@ -378,10 +378,10 @@ export function NodeRenderer({ node }: Props) {
       {/* Interactive Connection Ports (rendered on hover, selection, or relation mode) */}
       {(isHovered || isSelected || activeTool === 'relation') && (
         <>
-          <div className={`node-port top ${relationSourcePort === 'top' || (isRelationTarget && relationTargetPort === 'top') ? 'active' : ''}`} title="Top connection" onMouseEnter={handlePortEnter('top')} onPointerDown={handlePortStart('top')} />
-          <div className={`node-port right ${relationSourcePort === 'right' || (isRelationTarget && relationTargetPort === 'right') ? 'active' : ''}`} title="Right connection" onMouseEnter={handlePortEnter('right')} onPointerDown={handlePortStart('right')} />
-          <div className={`node-port bottom ${relationSourcePort === 'bottom' || (isRelationTarget && relationTargetPort === 'bottom') ? 'active' : ''}`} title="Bottom connection" onMouseEnter={handlePortEnter('bottom')} onPointerDown={handlePortStart('bottom')} />
-          <div className={`node-port left ${relationSourcePort === 'left' || (isRelationTarget && relationTargetPort === 'left') ? 'active' : ''}`} title="Left connection" onMouseEnter={handlePortEnter('left')} onPointerDown={handlePortStart('left')} />
+          <div className={`node-port top ${relationSourcePort === 'top' || (isRelationTarget && relationTargetPort === 'top') ? 'active' : ''}`} title="Top connection" onMouseEnter={handlePortEnter('top')} onMouseDown={handlePortStart('top')} />
+          <div className={`node-port right ${relationSourcePort === 'right' || (isRelationTarget && relationTargetPort === 'right') ? 'active' : ''}`} title="Right connection" onMouseEnter={handlePortEnter('right')} onMouseDown={handlePortStart('right')} />
+          <div className={`node-port bottom ${relationSourcePort === 'bottom' || (isRelationTarget && relationTargetPort === 'bottom') ? 'active' : ''}`} title="Bottom connection" onMouseEnter={handlePortEnter('bottom')} onMouseDown={handlePortStart('bottom')} />
+          <div className={`node-port left ${relationSourcePort === 'left' || (isRelationTarget && relationTargetPort === 'left') ? 'active' : ''}`} title="Left connection" onMouseEnter={handlePortEnter('left')} onMouseDown={handlePortStart('left')} />
         </>
       )}
 
