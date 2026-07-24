@@ -23,6 +23,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   const panBy = useCanvasStore((s) => s.panBy);
   const zoomAtPoint = useCanvasStore((s) => s.zoomAtPoint);
   const addNode = useCanvasStore((s) => s.addNode);
+  const updateNode = useCanvasStore((s) => s.updateNode);
   const addRelation = useCanvasStore((s) => s.addRelation);
   const selectNode = useCanvasStore((s) => s.selectNode);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
@@ -42,6 +43,20 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<number[][] | null>(null);
+  // Tracks the "ink session" for the plain pen tool: while the user keeps
+  // writing/drawing nearby strokes in quick succession (e.g. letters in a word,
+  // or a sentence), we group them into the SAME drawing node instead of
+  // creating a brand-new independent object per pen lift. A long pause or a
+  // stroke far away from the last one starts a fresh node.
+  const inkSessionRef = useRef<{ nodeId: string; lastEndTime: number; minX: number; minY: number; maxX: number; maxY: number } | null>(null);
+  const INK_SESSION_MAX_GAP_MS = 900;
+  const INK_SESSION_PROXIMITY_PX = 120;
+
+  useEffect(() => {
+    if (activeTool !== 'draw') {
+      inkSessionRef.current = null;
+    }
+  }, [activeTool]);
 
   const [cursorWorldPos, setCursorWorldPos] = useState<{ x: number, y: number } | null>(null);
 
@@ -116,6 +131,81 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       panBy(-e.deltaX / viewport.zoom, -e.deltaY / viewport.zoom);
     }
   }, [panBy, zoomAtPoint, viewport.zoom]);
+
+  // Two-finger pinch-to-zoom and pan for touchscreens. This is intentionally
+  // separate from the mouse-based handlers above: on touch devices, browsers
+  // only synthesize compatibility mouse events for a SINGLE touch point, so a
+  // second finger is invisible to onMouseDown/onMouseMove — there was
+  // previously no way to zoom the canvas at all on a phone or tablet.
+  // Note: a pointerdown that starts on an *interactive* Living Map Node calls
+  // stopPropagation (see MapNode.tsx), so these handlers never see touches
+  // that land on an unlocked map — Leaflet's own pinch-zoom handles those, and
+  // this canvas-level pinch only takes over once the map is locked or the
+  // fingers are elsewhere on the world. That keeps the existing lock/unlock
+  // affordance as the single source of truth for "who owns this gesture."
+  const pinchStateRef = useRef<{ distance: number; midpoint: { x: number; y: number } } | null>(null);
+
+  const getTouchDistance = (touches: React.TouchList) => {
+    const a = touches[0];
+    const b = touches[1];
+    return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+  };
+
+  const getTouchMidpoint = (touches: React.TouchList) => {
+    const a = touches[0];
+    const b = touches[1];
+    return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+  };
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // A second finger just landed — this is a navigation gesture. Cancel any
+      // single-finger action already in progress (a stroke, a marquee, a frame
+      // being drawn, single-finger panning) so the two never fight over the
+      // same movement.
+      setIsPanning(false);
+      setLastMousePos(null);
+      setIsDrawing(false);
+      setCurrentStroke(null);
+      setIsMarqueeActive(false);
+      setMarqueeStart(null);
+      setMarqueeEnd(null);
+      setIsDrawingFrame(false);
+      setFrameStartPos(null);
+      setFrameCurrentPos(null);
+
+      pinchStateRef.current = {
+        distance: getTouchDistance(e.touches),
+        midpoint: getTouchMidpoint(e.touches),
+      };
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStateRef.current) {
+      e.preventDefault();
+      const distance = getTouchDistance(e.touches);
+      const midpoint = getTouchMidpoint(e.touches);
+      const rect = canvasRef.current?.getBoundingClientRect();
+
+      if (rect && pinchStateRef.current.distance > 0) {
+        const scaleDelta = distance / pinchStateRef.current.distance - 1;
+        zoomAtPoint(scaleDelta, midpoint, { width: rect.width, height: rect.height });
+
+        const dx = (midpoint.x - pinchStateRef.current.midpoint.x) / viewport.zoom;
+        const dy = (midpoint.y - pinchStateRef.current.midpoint.y) / viewport.zoom;
+        panBy(dx, dy);
+      }
+
+      pinchStateRef.current = { distance, midpoint };
+    }
+  }, [zoomAtPoint, panBy, viewport.zoom]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      pinchStateRef.current = null;
+    }
+  }, []);
 
   // Handle mouse down
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -409,41 +499,121 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
         setActiveTool('select');
       } else {
         // Standard Freehand Stroke
-        const minX = Math.min(...currentStroke.map(p => p[0]));
-        const minY = Math.min(...currentStroke.map(p => p[1]));
-        const maxX = Math.max(...currentStroke.map(p => p[0]));
-        const maxY = Math.max(...currentStroke.map(p => p[1]));
+        const strokeMinX = Math.min(...currentStroke.map(p => p[0]));
+        const strokeMinY = Math.min(...currentStroke.map(p => p[1]));
+        const strokeMaxX = Math.max(...currentStroke.map(p => p[0]));
+        const strokeMaxY = Math.max(...currentStroke.map(p => p[1]));
         const padding = 20;
 
-        const normalizedPoints = currentStroke.map(([x, y, p]) => [
-          x - minX + padding,
-          y - minY + padding,
-          p
-        ]);
+        const session = inkSessionRef.current;
+        const now = Date.now();
+        const withinTime = session ? (now - session.lastEndTime) <= INK_SESSION_MAX_GAP_MS : false;
+        const withinProximity = session
+          ? strokeMinX < session.maxX + INK_SESSION_PROXIMITY_PX &&
+            strokeMaxX > session.minX - INK_SESSION_PROXIMITY_PX &&
+            strokeMinY < session.maxY + INK_SESSION_PROXIMITY_PX &&
+            strokeMaxY > session.minY - INK_SESSION_PROXIMITY_PX
+          : false;
 
-        const node = {
-          id: nanoid(10),
-          type: 'drawing',
-          position: { x: minX - padding, y: minY - padding },
-          size: { width: maxX - minX + padding * 2, height: maxY - minY + padding * 2 },
-          rotation: 0,
-          zIndex: nextZIndex(),
-          locked: false,
-          data: {
-            kind: 'freehand',
-            strokes: [{
-              id: nanoid(6),
-              points: normalizedPoints,
-              color: strokeColor,
-              width: strokeWidth,
-              complete: true,
-            }]
-          },
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        addNode(node);
-        selectNode(node.id);
+        const existingNode = session ? useCanvasStore.getState().nodes[session.nodeId] : null;
+
+        if (session && existingNode && withinTime && withinProximity) {
+          // Merge this stroke into the same node as the previous one (e.g. the
+          // next letter of the same word) instead of creating a new object.
+          const combinedMinX = Math.min(session.minX, strokeMinX);
+          const combinedMinY = Math.min(session.minY, strokeMinY);
+          const combinedMaxX = Math.max(session.maxX, strokeMaxX);
+          const combinedMaxY = Math.max(session.maxY, strokeMaxY);
+
+          const newPosition = { x: combinedMinX - padding, y: combinedMinY - padding };
+          const newSize = {
+            width: combinedMaxX - combinedMinX + padding * 2,
+            height: combinedMaxY - combinedMinY + padding * 2,
+          };
+
+          // Existing strokes are stored in local coordinates (world = local +
+          // node.position). Re-normalize them to the new, possibly-expanded
+          // bounding box by shifting every point by the origin's delta.
+          const shiftX = existingNode.position.x - newPosition.x;
+          const shiftY = existingNode.position.y - newPosition.y;
+          type InkStroke = { id: string; points: number[][]; color: string; width: number; complete: boolean };
+          const priorStrokes = ((existingNode.data?.strokes as InkStroke[] | undefined) || []);
+          const existingStrokes = priorStrokes.map((s) => ({
+            ...s,
+            points: s.points.map(([x, y, p]) => [x + shiftX, y + shiftY, p]),
+          }));
+
+          const newStrokeNormalized = currentStroke.map(([x, y, p]) => [
+            x - newPosition.x,
+            y - newPosition.y,
+            p,
+          ]);
+
+          updateNode(session.nodeId, {
+            position: newPosition,
+            size: newSize,
+            data: {
+              ...existingNode.data,
+              strokes: [...existingStrokes, {
+                id: nanoid(6),
+                points: newStrokeNormalized,
+                color: strokeColor,
+                width: strokeWidth,
+                complete: true,
+              }],
+            },
+            updatedAt: now,
+          });
+          selectNode(session.nodeId);
+
+          inkSessionRef.current = {
+            nodeId: session.nodeId,
+            lastEndTime: now,
+            minX: combinedMinX,
+            minY: combinedMinY,
+            maxX: combinedMaxX,
+            maxY: combinedMaxY,
+          };
+        } else {
+          const normalizedPoints = currentStroke.map(([x, y, p]) => [
+            x - strokeMinX + padding,
+            y - strokeMinY + padding,
+            p
+          ]);
+
+          const node = {
+            id: nanoid(10),
+            type: 'drawing',
+            position: { x: strokeMinX - padding, y: strokeMinY - padding },
+            size: { width: strokeMaxX - strokeMinX + padding * 2, height: strokeMaxY - strokeMinY + padding * 2 },
+            rotation: 0,
+            zIndex: nextZIndex(),
+            locked: false,
+            data: {
+              kind: 'freehand',
+              strokes: [{
+                id: nanoid(6),
+                points: normalizedPoints,
+                color: strokeColor,
+                width: strokeWidth,
+                complete: true,
+              }]
+            },
+            createdAt: now,
+            updatedAt: now,
+          };
+          addNode(node);
+          selectNode(node.id);
+
+          inkSessionRef.current = {
+            nodeId: node.id,
+            lastEndTime: now,
+            minX: strokeMinX,
+            minY: strokeMinY,
+            maxX: strokeMaxX,
+            maxY: strokeMaxY,
+          };
+        }
       }
     }
 
@@ -686,6 +856,10 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onWheel={handleWheel}
       onDragOver={handleDragOver}
       onDrop={handleDrop}

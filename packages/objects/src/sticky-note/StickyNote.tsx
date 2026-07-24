@@ -49,12 +49,24 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     }
   };
 
+  // Only swallow the event if this note's textarea is already focused (mid-edit) —
+  // that preserves native text selection / cursor placement while typing.
+  // Otherwise let the pointerdown bubble up so NodeRenderer can decide, based on
+  // whether the gesture turns into a drag or stays a stationary tap, whether to
+  // move the whole note or enter edit mode. Without this, a tap anywhere on the
+  // textarea (which covers almost the entire note) always ate the event and the
+  // note could only ever be dragged from a tiny sliver of non-text border —
+  // nearly impossible to hit accurately with a finger on mobile.
   const handlePointerDown = (e: React.PointerEvent) => {
-    e.stopPropagation();
+    if (document.activeElement === textRef.current) {
+      e.stopPropagation();
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    if (document.activeElement === textRef.current) {
+      e.stopPropagation();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

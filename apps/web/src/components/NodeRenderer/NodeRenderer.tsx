@@ -37,6 +37,18 @@ export function NodeRenderer({ node }: Props) {
 
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number, y: number } | null>(null);
+  // Fixed pointerdown origin (never mutated during the gesture) used only to
+  // measure total displacement, so we can tell a real drag apart from a
+  // stationary tap on a text field.
+  const dragOriginRef = useRef<{ x: number, y: number } | null>(null);
+  const hasExceededDragThresholdRef = useRef(false);
+  // If the pointerdown landed on a text field (sticky note / text node), we hold
+  // a reference to it here instead of focusing immediately. We only focus it on
+  // pointerup if the gesture never turned into a drag — that's what lets you
+  // grab and move a note by touching its text, instead of every tap opening the
+  // keyboard and blocking the drag.
+  const pendingTapEditTargetRef = useRef<HTMLElement | null>(null);
+  const DRAG_THRESHOLD_PX = 6;
 
   const [resizeDir, setResizeDir] = useState<'tl' | 'tr' | 'bl' | 'br' | null>(null);
   const resizeStartRef = useRef<{ x: number, y: number, width: number, height: number, posX: number, posY: number } | null>(null);
@@ -113,23 +125,25 @@ export function NodeRenderer({ node }: Props) {
       return;
     }
 
-    // If clicking an input or textarea, let the element handle focus and selection
+    // Text fields (sticky notes, text nodes): don't decide select-vs-edit-vs-drag
+    // yet based on which element was hit — on mobile a fingertip almost always
+    // lands on the textarea since it fills the note. Defer the decision to
+    // pointerup/pointermove instead: real movement past a small threshold moves
+    // the node; a stationary tap enters edit mode (see handlePointerUp).
     const targetTag = target.tagName.toLowerCase();
-    if (targetTag === 'textarea' || targetTag === 'input' || target.closest('.sticky-note__textarea')) {
-      selectNode(node.id, e.shiftKey);
-      return;
+    const isTextField = targetTag === 'textarea' || targetTag === 'input' || Boolean(target.closest('.sticky-note__textarea'));
+    if (isTextField) {
+      e.preventDefault(); // suppress the browser's native focus-on-pointerdown
+      pendingTapEditTargetRef.current = target;
+    } else {
+      pendingTapEditTargetRef.current = null;
+      e.preventDefault();
     }
-    
-    // If clicking inside an interactive map, do not start node dragging
-    if (node.type === 'map' && node.data?.interactive && target.closest('.leaflet-container')) {
-      // Still select the node on click
-      selectNode(node.id, e.shiftKey);
-      return;
-    }
-    
+
     e.stopPropagation();
-    e.preventDefault();
     selectNode(node.id, e.shiftKey);
+    hasExceededDragThresholdRef.current = false;
+    dragOriginRef.current = { x: e.clientX, y: e.clientY };
     if (!node.locked) {
       e.currentTarget.setPointerCapture?.(e.pointerId);
       setIsDragging(true);
@@ -141,6 +155,24 @@ export function NodeRenderer({ node }: Props) {
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (isDragging && dragStartRef.current) {
+      if (!hasExceededDragThresholdRef.current && dragOriginRef.current) {
+        const totalDx = e.clientX - dragOriginRef.current.x;
+        const totalDy = e.clientY - dragOriginRef.current.y;
+        if (Math.hypot(totalDx, totalDy) <= DRAG_THRESHOLD_PX) {
+          // Still within tap tolerance — don't move the node yet, and don't let
+          // tiny jitter nudge it before we know this is really a drag.
+          return;
+        }
+        hasExceededDragThresholdRef.current = true;
+        // The gesture turned into a real drag — cancel the pending "focus this
+        // text field" action (and dismiss the mobile keyboard if it already
+        // opened) so dragging a note never fights with editing it.
+        if (pendingTapEditTargetRef.current) {
+          pendingTapEditTargetRef.current.blur?.();
+          pendingTapEditTargetRef.current = null;
+        }
+      }
+
       const zoom = useCanvasStore.getState().viewport.zoom;
       const dx = (e.clientX - dragStartRef.current.x) / zoom;
       const dy = (e.clientY - dragStartRef.current.y) / zoom;
@@ -184,6 +216,14 @@ export function NodeRenderer({ node }: Props) {
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
     dragStartRef.current = null;
+    dragOriginRef.current = null;
+    if (!hasExceededDragThresholdRef.current && pendingTapEditTargetRef.current) {
+      // A genuine stationary tap on a text field (no meaningful movement) —
+      // enter edit mode now.
+      pendingTapEditTargetRef.current.focus();
+    }
+    pendingTapEditTargetRef.current = null;
+    hasExceededDragThresholdRef.current = false;
   }, []);
 
   // Resizing handlers
