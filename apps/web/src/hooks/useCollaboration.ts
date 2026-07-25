@@ -106,8 +106,18 @@ export function useCollaboration(worldId: string) {
     // Create Yjs Doc
     const doc = new Y.Doc();
     const wsUrl = getWebSocketUrl();
-    const wsProvider = new WebsocketProvider(wsUrl, worldId, doc);
+    const wsProvider = new WebsocketProvider(wsUrl, worldId, doc, {
+      connect: false,
+      maxBackoffTime: 30000,
+    });
     setProvider(wsProvider);
+    
+    // Delay actual connection by 150ms to bypass React StrictMode's immediate unmount sequence,
+    // avoiding the "WebSocket is closed before the connection is established" console errors.
+    const connectTimer = window.setTimeout(() => {
+      wsProvider.connect();
+    }, 150);
+
     let remoteSynced = false;
     let isReceivingRemote = false;
 
@@ -215,6 +225,17 @@ export function useCollaboration(worldId: string) {
       setConnected(event.status === 'connected');
     };
 
+    let hasHandledError = false;
+    const handleConnectionFailure = () => {
+      if (hasHandledError) return;
+      hasHandledError = true;
+      if (wsUrl.includes('localhost') || wsUrl.includes('127.0.0.1')) {
+        wsProvider.off('connection-error', handleConnectionFailure);
+        wsProvider.disconnect();
+        console.info('🔌 Canvio is running in Offline-First LocalStorage mode.');
+      }
+    };
+
     const handleProviderSync = (synced: boolean) => {
       remoteSynced = synced;
     };
@@ -241,6 +262,7 @@ export function useCollaboration(worldId: string) {
 
     wsProvider.on('status', handleProviderStatus);
     wsProvider.on('sync', handleProviderSync);
+    wsProvider.on('connection-error', handleConnectionFailure);
     awareness.on('change', handleAwarenessChange);
 
     // ─── Local → Remote Sync ──────────────────────────────────────────
@@ -365,6 +387,7 @@ export function useCollaboration(worldId: string) {
     const unsubscribeLocalSave = useCanvasStore.subscribe(saveLocalState);
 
     return () => {
+      window.clearTimeout(connectTimer);
       if (saveTimeout !== null) window.clearTimeout(saveTimeout);
       unsubscribeNodes();
       unsubscribeRelations();
@@ -373,6 +396,7 @@ export function useCollaboration(worldId: string) {
       window.removeEventListener('pointermove', handlePointerMove);
       wsProvider.off('status', handleProviderStatus);
       wsProvider.off('sync', handleProviderSync);
+      wsProvider.off('connection-error', handleConnectionFailure);
       awareness.off('change', handleAwarenessChange);
       yNodes.unobserve(handleNodesObserve);
       yRelations.unobserve(handleRelationsObserve);

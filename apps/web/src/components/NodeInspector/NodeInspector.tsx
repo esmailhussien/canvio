@@ -445,6 +445,18 @@ export function NodeInspector({ node }: NodeInspectorProps) {
       {/* Action Buttons */}
       <div className="node-inspector__actions">
         <button
+          className="node-inspector__btn node-inspector__btn--connect"
+          onClick={(e) => {
+            e.stopPropagation();
+            useCanvasStore.getState().setRelationSourceId(node.id);
+            useCanvasStore.getState().setActiveTool('relation');
+          }}
+          title="Connect Relation (↗) — Click any target node to create link"
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-primary)' }}>↗</span>
+        </button>
+
+        <button
           className={`node-inspector__btn node-inspector__btn--ai ${isExpanding ? 'spinning' : ''}`}
           onClick={handleAIExpand}
           disabled={isExpanding}

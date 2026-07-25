@@ -101,8 +101,22 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     return localStorage.getItem('CANVIO_AI_MODEL') || 'gemini-2.5-flash';
   });
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const addNode = useCanvasStore((s) => s.addNode);
   const addRelation = useCanvasStore((s) => s.addRelation);
+
+  // Close on Escape key press
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -226,68 +240,71 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   return (
     <div className="ai-modal__overlay" onClick={onClose}>
       <div className="ai-modal__content" onClick={(e) => e.stopPropagation()}>
-        <div className="ai-modal__header">
-          <div className="ai-modal__title-group">
-            <span className="ai-modal__sparkle">✨</span>
-            <div>
-              <h3>Spatial AI Navigator</h3>
-              <p>Generate a structured World with meaningful Nodes, Relations, owners, risks, and map pins when useful.</p>
-            </div>
-          </div>
-          <button className="ai-modal__close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="ai-modal__quality-row">
-          <span>Spatial layout</span>
-          <span>Semantic relations</span>
-          <span>Viewport fitted</span>
-          <span>Map-aware when useful</span>
-        </div>
-
-        <form onSubmit={handleGenerate} className="ai-modal__form">
-          <div className="ai-modal__input-wrapper">
-            <input
-              autoFocus
-              className="ai-modal__input"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the board you want to build..."
-              disabled={isGenerating}
-            />
-            <button type="submit" className="ai-modal__generate-btn" disabled={!prompt.trim() || isGenerating}>
-              {isGenerating ? 'Generating...' : 'Generate World'}
-            </button>
-          </div>
-        </form>
-
-        <div className="ai-modal__quick-actions">
-          <button type="button" className="ai-action-btn" onClick={handleSummarizeBoard} disabled={isGenerating}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#8083ff' }}>summarize</span>
-            <span>✨ Summarize Board</span>
-          </button>
-          <button type="button" className="ai-action-btn" onClick={handleOrganizeCluster} disabled={isGenerating}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#22c55e' }}>grid_view</span>
-            <span>✨ Organize & Cluster</span>
-          </button>
-        </div>
-
-        <div className="ai-modal__quick-prompts">
-          <span>High-quality starters</span>
-          <div className="ai-modal__prompt-pills">
-            {QUICK_PROMPTS.map((qp) => (
-              <button
-                key={qp.title}
-                className="ai-prompt-pill"
-                onClick={() => setPrompt(qp.prompt)}
-              >
-                <strong>{qp.title}</strong>
-                <span>{qp.prompt}</span>
+        <div className="ai-modal__header-row">
+          <span className="ai-modal__sparkle" title="Canvio Spatial AI">✨</span>
+          <form onSubmit={handleGenerate} className="ai-modal__form flex-1" style={{ flex: 1, margin: 0 }}>
+            <div className="ai-modal__input-wrapper">
+              <input
+                autoFocus
+                className="ai-modal__input"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Ask AI to generate a World, summarize, or organize... (Ctrl+K)"
+                disabled={isGenerating}
+              />
+              <button type="submit" className="ai-modal__generate-btn" disabled={!prompt.trim() || isGenerating}>
+                {isGenerating ? 'Running...' : 'Generate'}
               </button>
-            ))}
+            </div>
+          </form>
+          <div className="ai-modal__header-actions">
+            <button
+              type="button"
+              className={`ai-modal__settings-toggle ${isSettingsOpen ? 'active' : ''}`}
+              onClick={() => setIsSettingsOpen((prev) => !prev)}
+              title="Toggle API Key & Model Settings"
+            >
+              <span className="material-symbols-outlined text-sm">settings</span>
+              <span>{isSettingsOpen ? 'Hide' : 'Settings'}</span>
+            </button>
+            <button className="ai-modal__close" onClick={onClose} title="Close (Esc)">✕</button>
           </div>
         </div>
 
-        <div className="ai-modal__settings">
+        {!isSettingsOpen && (
+          <>
+            <div className="ai-modal__quick-actions">
+              <button type="button" className="ai-action-btn" onClick={handleSummarizeBoard} disabled={isGenerating}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#8083ff' }}>summarize</span>
+                <span>✨ Summarize Board</span>
+              </button>
+              <button type="button" className="ai-action-btn" onClick={handleOrganizeCluster} disabled={isGenerating}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#22c55e' }}>grid_view</span>
+                <span>✨ Organize & Cluster</span>
+              </button>
+            </div>
+
+            {!prompt.trim() && (
+              <div className="ai-modal__quick-prompts">
+                <span className="ai-modal__prompts-label">Suggested Starters</span>
+                <div className="ai-modal__prompt-pills">
+                  {QUICK_PROMPTS.slice(0, 3).map((qp) => (
+                    <button
+                      key={qp.title}
+                      className="ai-prompt-pill"
+                      onClick={() => setPrompt(qp.prompt)}
+                    >
+                      <strong>{qp.title}:</strong> <span>{qp.prompt}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {isSettingsOpen && (
+          <div className="ai-modal__settings">
           <div className="ai-modal__settings-top">
             <div className="ai-modal__provider-tabs">
               {(Object.keys(PROVIDER_CONFIGS) as AIProvider[]).map((p) => {
@@ -368,6 +385,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
             </span>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

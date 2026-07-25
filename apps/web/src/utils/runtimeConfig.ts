@@ -22,11 +22,14 @@ export function getApiBaseUrl() {
 }
 
 export function getWebSocketUrl() {
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Use custom configured URL, environment variable, or public Yjs demo provider fallback on production
   if (getRuntimeConfig().wsUrl) return getRuntimeConfig().wsUrl!.replace(/\/$/, '');
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL.replace(/\/$/, '');
   
-  // Default fallback for Vercel / production static deployments where port 4001 backend is not running
+  // Connect directly to local Canvio server in local development or on localhost
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || import.meta.env.DEV)) {
+    return 'ws://localhost:4001';
+  }
+
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${wsProtocol}//demos.yjs.dev`;
 }

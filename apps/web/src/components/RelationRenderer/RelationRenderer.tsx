@@ -8,6 +8,50 @@ interface Props {
   nodes: Record<string, LivingNode>;
 }
 
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
+  if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return '';
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const d = R * c;
+  if (isNaN(d)) return '';
+  if (d < 1) {
+    return `${Math.round(d * 1000)} m`;
+  }
+  return `${d.toFixed(1)} km`;
+}
+
+function getNodeGeoCoords(node: LivingNode, portId?: string): [number, number] | null {
+  if (!node || node.type !== 'map' || !node.data) return null;
+  const data = node.data as any;
+  const markers = Array.isArray(data.markers) ? data.markers : [];
+
+  if (portId && portId.startsWith('marker:')) {
+    const markerId = portId.replace('marker:', '');
+    const found = markers.find((m: any) => m.id === markerId);
+    if (found && Array.isArray(found.position) && found.position.length === 2) {
+      return found.position as [number, number];
+    }
+  }
+
+  if (markers.length > 0 && Array.isArray(markers[0].position)) {
+    return markers[0].position as [number, number];
+  }
+
+  if (Array.isArray(data.center) && data.center.length === 2) {
+    return data.center as [number, number];
+  }
+
+  return null;
+}
+
 export function RelationRenderer({ relations, nodes }: Props) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const selectedRelationId = useCanvasStore((s) => s.selectedRelationId);
@@ -94,7 +138,23 @@ export function RelationRenderer({ relations, nodes }: Props) {
           ? 'var(--accent-primary)'
           : style.color || 'var(--relation-default)';
 
-        const displayLabel = rel.label || (rel.relationship && rel.relationship !== 'related_to' ? rel.relationship.replace('_', ' ') : '');
+        const sourceCoords = getNodeGeoCoords(source, rel.sourcePort);
+        const targetCoords = getNodeGeoCoords(target, rel.targetPort);
+        let distanceLabel = '';
+        if (sourceCoords && targetCoords) {
+          distanceLabel = calculateHaversineDistance(
+            sourceCoords[0],
+            sourceCoords[1],
+            targetCoords[0],
+            targetCoords[1]
+          );
+        }
+
+        const baseLabel = rel.label || (rel.relationship && rel.relationship !== 'related_to' ? rel.relationship.replace('_', ' ') : '');
+        const displayLabel = baseLabel && distanceLabel
+          ? `${baseLabel} • ${distanceLabel}`
+          : baseLabel || distanceLabel;
+
         const lineWidth = style.width || 2;
         const shouldAnimate = style.animated || rel.relationship === 'leads_to';
 
@@ -193,22 +253,23 @@ export function RelationRenderer({ relations, nodes }: Props) {
                 style={{ pointerEvents: isSelectTool ? 'auto' : 'none' }}
               >
                 <rect
-                  x={-(displayLabel.length * 4 + 10)}
-                  y={-10}
-                  width={displayLabel.length * 8 + 20}
-                  height={20}
-                  rx={10}
+                  x={-(Math.max(displayLabel.length * 3.7, 16) + 12)}
+                  y={-12}
+                  width={Math.max(displayLabel.length * 7.4, 32) + 24}
+                  height={24}
+                  rx={12}
                   fill="var(--relation-label-bg)"
                   stroke={isSelected ? 'var(--accent-primary)' : 'var(--border-strong)'}
                   strokeWidth={1}
                 />
                 <text
                   x={0}
-                  y={4}
+                  y={1}
                   textAnchor="middle"
+                  dominantBaseline="middle"
                   fill="var(--text-primary)"
                   fontSize={11}
-                  fontWeight={500}
+                  fontWeight={600}
                   fontFamily="var(--font-sans)"
                 >
                   {displayLabel}

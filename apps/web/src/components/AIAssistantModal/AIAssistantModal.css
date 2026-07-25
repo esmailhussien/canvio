@@ -1,31 +1,73 @@
 .ai-modal__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 15, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: transparent;
   z-index: 1000;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  animation: fadeIn 0.2s ease-out;
+  padding-top: 56px;
+  pointer-events: auto;
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ai-modal__content {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-xl, 16px);
-  width: 640px;
-  max-width: min(92vw, 640px);
-  max-height: calc(100dvh - 40px);
+  background: var(--toolbar-bg, rgba(19, 19, 27, 0.92));
+  border: 1px solid var(--border-strong, rgba(192, 193, 255, 0.28));
+  border-radius: var(--radius-xl, 18px);
+  width: 660px;
+  max-width: min(94vw, 660px);
+  max-height: calc(100dvh - 80px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 24px;
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.34), 0 0 30px rgba(99, 102, 241, 0.12);
+  padding: 14px 18px;
+  box-shadow: var(--shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.5)), 0 0 30px var(--selection-ring-soft, rgba(128, 131, 255, 0.25));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ai-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-modal__settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.ai-modal__settings-toggle:hover,
+.ai-modal__settings-toggle.active {
+  background: rgba(128, 131, 255, 0.2);
+  border-color: rgba(192, 193, 255, 0.4);
+  color: #ffffff;
 }
 
 @media (max-width: 768px) {
@@ -37,37 +79,27 @@
   }
 }
 
-.ai-modal__header {
+.ai-modal__header-row {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.ai-modal__title-group {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .ai-modal__sparkle {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   background: linear-gradient(135deg, #a855f7, #ec4899);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  flex-shrink: 0;
 }
 
-.ai-modal__header h3 {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 750;
-  color: var(--text-primary);
-}
-
-.ai-modal__header p {
-  margin: 4px 0 0;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+.ai-modal__prompts-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
 }
 
 .ai-modal__close {
@@ -84,22 +116,6 @@
 .ai-modal__close:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-}
-
-.ai-modal__quality-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.ai-modal__quality-row span {
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 25%, var(--border-default));
-  border-radius: var(--radius-full);
-  color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
-  font-size: 0.75rem;
-  font-weight: 650;
-  padding: 5px 9px;
 }
 
 .ai-modal__form {
@@ -443,12 +459,6 @@
   box-shadow: 0 28px 90px rgba(15, 23, 42, 0.28), 0 0 30px rgba(99, 102, 241, 0.08);
 }
 
-[data-theme="light"] .ai-modal__quality-row span {
-  color: #4338ca;
-  background: rgba(99, 102, 241, 0.1);
-  border-color: rgba(79, 70, 229, 0.22);
-}
-
 [data-theme="light"] .ai-prompt-pill,
 [data-theme="light"] .ai-modal__input-wrapper {
   background: #ffffff;
@@ -489,11 +499,4 @@
     gap: 14px;
   }
 
-  .ai-modal__header h3 {
-    font-size: 1.08rem;
-  }
-
-  .ai-modal__quality-row {
-    gap: 6px;
-  }
 }

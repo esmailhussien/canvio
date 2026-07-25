@@ -39,3 +39,114 @@
 .canvas__world > * {
   pointer-events: auto;
 }
+
+.canvas__radial-ring {
+  position: fixed;
+  z-index: 1000;
+  width: 170px;
+  height: 170px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: radialPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  user-select: none;
+}
+
+@keyframes radialPopIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.65);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.canvas__radial-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--toolbar-bg, rgba(19, 19, 27, 0.92));
+  border: 1px solid var(--toolbar-border, rgba(255, 255, 255, 0.2));
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.15s ease;
+}
+
+.canvas__radial-center:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.canvas__radial-circle-item {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--toolbar-bg, rgba(19, 19, 27, 0.92));
+  border: 1px solid var(--toolbar-border, rgba(255, 255, 255, 0.18));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 15px var(--selection-ring-soft, rgba(128, 131, 255, 0.25));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.canvas__radial-circle-item:hover {
+  background: color-mix(in srgb, var(--accent-primary) 35%, var(--bg-surface));
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 22px var(--selection-ring-soft), 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.canvas__radial-circle-item.ai-item {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(99, 102, 241, 0.25));
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #c084fc;
+}
+
+.canvas__radial-circle-item.ai-item:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.45), rgba(99, 102, 241, 0.45));
+  border-color: #c084fc;
+  color: #ffffff;
+}
+
+.canvas__radial-label {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.95);
+  color: #f8fafc;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.canvas__radial-circle-item:hover .canvas__radial-label {
+  opacity: 1;
+}

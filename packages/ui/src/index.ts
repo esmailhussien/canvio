@@ -28,6 +28,7 @@ export {
   IconImage,
   IconShape,
   IconFrame,
+  IconSparkles,
   type IconProps
 } from './icons';
 export { Tooltip } from './components/Tooltip';

@@ -7,6 +7,15 @@ import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRel
 import { DrawingLayer } from '../DrawingLayer/DrawingLayer';
 import { nanoid } from 'nanoid';
 import { getPlugin } from '@canvio/objects';
+import {
+  IconSticky,
+  IconText,
+  IconShape,
+  IconMap,
+  IconFrame,
+  IconSparkles,
+  IconX,
+} from '@canvio/ui';
 import './Canvas.css';
 
 interface CanvasProps {
@@ -43,6 +52,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<number[][] | null>(null);
+  const [radialMenu, setRadialMenu] = useState<{ screenX: number; screenY: number; worldPos: { x: number; y: number } } | null>(null);
   // Tracks the "ink session" for the plain pen tool: while the user keeps
   // writing/drawing nearby strokes in quick succession (e.g. letters in a word,
   // or a sentence), we group them into the SAME drawing node instead of
@@ -209,6 +219,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
 
   // Handle mouse down
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (radialMenu) setRadialMenu(null);
     const target = e.target as HTMLElement;
     const isCanvasSurface =
       target === canvasRef.current ||
@@ -651,15 +662,21 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     setMarqueeEnd(null);
   }, [activeTool, isPanning, isDrawing, currentStroke, isMarqueeActive, marqueeStart, marqueeEnd, isDrawingFrame, frameStartPos, frameCurrentPos, addNode, selectNode, setActiveTool, nextZIndex, strokeColor, strokeWidth, autoShapeEnabled, nodes, addRelation]);
 
-  // Prevent default context menu
+  // Handle context menu / long-press for radial menu
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!e.clientX && !e.clientY) return;
+    const worldPos = screenToWorld(e.clientX, e.clientY);
+    setRadialMenu({ screenX: e.clientX, screenY: e.clientY, worldPos });
+  }, [screenToWorld]);
+
+  // Prevent default scroll behavior
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
     const prevent = (e: Event) => e.preventDefault();
-    el.addEventListener('contextmenu', prevent);
     el.addEventListener('wheel', prevent as any, { passive: false });
     return () => {
-      el.removeEventListener('contextmenu', prevent);
       el.removeEventListener('wheel', prevent as any);
     };
   }, []);
@@ -861,6 +878,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       onWheel={handleWheel}
+      onContextMenu={handleContextMenu}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -960,7 +978,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
         })()}
 
         {/* Nodes layer */}
-        <div style={{ pointerEvents: (activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow' || activeTool === 'pan') ? 'none' : 'auto' }}>
+        <div style={{ pointerEvents: (activeTool === 'select' || activeTool === 'relation' || activeTool === 'eraser') ? 'auto' : 'none' }}>
           {Object.values(nodes).map((node) => (
             <NodeRenderer key={node.id} node={node} />
           ))}
@@ -1018,6 +1036,91 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
           viewport={viewport}
         />
       )}
+
+      {/* Quick Spatial Radial Wheel Creation Menu */}
+      {radialMenu && (() => {
+        const RADIAL_ITEMS = [
+          {
+            id: 'sticky',
+            label: 'Sticky Note',
+            icon: IconSticky,
+            action: (pos: { x: number; y: number }) => createNodeFromPlugin('sticky', pos, { color: stickyColor }),
+          },
+          {
+            id: 'text',
+            label: 'Text Node',
+            icon: IconText,
+            action: (pos: { x: number; y: number }) => createNodeFromPlugin('text', pos, { color: 'var(--text-primary)' }),
+          },
+          {
+            id: 'shape',
+            label: 'Vector Shape',
+            icon: IconShape,
+            action: (pos: { x: number; y: number }) => createNodeFromPlugin('shape', pos),
+          },
+          {
+            id: 'map',
+            label: 'Living Map',
+            icon: IconMap,
+            action: (pos: { x: number; y: number }) => createNodeFromPlugin('map', pos),
+          },
+          {
+            id: 'frame',
+            label: 'Frame Page',
+            icon: IconFrame,
+            action: (pos: { x: number; y: number }) => createNodeFromPlugin('frame', pos),
+          },
+          {
+            id: 'ai',
+            label: 'Spatial AI Prompt',
+            icon: IconSparkles,
+            isAI: true,
+            action: () => useCanvasStore.getState().setAIAssistantOpen(true),
+          },
+        ];
+
+        return (
+          <div
+            className="canvas__radial-ring"
+            style={{ left: radialMenu.screenX, top: radialMenu.screenY }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="canvas__radial-center"
+              onClick={() => setRadialMenu(null)}
+              title="Close (Esc)"
+            >
+              <IconX size={15} />
+            </button>
+
+            {RADIAL_ITEMS.map((item, index) => {
+              const angleDeg = index * (360 / RADIAL_ITEMS.length) - 90;
+              const angleRad = (angleDeg * Math.PI) / 180;
+              const radius = 62;
+              const x = Math.round(radius * Math.cos(angleRad));
+              const y = Math.round(radius * Math.sin(angleRad));
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`canvas__radial-circle-item ${item.isAI ? 'ai-item' : ''}`}
+                  style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` }}
+                  onClick={() => {
+                    item.action(radialMenu.worldPos);
+                    setRadialMenu(null);
+                  }}
+                  title={item.label}
+                >
+                  <item.icon size={20} />
+                  <span className="canvas__radial-label">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

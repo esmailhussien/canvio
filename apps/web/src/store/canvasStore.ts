@@ -49,6 +49,10 @@ interface CanvasStore {
   activeTool: ToolMode;
   setActiveTool: (tool: ToolMode) => void;
 
+  // AI Assistant Modal
+  isAIAssistantOpen: boolean;
+  setAIAssistantOpen: (open: boolean) => void;
+
   // Drawing settings
   strokeColor: string;
   strokeWidth: number;
@@ -303,6 +307,10 @@ export const useCanvasStore = create(
     relationTargetId: tool === 'relation' ? s.relationTargetId : null,
     relationTargetPort: tool === 'relation' ? s.relationTargetPort : null,
   })),
+
+  // AI Assistant Modal
+  isAIAssistantOpen: false,
+  setAIAssistantOpen: (open) => set({ isAIAssistantOpen: open }),
 
   // Drawing settings
   strokeColor: '#f0f0f5',

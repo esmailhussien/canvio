@@ -95,30 +95,30 @@ const TILE_LAYERS: Record<TileLayerType, { url: string; attribution: string }> =
   }
 };
 
-// Component to watch map move/zoom and save center/zoom back to store
-const MapEvents: React.FC<{ onChangeCenterZoom: (center: [number, number], zoom: number) => void }> = ({ onChangeCenterZoom }) => {
-  const map = useMapEvents({
-    moveend: () => {
-      const center = map.getCenter();
-      onChangeCenterZoom([center.lat, center.lng], map.getZoom());
-    },
-    zoomend: () => {
-      const center = map.getCenter();
-      onChangeCenterZoom([center.lat, center.lng], map.getZoom());
-    }
-  });
+const MapResizer: React.FC<{ width?: number; height?: number }> = ({ width, height }) => {
+  const map = useMap();
 
   React.useEffect(() => {
-    // Force Leaflet to recalculate its internal size if the wrapper node resizes
+    map.invalidateSize(false);
+    const t1 = window.setTimeout(() => map.invalidateSize(false), 30);
+    const t2 = window.setTimeout(() => map.invalidateSize(false), 150);
+    const t3 = window.setTimeout(() => map.invalidateSize(false), 400);
+
     const resizeObserver = new ResizeObserver(() => {
-      map.invalidateSize();
+      map.invalidateSize(false);
     });
-    resizeObserver.observe(map.getContainer());
-    
+    const container = map.getContainer();
+    if (container) {
+      resizeObserver.observe(container);
+    }
+
     return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
       resizeObserver.disconnect();
     };
-  }, [map]);
+  }, [map, width, height]);
 
   return null;
 };
@@ -329,6 +329,16 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
 
   return (
     <div className={`map-node ${selected ? 'map-node--selected' : ''}`}>
+      <div className="map-node__header" title="Drag here to reposition Map Node">
+        <div className="map-node__header-title">
+          <span className="material-symbols-outlined map-node__drag-icon">drag_indicator</span>
+          <span className="map-node__title-text">Living Map</span>
+        </div>
+        <div className="map-node__header-coords">
+          {Array.isArray(data.center) ? `${data.center[0].toFixed(2)}°, ${data.center[1].toFixed(2)}° • Zoom ${data.zoom || 4}` : 'Globe'}
+        </div>
+      </div>
+
       {/* Floating Action Buttons */}
       <div className="map-node__controls" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
         <button 
@@ -361,6 +371,7 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
           url={TILE_LAYERS[layer].url}
           attribution={TILE_LAYERS[layer].attribution}
         />
+        <MapResizer width={node.size.width} height={node.size.height} />
         <MapController center={data.center} zoom={data.zoom} markers={data.markers} onChangeCenterZoom={handleCenterZoomChange} />
         <MarkerAnchorTracker markers={data.markers} onAnchorsChange={updateMarkerAnchors} />
         <MapClickEvents enabled={true} onAddMarker={addMarker} />

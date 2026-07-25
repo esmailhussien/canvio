@@ -258,3 +258,9 @@ export const IconCode = (props: IconProps) => (
     <path d="m14 5-4 14" />
   </IconBase>
 );
+
+export const IconSparkles = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />
+  </IconBase>
+);

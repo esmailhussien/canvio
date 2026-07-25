@@ -15,6 +15,7 @@ import { touchBoard, updateBoardAppearance } from '../utils/api';
 import { RelationInspector } from '../components/RelationInspector/RelationInspector';
 import { PenInspector } from '../components/PenInspector/PenInspector';
 import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
+import { getPlugin } from '@canvio/objects';
 import { fitViewportToNodes } from '../utils/viewportFit';
 import './WorldPage.css';
 
@@ -53,7 +54,8 @@ export function WorldPage() {
   const setAppearance = useCanvasStore((s) => s.setAppearance);
   const replaceWorld = useCanvasStore((s) => s.replaceWorld);
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
-  const [isAIOpen, setIsAIOpen] = useState(false);
+  const isAIOpen = useCanvasStore((s) => s.isAIAssistantOpen);
+  const setIsAIOpen = useCanvasStore((s) => s.setAIAssistantOpen);
   const [isCanvioMenuOpen, setIsCanvioMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isStarterDismissed, setIsStarterDismissed] = useState(false);
@@ -104,6 +106,34 @@ export function WorldPage() {
     });
     setActiveTool('select');
     setViewport({ x: 0, y: 0, zoom: 1 });
+  };
+
+  const handleDropMap = () => {
+    setIsStarterDismissed(true);
+    replaceWorld({
+      nodes: {},
+      relations: {},
+      viewport: { x: 0, y: 0, zoom: 1 },
+      appearance: { theme, canvasBackground },
+    });
+    const mapPlugin = getPlugin('map');
+    if (mapPlugin) {
+      const mapNode = mapPlugin.create({ x: 0, y: 0 });
+      const positionedNode = {
+        ...mapNode,
+        position: { 
+          x: -(mapNode.size.width / 2), 
+          y: -(mapNode.size.height / 2) 
+        },
+        zIndex: nextZIndex(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      addNode(positionedNode);
+      selectNode(positionedNode.id);
+      setActiveTool('select');
+      setViewport({ x: 0, y: 0, zoom: 1 });
+    }
   };
 
   useEffect(() => {
@@ -166,6 +196,10 @@ export function WorldPage() {
               <IconSticky size={22} />
               <span>Start from scratch</span>
             </button>
+            <button className="world-page__starter-card map-card" onClick={handleDropMap}>
+              <IconMap size={22} />
+              <span>Drop Living Map</span>
+            </button>
             <button
               className="world-page__starter-card"
               onClick={() => {
@@ -173,7 +207,7 @@ export function WorldPage() {
                 setIsStarterDismissed(true);
               }}
             >
-              <IconMap size={22} />
+              <span className="material-symbols-outlined text-xl">space_dashboard</span>
               <span>Choose a model</span>
             </button>
             <button
