@@ -22,7 +22,8 @@ export async function generateSpatialBoardAsync(
     let boardContext = '';
     if (existingNodes.length > 0) {
       boardContext = `\n\nExisting Canvas Board Context:\n` + existingNodes.map((n) => {
-        const text = n.data?.text || n.data?.content || n.data?.title || n.data?.label || '';
+        const d = n.data as Record<string, any> | undefined;
+        const text = String(d?.text || d?.content || d?.title || d?.label || '');
         return `- [${n.type.toUpperCase()}] "${text.slice(0, 150)}"`;
       }).join('\n');
     }
@@ -183,7 +184,8 @@ export async function expandNodeWithAIAsync(
   const apiKey = localStorage.getItem(keyStorageKey) || localStorage.getItem('CANVIO_AI_API_KEY') || '';
   const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
 
-  const nodeContent = targetNode.data?.text || targetNode.data?.content || targetNode.data?.title || targetNode.data?.label || 'Concept';
+  const targetData = targetNode.data as Record<string, any> | undefined;
+  const nodeContent = String(targetData?.text || targetData?.content || targetData?.title || targetData?.label || 'Concept');
   const prompt = `Given this central node idea: "${nodeContent}", generate 3 distinct sub-topics or logical next steps. Connect each new sub-topic node to this central node (sourceId: "${targetNode.id}").`;
 
   if (apiKey && apiKey.trim()) {
@@ -250,7 +252,8 @@ export async function summarizeBoardWithAIAsync(
   const cy = -viewport.y / zoom + (window.innerHeight / (2 * zoom));
 
   const graphSummary = nodes.map((n) => {
-    const text = n.data?.text || n.data?.content || n.data?.title || n.data?.label || '';
+    const d = n.data as Record<string, any> | undefined;
+    const text = String(d?.text || d?.content || d?.title || d?.label || '');
     return `- [${n.type.toUpperCase()}] "${text.slice(0, 80)}"`;
   }).join('\n');
 
@@ -281,11 +284,14 @@ export async function summarizeBoardWithAIAsync(
   const s3 = nanoid(10);
   const s4 = nanoid(10);
 
+  const firstNodeData = nodes[0]?.data as Record<string, any> | undefined;
+  const firstText = String(firstNodeData?.text || 'Central whiteboard overview and key goals.');
+
   return {
     title: '✨ AI Executive Summary',
     nodes: [
       frame(frameId, cx - 450, cy - 250, 900, 500, '✨ AI Executive Canvas Summary', '#8083ff'),
-      sticky(s1, cx - 410, cy - 180, 400, 180, '📌 Core Vision & Context\n' + (nodes[0]?.data?.text || 'Central whiteboard overview and key goals.'), 'purple', 2),
+      sticky(s1, cx - 410, cy - 180, 400, 180, '📌 Core Vision & Context\n' + firstText, 'purple', 2),
       sticky(s2, cx + 20, cy - 180, 400, 180, '⚡ Key Decisions & Milestones\nIdentified high-impact trade-offs and approvals.', 'green', 3),
       sticky(s3, cx - 410, cy + 30, 400, 180, '🚨 Critical Risks & Dependencies\nOperational bottlenecks and quality gates to monitor.', 'pink', 4),
       sticky(s4, cx + 20, cy + 30, 400, 180, '🎯 Next Action Plan\nAssigned owners, immediate deliverables, and review dates.', 'blue', 5),
