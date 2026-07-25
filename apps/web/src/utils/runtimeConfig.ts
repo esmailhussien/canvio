@@ -17,15 +17,16 @@ export function getApiBaseUrl() {
   return (
     getRuntimeConfig().apiUrl ||
     import.meta.env.VITE_API_URL ||
-    (import.meta.env.DEV ? '' : `${window.location.protocol}//${window.location.hostname}:4000`)
+    ''
   ).replace(/\/$/, '');
 }
 
 export function getWebSocketUrl() {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return (
-    getRuntimeConfig().wsUrl ||
-    import.meta.env.VITE_WS_URL ||
-    `${wsProtocol}//${window.location.hostname}:4001`
-  ).replace(/\/$/, '');
+  // Use custom configured URL, environment variable, or public Yjs demo provider fallback on production
+  if (getRuntimeConfig().wsUrl) return getRuntimeConfig().wsUrl!.replace(/\/$/, '');
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL.replace(/\/$/, '');
+  
+  // Default fallback for Vercel / production static deployments where port 4001 backend is not running
+  return `${wsProtocol}//demos.yjs.dev`;
 }
