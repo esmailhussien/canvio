@@ -67,9 +67,16 @@ export function WorldPage() {
 
   const activeBackground = BACKGROUND_SWATCHES.find((swatch) => swatch.value === canvasBackground);
 
-  const isDarkCanvas = !canvasBackground
-    ? theme === 'dark'
-    : ['#0a0a0f', '#102033', '#10251e', '#2b2138'].includes(canvasBackground);
+  const isDarkCanvas = (() => {
+    if (!canvasBackground || canvasBackground === 'null' || canvasBackground === 'undefined') {
+      return theme !== 'light';
+    }
+    const bgLower = canvasBackground.toLowerCase();
+    if (bgLower === '#f8fafc' || bgLower === '#ffffff' || bgLower.includes('248, 250, 252') || bgLower.includes('255, 255, 255')) {
+      return false;
+    }
+    return true;
+  })();
 
   const activeTheme = isDarkCanvas ? 'dark' : 'light';
 

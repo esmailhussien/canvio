@@ -298,3 +298,33 @@ export const IconLetter = (props: IconProps) => (
   </IconBase>
 );
 
+export const IconRectangle = (props: IconProps) => (
+  <IconBase {...props}>
+    <rect x="3" y="5" width="18" height="14" rx="2" ry="2" />
+  </IconBase>
+);
+
+export const IconCircle = (props: IconProps) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+  </IconBase>
+);
+
+export const IconDiamond = (props: IconProps) => (
+  <IconBase {...props}>
+    <polygon points="12 3 21 12 12 21 3 12" />
+  </IconBase>
+);
+
+export const IconTriangle = (props: IconProps) => (
+  <IconBase {...props}>
+    <polygon points="12 3 21 20 3 20" />
+  </IconBase>
+);
+
+export const IconHexagon = (props: IconProps) => (
+  <IconBase {...props}>
+    <polygon points="12 3 20.5 7.8 20.5 16.2 12 21 3.5 16.2 3.5 7.8" />
+  </IconBase>
+);
+

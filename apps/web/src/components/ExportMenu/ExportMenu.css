@@ -7,7 +7,7 @@
 
 .export-menu__trigger-btn,
 .export-menu__trigger-btn * {
-  color: var(--text-primary) !important;
+  color: var(--text-primary, #f8fafc) !important;
 }
 
 .export-menu__trigger-btn {

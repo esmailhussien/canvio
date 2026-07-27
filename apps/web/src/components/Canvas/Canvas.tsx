@@ -779,22 +779,11 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
       const activeEl = document.activeElement as HTMLElement | null;
-
-      const isEditingText =
-        (target && (
-          target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable ||
-          Boolean(target.closest('input, textarea, [contenteditable], .text-node__editor, .shape-node__textarea, .sticky-note__textarea, .code-node__textarea, .frame-node__input'))
-        )) ||
-        (activeEl && (
-          activeEl.tagName === 'INPUT' ||
-          activeEl.tagName === 'TEXTAREA' ||
-          activeEl.isContentEditable ||
-          Boolean(activeEl.closest('input, textarea, [contenteditable], .text-node__editor, .shape-node__textarea, .sticky-note__textarea, .code-node__textarea, .frame-node__input'))
-        ));
+      const isEditingText = Boolean(
+        activeEl &&
+        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)
+      );
 
       const isDeleteKey = e.key === 'Delete' || e.key === 'Backspace' || e.code === 'Delete' || e.code === 'Backspace';
 

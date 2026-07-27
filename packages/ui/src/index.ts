@@ -33,6 +33,11 @@ export {
   IconPageLandscape,
   IconSlideScreen,
   IconLetter,
+  IconRectangle,
+  IconCircle,
+  IconDiamond,
+  IconTriangle,
+  IconHexagon,
   type IconProps
 } from './icons';
 export { Tooltip } from './components/Tooltip';

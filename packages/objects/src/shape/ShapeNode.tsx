@@ -169,11 +169,11 @@ export const ShapeNode: React.FC<ShapeNodeProps> = ({ node, selected, onChange }
       ) : (
         <div
           className={`shape-node__label ${!label ? 'shape-node__label--empty' : ''}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
-            if (selected) {
-              e.stopPropagation();
-              setIsEditing(true);
-            }
+            e.stopPropagation();
+            setIsEditing(true);
           }}
         >
           {label || (selected ? 'Type text...' : '')}

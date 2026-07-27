@@ -156,6 +156,10 @@ export function NodeRenderer({ node }: Props) {
     }
 
     e.stopPropagation();
+    const active = document.activeElement as HTMLElement | null;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+      active.blur();
+    }
     selectNode(node.id, e.shiftKey);
     hasExceededDragThresholdRef.current = false;
     dragOriginRef.current = { x: e.clientX, y: e.clientY };

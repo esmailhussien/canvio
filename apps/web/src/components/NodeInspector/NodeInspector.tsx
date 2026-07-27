@@ -11,8 +11,21 @@ import {
   IconPagePortrait,
   IconPageLandscape,
   IconSlideScreen,
-  IconLetter
+  IconLetter,
+  IconRectangle,
+  IconCircle,
+  IconDiamond,
+  IconTriangle,
+  IconHexagon
 } from '@canvio/ui';
+
+const SHAPE_TYPES = [
+  { id: 'rectangle', icon: IconRectangle, title: 'Rectangle' },
+  { id: 'circle', icon: IconCircle, title: 'Circle' },
+  { id: 'diamond', icon: IconDiamond, title: 'Diamond' },
+  { id: 'triangle', icon: IconTriangle, title: 'Triangle' },
+  { id: 'hexagon', icon: IconHexagon, title: 'Hexagon' },
+];
 import './NodeInspector.css';
 
 const STICKY_COLORS = [
@@ -172,14 +185,6 @@ export function NodeInspector({ node }: NodeInspectorProps) {
     });
   };
 
-  const SHAPE_TYPES = [
-    { id: 'rectangle', label: '▭' },
-    { id: 'circle', label: '○' },
-    { id: 'diamond', label: '◇' },
-    { id: 'triangle', label: '△' },
-    { id: 'hexagon', label: '⬡' },
-  ];
-
   const viewport = useCanvasStore((s) => s.viewport);
   const scaleFactor = Math.max(0.65, Math.min(2.5, 1 / viewport.zoom));
 
@@ -274,19 +279,22 @@ export function NodeInspector({ node }: NodeInspectorProps) {
       {isShape && (
         <>
           <div className="node-inspector__shapes">
-            {SHAPE_TYPES.map((s) => (
-              <button
-                key={s.id}
-                className={`node-inspector__shape-btn ${currentShape === s.id ? 'selected' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateNodeData(node.id, { shape: s.id });
-                }}
-                title={s.id}
-              >
-                {s.label}
-              </button>
-            ))}
+            {SHAPE_TYPES.map((s) => {
+              const IconComp = s.icon;
+              return (
+                <button
+                  key={s.id}
+                  className={`node-inspector__shape-btn ${currentShape === s.id ? 'selected' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateNodeData(node.id, { shape: s.id });
+                  }}
+                  title={s.title}
+                >
+                  <IconComp size={15} />
+                </button>
+              );
+            })}
           </div>
 
           <div className="node-inspector__colors">
