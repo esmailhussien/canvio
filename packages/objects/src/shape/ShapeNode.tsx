@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { LivingNode, Point } from '../types';
 import './ShapeNode.css';
@@ -22,8 +22,8 @@ interface ShapeNodeProps {
 
 function getShapeSVG(shape: ShapeType, w: number, h: number, fill: string, stroke: string, strokeWidth: number, opacity: number): React.ReactNode {
   const pad = strokeWidth;
-  const iw = w - pad * 2;
-  const ih = h - pad * 2;
+  const iw = Math.max(10, w - pad * 2);
+  const ih = Math.max(10, h - pad * 2);
 
   const sharedProps = {
     fill,
@@ -99,19 +99,38 @@ export const ShapeNode: React.FC<ShapeNodeProps> = ({ node, selected, onChange }
   const strokeWidth = data.strokeWidth ?? 2;
   const opacity = data.opacity ?? 1;
 
-  const [isEditing, setIsEditing] = React.useState(false);
-  const [label, setLabel] = React.useState(data.label || '');
+  const [isEditing, setIsEditing] = useState(false);
+  const [label, setLabel] = useState(data.label || '');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isEditing) {
       setLabel(data.label || '');
     }
   }, [data.label, isEditing]);
 
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [isEditing]);
+
   const handleBlur = () => {
     setIsEditing(false);
-    if (onChange) {
+    if (onChange && label !== data.label) {
       onChange(node.id, { data: { ...data, label } });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      setIsEditing(false);
+      setLabel(data.label || '');
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleBlur();
     }
   };
 
@@ -121,7 +140,10 @@ export const ShapeNode: React.FC<ShapeNodeProps> = ({ node, selected, onChange }
   return (
     <div
       className={`shape-node ${selected ? 'shape-node--selected' : ''}`}
-      onDoubleClick={() => setIsEditing(true)}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
     >
       <svg
         className="shape-node__svg"
@@ -132,20 +154,30 @@ export const ShapeNode: React.FC<ShapeNodeProps> = ({ node, selected, onChange }
         {getShapeSVG(shape, w, h, fill, stroke, strokeWidth, opacity)}
       </svg>
       {isEditing ? (
-        <input
-          autoFocus
-          className="shape-node__input"
+        <textarea
+          ref={textareaRef}
+          className="shape-node__textarea"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           onBlur={handleBlur}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === 'Enter') handleBlur();
-          }}
-          placeholder="Shape label..."
+          onKeyDown={handleKeyDown}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          placeholder="Type text..."
         />
       ) : (
-        <div className="shape-node__label">{label || ''}</div>
+        <div
+          className={`shape-node__label ${!label ? 'shape-node__label--empty' : ''}`}
+          onClick={(e) => {
+            if (selected) {
+              e.stopPropagation();
+              setIsEditing(true);
+            }
+          }}
+        >
+          {label || (selected ? 'Type text...' : '')}
+        </div>
       )}
     </div>
   );
@@ -156,12 +188,12 @@ export const shapePlugin = {
   name: 'Shape',
   icon: 'square',
   category: 'core' as const,
-  defaultSize: { width: 150, height: 150 },
+  defaultSize: { width: 200, height: 140 },
   create: (position: Point): LivingNode => ({
     id: nanoid(),
     type: 'shape',
     position,
-    size: { width: 150, height: 150 },
+    size: { width: 200, height: 140 },
     rotation: 0,
     zIndex: 0,
     locked: false,

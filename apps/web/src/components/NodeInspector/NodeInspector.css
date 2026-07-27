@@ -1,8 +1,6 @@
 .node-inspector {
   position: absolute;
-  top: -54px;
   left: 50%;
-  transform: translateX(-50%);
   z-index: 260;
   display: flex;
   align-items: center;
@@ -101,15 +99,26 @@
 }
 
 .node-inspector__segment {
-  height: 24px;
+  height: 26px;
   min-width: 44px;
-  padding: 0 8px;
+  padding: 0 9px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-sm, 6px);
   background: transparent;
   color: var(--text-secondary);
   font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.node-inspector__segment svg {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .node-inspector__segment:hover {
@@ -117,9 +126,19 @@
   color: var(--text-primary);
 }
 
+.node-inspector__segment:hover svg {
+  opacity: 1;
+}
+
 .node-inspector__segment.selected {
-  background: var(--accent-primary);
+  background: var(--accent-primary, #6366f1);
   color: #fff;
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.35);
+}
+
+.node-inspector__segment.selected svg {
+  opacity: 1;
+  stroke: currentColor;
 }
 
 .node-inspector__range {

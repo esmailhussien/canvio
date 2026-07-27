@@ -29,6 +29,10 @@ export {
   IconShape,
   IconFrame,
   IconSparkles,
+  IconPagePortrait,
+  IconPageLandscape,
+  IconSlideScreen,
+  IconLetter,
   type IconProps
 } from './icons';
 export { Tooltip } from './components/Tooltip';

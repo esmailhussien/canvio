@@ -136,14 +136,19 @@ export function NodeRenderer({ node }: Props) {
       return;
     }
 
-    // Text fields and clickable node controls (image placeholders, replace buttons, sticky notes):
-    // Don't swallow action on pointerdown — defer to pointerup/pointermove to differentiate static tap from drag.
+    // Text fields and editable inputs:
     const targetTag = target.tagName.toLowerCase();
-    const isTextField = targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file') || Boolean(target.closest('.sticky-note__textarea'));
+    const isEditingField = targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file') || Boolean(target.closest('.shape-node__textarea, .sticky-note__textarea, .text-node__editor, .code-node__textarea'));
     const isClickableTarget = Boolean(target.closest('.image-node__placeholder, .image-node__replace-btn, .image-node--empty'));
 
-    if (isTextField || isClickableTarget) {
-      e.preventDefault(); // suppress the browser's native focus-on-pointerdown
+    if (isEditingField) {
+      e.stopPropagation();
+      selectNode(node.id, e.shiftKey);
+      return;
+    }
+
+    if (isClickableTarget) {
+      e.preventDefault();
       pendingTapEditTargetRef.current = target;
     } else {
       pendingTapEditTargetRef.current = null;

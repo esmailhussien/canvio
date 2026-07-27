@@ -126,16 +126,28 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     reader.readAsDataURL(file);
   }, [createNodeFromPlugin]);
 
-  // Handle wheel zoom
+  // Handle wheel zoom with exact pointer targeting & smooth exponential scaling
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    // Note: e.preventDefault() is handled by the native listener with { passive: false }
     if (e.ctrlKey || e.metaKey) {
-      // Pinch zoom
-      const delta = -e.deltaY * 0.01;
       const rect = canvasRef.current?.getBoundingClientRect();
-      if (rect) {
-        zoomAtPoint(delta, { x: e.clientX, y: e.clientY }, { width: rect.width, height: rect.height });
-      }
+      if (!rect) return;
+
+      let delta = e.deltaY;
+      if (e.deltaMode === 1) delta *= 16;
+      if (e.deltaMode === 2) delta *= 100;
+
+      // Clamp delta to avoid massive zoom steps from fast spinning
+      const clampedDelta = Math.max(-100, Math.min(100, delta));
+
+      // Calculate smooth zoom factor (0.9975 per pixel of scroll)
+      const factor = Math.pow(0.9975, clampedDelta);
+
+      zoomAtPoint(
+        factor,
+        { x: e.clientX, y: e.clientY },
+        { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        true
+      );
     } else {
       // Pan
       panBy(-e.deltaX / viewport.zoom, -e.deltaY / viewport.zoom);
@@ -199,8 +211,13 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       const rect = canvasRef.current?.getBoundingClientRect();
 
       if (rect && pinchStateRef.current.distance > 0) {
-        const scaleDelta = distance / pinchStateRef.current.distance - 1;
-        zoomAtPoint(scaleDelta, midpoint, { width: rect.width, height: rect.height });
+        const factor = distance / pinchStateRef.current.distance;
+        zoomAtPoint(
+          factor,
+          midpoint,
+          { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          true
+        );
 
         const dx = (midpoint.x - pinchStateRef.current.midpoint.x) / viewport.zoom;
         const dy = (midpoint.y - pinchStateRef.current.midpoint.y) / viewport.zoom;
@@ -682,6 +699,25 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     setRadialMenu({ screenX: e.clientX, screenY: e.clientY, worldPos });
   }, [screenToWorld]);
 
+  // Close radial menu whenever clicking anywhere on frame, nodes, or canvas
+  useEffect(() => {
+    if (!radialMenu) return;
+    const handleCloseRadial = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.canvas__radial-ring')) return;
+      setRadialMenu(null);
+    };
+    const timer = setTimeout(() => {
+      window.addEventListener('pointerdown', handleCloseRadial, true);
+      window.addEventListener('click', handleCloseRadial, true);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointerdown', handleCloseRadial, true);
+      window.removeEventListener('click', handleCloseRadial, true);
+    };
+  }, [radialMenu]);
+
   // Prevent default scroll behavior
   useEffect(() => {
     const el = canvasRef.current;
@@ -743,13 +779,45 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.isContentEditable ||
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.closest('input, textarea, [contenteditable], .text-node__editor, .shape-node__input, .sticky-node__textarea')
-      ) {
+      const target = e.target as HTMLElement | null;
+      const activeEl = document.activeElement as HTMLElement | null;
+
+      const isEditingText =
+        (target && (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          Boolean(target.closest('input, textarea, [contenteditable], .text-node__editor, .shape-node__textarea, .sticky-note__textarea, .code-node__textarea, .frame-node__input'))
+        )) ||
+        (activeEl && (
+          activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable ||
+          Boolean(activeEl.closest('input, textarea, [contenteditable], .text-node__editor, .shape-node__textarea, .sticky-note__textarea, .code-node__textarea, .frame-node__input'))
+        ));
+
+      const isDeleteKey = e.key === 'Delete' || e.key === 'Backspace' || e.code === 'Delete' || e.code === 'Backspace';
+
+      if (isDeleteKey) {
+        if (isEditingText) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const store = useCanvasStore.getState();
+        const selectedNodes = store.selectedNodeIds || [];
+        const selectedRel = store.selectedRelationId;
+
+        if (selectedRel) {
+          store.removeRelation(selectedRel);
+          store.selectRelation(null);
+        }
+        if (selectedNodes.length > 0) {
+          selectedNodes.forEach((id) => store.removeNode(id));
+          store.clearSelection();
+        }
+        return;
+      }
+
+      if (isEditingText) {
         return;
       }
 
@@ -832,14 +900,27 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
         case 'm': case 'M': store.setActiveTool('map'); break;
         case 'l': case 'L': store.setActiveTool('relation'); break;
         case 'e': case 'E': store.setActiveTool('eraser'); break;
-        case 'Delete': case 'Backspace':
-          store.selectedNodeIds.forEach(id => store.removeNode(id));
+        case 'Delete': case 'Backspace': {
+          const selectedNodes = store.selectedNodeIds;
+          const selectedRel = store.selectedRelationId;
+          if (selectedRel || selectedNodes.length > 0) {
+            e.preventDefault();
+          }
+          if (selectedRel) {
+            store.removeRelation(selectedRel);
+            store.selectRelation(null);
+          }
+          if (selectedNodes.length > 0) {
+            selectedNodes.forEach((id) => store.removeNode(id));
+            store.clearSelection();
+          }
           break;
+        }
         case 'Escape': {
           // If editing text, blur the element instead of switching tool
-          const activeEl = document.activeElement as HTMLElement;
-          if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || activeEl.contentEditable === 'true')) {
-            activeEl.blur();
+          const active = document.activeElement as HTMLElement;
+          if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.contentEditable === 'true')) {
+            active.blur();
           } else {
             store.setRelationSourceId(null);
             store.clearSelection();
@@ -1113,16 +1194,22 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
               const x = Math.round(radius * Math.cos(angleRad));
               const y = Math.round(radius * Math.sin(angleRad));
 
+              const handleTrigger = (e: React.SyntheticEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                item.action(radialMenu.worldPos);
+                setRadialMenu(null);
+              };
+
               return (
                 <button
                   key={item.id}
                   type="button"
                   className={`canvas__radial-circle-item ${item.isAI ? 'ai-item' : ''}`}
                   style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` }}
-                  onClick={() => {
-                    item.action(radialMenu.worldPos);
-                    setRadialMenu(null);
-                  }}
+                  onPointerDown={handleTrigger}
+                  onMouseDown={handleTrigger}
+                  onClick={handleTrigger}
                   title={item.label}
                 >
                   <item.icon size={20} />

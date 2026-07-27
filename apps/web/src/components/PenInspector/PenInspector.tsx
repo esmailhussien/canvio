@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
+import { IconDraw, IconHighlighter, IconArrowTool, IconSparkles } from '@canvio/ui';
 import './PenInspector.css';
 
 const PEN_COLORS = [
@@ -63,7 +64,10 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <span className="pen-inspector__title">{isHighlighter ? '▰' : isArrow ? '↗' : '✏️'} {title}</span>
+      <span className="pen-inspector__title">
+        {isHighlighter ? <IconHighlighter size={15} /> : isArrow ? <IconArrowTool size={15} /> : <IconDraw size={15} />}
+        <span>{title}</span>
+      </span>
 
       {/* Color Swatches */}
       <div className="pen-inspector__colors">
@@ -107,7 +111,8 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
             onClick={onToggleAutoShape}
             title="Auto-convert hand-drawn shapes into clean vector shapes"
           >
-            ✨ Ink-to-Shape {autoShapeEnabled ? 'ON' : 'OFF'}
+            <IconSparkles size={14} />
+            <span>Ink-to-Shape {autoShapeEnabled ? 'ON' : 'OFF'}</span>
           </button>
         </>
       )}

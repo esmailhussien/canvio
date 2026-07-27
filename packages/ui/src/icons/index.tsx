@@ -264,3 +264,37 @@ export const IconSparkles = (props: IconProps) => (
     <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />
   </IconBase>
 );
+
+export const IconPagePortrait = (props: IconProps) => (
+  <IconBase {...props}>
+    <rect x="5" y="3" width="14" height="18" rx="2" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="9" y1="12" x2="15" y2="12" />
+    <line x1="9" y1="16" x2="13" y2="16" />
+  </IconBase>
+);
+
+export const IconPageLandscape = (props: IconProps) => (
+  <IconBase {...props}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <line x1="7" y1="9" x2="17" y2="9" />
+    <line x1="7" y1="13" x2="13" y2="13" />
+  </IconBase>
+);
+
+export const IconSlideScreen = (props: IconProps) => (
+  <IconBase {...props}>
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M12 16v4M8 20h8" />
+  </IconBase>
+);
+
+export const IconLetter = (props: IconProps) => (
+  <IconBase {...props}>
+    <rect x="4" y="3" width="16" height="18" rx="2" />
+    <line x1="8" y1="8" x2="16" y2="8" />
+    <line x1="8" y1="12" x2="16" y2="12" />
+    <line x1="8" y1="16" x2="13" y2="16" />
+  </IconBase>
+);
+

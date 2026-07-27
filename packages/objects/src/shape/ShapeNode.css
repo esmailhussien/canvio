@@ -5,6 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .shape-node__svg {
@@ -19,27 +20,48 @@
 .shape-node__label {
   position: relative;
   z-index: 2;
-  color: var(--text-primary);
-  font-size: var(--text-sm);
+  color: var(--text-primary, #f0f0f5);
+  font-size: var(--text-sm, 14px);
   font-weight: 500;
   text-align: center;
   padding: 8px 12px;
-  pointer-events: none;
   word-break: break-word;
-  max-width: 80%;
+  white-space: pre-wrap;
+  max-width: 84%;
+  max-height: 84%;
+  overflow: hidden;
+  cursor: text;
+  line-height: 1.35;
+  user-select: text;
 }
 
-.shape-node__input {
+.shape-node__label--empty {
+  opacity: 0.45;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.shape-node__textarea {
   position: relative;
   z-index: 2;
-  background: transparent;
-  border: 1px dashed var(--accent-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  border: 1.5px dashed var(--accent-primary, #6366f1);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-primary, #f0f0f5);
+  font-family: inherit;
+  font-size: var(--text-sm, 14px);
   font-weight: 500;
   text-align: center;
-  padding: 4px 8px;
+  padding: 6px 10px;
   outline: none;
-  width: 80%;
+  width: 84%;
+  max-height: 84%;
+  resize: none;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.shape-node__textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45);
 }

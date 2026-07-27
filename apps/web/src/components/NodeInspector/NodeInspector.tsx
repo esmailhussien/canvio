@@ -7,7 +7,11 @@ import {
   IconUnlock,
   IconArrowUp,
   IconArrowDown,
-  IconTrash
+  IconTrash,
+  IconPagePortrait,
+  IconPageLandscape,
+  IconSlideScreen,
+  IconLetter
 } from '@canvio/ui';
 import './NodeInspector.css';
 
@@ -176,9 +180,17 @@ export function NodeInspector({ node }: NodeInspectorProps) {
     { id: 'hexagon', label: '⬡' },
   ];
 
+  const viewport = useCanvasStore((s) => s.viewport);
+  const scaleFactor = Math.max(0.65, Math.min(2.5, 1 / viewport.zoom));
+
   return (
     <div
       className="node-inspector canvio-toolbar-enter"
+      style={{
+        top: -10,
+        transform: `translate(-50%, -100%) scale(${scaleFactor})`,
+        transformOrigin: 'bottom center',
+      }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
@@ -327,28 +339,32 @@ export function NodeInspector({ node }: NodeInspectorProps) {
               onClick={(e) => { e.stopPropagation(); setFramePagePreset('a4-portrait'); }}
               title="A4 Portrait Page (595x842)"
             >
-              A4 📄
+              <IconPagePortrait size={14} />
+              <span>A4</span>
             </button>
             <button
               className={`node-inspector__segment ${node.data?.pagePreset === 'a4-landscape' ? 'selected' : ''}`}
               onClick={(e) => { e.stopPropagation(); setFramePagePreset('a4-landscape'); }}
               title="A4 Landscape Page (842x595)"
             >
-              A4 🖼️
+              <IconPageLandscape size={14} />
+              <span>A4</span>
             </button>
             <button
               className={`node-inspector__segment ${node.data?.pagePreset === 'slide' ? 'selected' : ''}`}
               onClick={(e) => { e.stopPropagation(); setFramePagePreset('slide'); }}
               title="16:9 Presentation Slide (960x540)"
             >
-              16:9 🖥️
+              <IconSlideScreen size={14} />
+              <span>16:9</span>
             </button>
             <button
               className={`node-inspector__segment ${node.data?.pagePreset === 'letter' ? 'selected' : ''}`}
               onClick={(e) => { e.stopPropagation(); setFramePagePreset('letter'); }}
               title="US Letter Page (612x792)"
             >
-              Letter
+              <IconLetter size={14} />
+              <span>Letter</span>
             </button>
           </div>
           <div className="node-inspector__colors">

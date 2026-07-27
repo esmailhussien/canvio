@@ -42,6 +42,9 @@
   font-weight: 600;
   color: var(--text-secondary, #94a3b8);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .pen-inspector__colors {
@@ -120,6 +123,9 @@
   border-radius: 12px;
   cursor: pointer;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   transition: all 0.15s ease;
 }
 
