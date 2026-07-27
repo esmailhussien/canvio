@@ -218,3 +218,30 @@
 .relation-inspector__delete-btn:hover {
   background: rgba(239, 68, 68, 0.25);
 }
+
+@media (pointer: coarse) {
+  .relation-inspector {
+    width: min(320px, calc(100vw - 16px));
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .relation-inspector__close,
+  .relation-inspector__pill,
+  .relation-inspector__btn,
+  .relation-inspector__toggle,
+  .relation-inspector__delete-btn {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+
+  .relation-inspector__color-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .relation-inspector__input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+}

@@ -175,7 +175,7 @@ export function WorldPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        setIsAIOpen((prev) => !prev);
+        setIsAIOpen(!useCanvasStore.getState().isAIAssistantOpen);
       }
     };
     window.addEventListener('keydown', handleKeyDown);

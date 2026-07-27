@@ -756,18 +756,18 @@ async function canvasToJpegBytes(canvas: HTMLCanvasElement): Promise<Uint8Array>
  */
 function buildPdfBlob(pages: { jpegBytes: Uint8Array; widthPx: number; heightPx: number; widthPt: number; heightPt: number }[]): Blob {
   const encoder = new TextEncoder();
-  const chunks: Uint8Array[] = [];
+  const chunks: BlobPart[] = [];
   const xrefOffsets: number[] = [];
   let currentOffset = 0;
 
   function writeString(str: string) {
     const bytes = encoder.encode(str);
-    chunks.push(bytes);
+    chunks.push(new Uint8Array(bytes).buffer);
     currentOffset += bytes.length;
   }
 
   function writeBytes(bytes: Uint8Array) {
-    chunks.push(bytes);
+    chunks.push(new Uint8Array(bytes).buffer);
     currentOffset += bytes.length;
   }
 
@@ -990,4 +990,3 @@ export async function exportAsPDF(worldId: string) {
   const pdfBlob = buildPdfBlob(pageData);
   downloadBlob(pdfBlob, `canvio-document-${safeName(worldId)}.pdf`);
 }
-

@@ -5,6 +5,7 @@
   overflow: hidden;
   background: var(--bg-canvas);
   touch-action: none;
+  overscroll-behavior: none;
 }
 
 .canvas--relation-ready {
@@ -149,4 +150,25 @@
 
 .canvas__radial-circle-item:hover .canvas__radial-label {
   opacity: 1;
+}
+
+@media (pointer: coarse) {
+  .canvas__radial-ring {
+    width: 196px;
+    height: 196px;
+  }
+
+  .canvas__radial-center {
+    width: 48px;
+    height: 48px;
+  }
+
+  .canvas__radial-circle-item {
+    width: 56px;
+    height: 56px;
+  }
+
+  .canvas__radial-label {
+    opacity: 1;
+  }
 }

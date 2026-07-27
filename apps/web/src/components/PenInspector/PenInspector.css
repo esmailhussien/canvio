@@ -26,7 +26,7 @@
 
 @media (max-width: 900px) {
   .pen-inspector {
-    bottom: 72px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     border-radius: var(--radius-lg, 12px);
     padding: 6px 10px;
   }
@@ -156,7 +156,7 @@
 
 @media (max-width: 520px) {
   .pen-inspector {
-    bottom: 66px;
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
     gap: 6px;
   }
 
@@ -164,5 +164,27 @@
     max-width: 128px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+}
+
+@media (pointer: coarse) {
+  .pen-inspector {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .pen-color-btn {
+    width: 28px;
+    height: 28px;
+    border-width: 2.5px;
+    touch-action: manipulation;
+  }
+
+  .pen-size-btn,
+  .pen-shape-toggle,
+  .pen-finish-btn {
+    min-height: 40px;
+    padding-inline: 12px;
+    touch-action: manipulation;
   }
 }

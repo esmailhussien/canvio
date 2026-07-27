@@ -207,3 +207,37 @@
   border-color: rgba(15, 23, 42, 0.12);
   box-shadow: 0 12px 34px rgba(15, 23, 42, 0.12);
 }
+
+@media (pointer: coarse) {
+  .node-inspector {
+    top: -64px;
+    gap: 7px;
+    padding: 7px 9px;
+    border-radius: 14px;
+  }
+
+  .node-inspector__color-btn,
+  .node-inspector__shape-btn,
+  .node-inspector__btn,
+  .node-inspector__segment--tight {
+    min-width: 36px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .node-inspector__segment {
+    min-width: 52px;
+    height: 36px;
+    padding-inline: 10px;
+  }
+
+  .node-inspector__mini-control {
+    min-height: 36px;
+  }
+}
+
+@media (max-width: 520px) {
+  .node-inspector {
+    max-width: calc(100vw - 12px);
+  }
+}

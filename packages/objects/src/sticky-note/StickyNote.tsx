@@ -73,6 +73,10 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     e.stopPropagation();
   };
 
+  const handleDragHandleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   const colorClass = `sticky-note--${data.color || 'yellow'}`;
 
   return (
@@ -82,6 +86,23 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
       onDoubleClick={() => textRef.current?.focus()}
       onClick={() => textRef.current?.focus()}
     >
+      <button
+        type="button"
+        className="sticky-note__drag-handle"
+        data-node-drag-handle
+        title="Move note"
+        aria-label="Move sticky note"
+        onClick={handleDragHandleClick}
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="5" cy="3.5" r="1.5" />
+          <circle cx="11" cy="3.5" r="1.5" />
+          <circle cx="5" cy="8" r="1.5" />
+          <circle cx="11" cy="8" r="1.5" />
+          <circle cx="5" cy="12.5" r="1.5" />
+          <circle cx="11" cy="12.5" r="1.5" />
+        </svg>
+      </button>
       <div className="sticky-note__fold"></div>
       <textarea
         ref={textRef}
