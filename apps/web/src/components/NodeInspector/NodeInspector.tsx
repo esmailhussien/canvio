@@ -187,12 +187,15 @@ export function NodeInspector({ node }: NodeInspectorProps) {
 
   const viewport = useCanvasStore((s) => s.viewport);
   const scaleFactor = Math.max(0.65, Math.min(2.5, 1 / viewport.zoom));
+  // Gap between node top edge and bottom of the toolbar (in node-local px).
+  // Multiply by scaleFactor so the visual gap stays consistent across zoom levels.
+  const gap = 14 * scaleFactor;
 
   return (
     <div
       className="node-inspector canvio-toolbar-enter"
       style={{
-        top: -10,
+        top: -gap,
         transform: `translate(-50%, -100%) scale(${scaleFactor})`,
         transformOrigin: 'bottom center',
       }}

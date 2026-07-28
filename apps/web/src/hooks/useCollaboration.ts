@@ -51,7 +51,16 @@ export function useCollaboration(worldId: string) {
       wsProvider.connect();
     }, 150);
 
+    // ──────────────────────────────────────────────────────────────────
+    // SYNC GUARDS
+    // remoteSynced: true once the first Yjs handshake completes and we
+    //   have the authoritative server state.
+    // localPushEnabled: true once we've finished merging remote + local
+    //   state and it's safe to push local changes back to Yjs.
+    //   This prevents a joiner from overwriting the creator's work.
+    // ──────────────────────────────────────────────────────────────────
     let remoteSynced = false;
+    let localPushEnabled = false;
     let isReceivingRemote = false;
 
     const yNodes = doc.getMap<Y.Map<any>>('nodes');
@@ -102,11 +111,24 @@ export function useCollaboration(worldId: string) {
     yNodes.observe(handleNodesObserve);
     yRelations.observe(handleRelationsObserve);
 
-    // ─── IndexedDB Preload (Quota-free local persistence) ─────────────
+    // ─── IndexedDB Preload (offline fallback) ─────────────────────────
+    // Only load IndexedDB cache if we don't have remote data yet.
+    // If remote sync delivers data first, we skip the cache to avoid
+    // overwriting the authoritative server state.
     const storageKey = `canvio_world_${worldId}`;
-    getStorageItem<any>(storageKey)
-      .then((parsed) => {
-        if (parsed) {
+    const loadFromIndexedDB = async () => {
+      // If remote already synced, skip local cache
+      if (remoteSynced) return;
+      
+      try {
+        const parsed = await getStorageItem<any>(storageKey);
+        if (!parsed) return;
+        
+        // Double-check: if remote synced while we were awaiting IndexedDB, bail out
+        if (remoteSynced) return;
+
+        isReceivingRemote = true;
+        try {
           if (parsed.nodes) {
             Object.values(parsed.nodes).forEach((node: any) => upsertNodeRemote(node));
           }
@@ -120,11 +142,14 @@ export function useCollaboration(worldId: string) {
               zoom: Math.min(5, Math.max(0.1, parsed.viewport.zoom)),
             });
           }
+        } finally {
+          isReceivingRemote = false;
         }
-      })
-      .catch((e) => {
+      } catch (e) {
         console.error('Failed to load local world state from IndexedDB', e);
-      });
+      }
+    };
+    loadFromIndexedDB();
 
     // ─── Initial State Loading ─────────────────────────────────────────
     isReceivingRemote = true;
@@ -165,11 +190,35 @@ export function useCollaboration(worldId: string) {
         wsProvider.off('connection-error', handleConnectionFailure);
         wsProvider.disconnect();
         console.info('🔌 Canvio is running in Offline-First IndexedDB mode.');
+        // In offline mode, enable local push immediately so the user can work
+        localPushEnabled = true;
       }
     };
 
     const handleProviderSync = (synced: boolean) => {
-      remoteSynced = synced;
+      if (synced && !remoteSynced) {
+        remoteSynced = true;
+
+        // Now load all remote state into the local store
+        isReceivingRemote = true;
+        try {
+          yNodes.forEach((yNode) => {
+            const node = yMapToNode(yNode);
+            if (node && node.id) upsertNodeRemote(node);
+          });
+          yRelations.forEach((yRelation) => {
+            const rel = yMapToRelation(yRelation);
+            if (rel && rel.id) upsertRelationRemote(rel);
+          });
+        } finally {
+          isReceivingRemote = false;
+        }
+
+        // Small delay before enabling local push to let the store settle
+        window.setTimeout(() => {
+          localPushEnabled = true;
+        }, 100);
+      }
     };
 
     const handleAwarenessChange = () => {
@@ -201,7 +250,8 @@ export function useCollaboration(worldId: string) {
     const unsubscribeNodes = useCanvasStore.subscribe(
       (s) => s.nodes,
       (nodes) => {
-        if (isReceivingRemote) return;
+        // CRITICAL: Don't push local state until remote sync is done
+        if (isReceivingRemote || !localPushEnabled) return;
 
         doc.transact(() => {
           const localNodeIds = new Set(Object.keys(nodes));
@@ -217,6 +267,7 @@ export function useCollaboration(worldId: string) {
             }
           });
 
+          // Only delete remote nodes that don't exist locally AFTER full sync
           if (remoteSynced) {
             yNodes.forEach((_, id) => {
               if (!localNodeIds.has(id)) {
@@ -231,7 +282,8 @@ export function useCollaboration(worldId: string) {
     const unsubscribeRelations = useCanvasStore.subscribe(
       (s) => s.relations,
       (relations) => {
-        if (isReceivingRemote) return;
+        // CRITICAL: Don't push local state until remote sync is done
+        if (isReceivingRemote || !localPushEnabled) return;
 
         doc.transact(() => {
           const localRelIds = new Set(Object.keys(relations));
@@ -326,3 +378,4 @@ export function useCollaboration(worldId: string) {
 
   return { connected, users, provider };
 }
+

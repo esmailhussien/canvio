@@ -497,21 +497,73 @@ export function generateSmartRelationPath(
   const stub = 28;
   const sStub = pushFromPort(source, stub);
   const tStub = pushFromPort(target, stub);
+
+  // Expand all node bounds by padding for clearance
   const bounds = allBounds.map((bound) => expandBounds(bound, padding));
+
+  // Only consider intermediate obstacles (not source/target themselves)
+  const obstacles = bounds.filter(
+    (b) => b.id !== sourceBounds.id && b.id !== targetBounds.id
+  );
+
   const combined = getCombinedBounds([sourceBounds, targetBounds, ...allBounds], padding);
   const midX = (sStub.x + tStub.x) / 2;
   const midY = (sStub.y + tStub.y) / 2;
 
+  // --- Base candidates (original 6) ---
   const candidates: Point[][] = [
+    // Direct mid-X split
     [source, sStub, { x: midX, y: sStub.y }, { x: midX, y: tStub.y }, tStub, target],
+    // Direct mid-Y split
     [source, sStub, { x: sStub.x, y: midY }, { x: tStub.x, y: midY }, tStub, target],
+    // Go around top
     [source, sStub, { x: sStub.x, y: combined.top }, { x: tStub.x, y: combined.top }, tStub, target],
+    // Go around bottom
     [source, sStub, { x: sStub.x, y: combined.bottom }, { x: tStub.x, y: combined.bottom }, tStub, target],
+    // Go around left
     [source, sStub, { x: combined.left, y: sStub.y }, { x: combined.left, y: tStub.y }, tStub, target],
+    // Go around right
     [source, sStub, { x: combined.right, y: sStub.y }, { x: combined.right, y: tStub.y }, tStub, target],
-  ].map(removeDuplicatePoints);
+  ];
 
-  const best = candidates.reduce((winner, candidate) => (
+  // --- Per-obstacle bypass candidates ---
+  // For each obstacle between source and target, generate routes that go around it
+  for (const obs of obstacles) {
+    const oLeft = obs.x;
+    const oRight = obs.x + obs.width;
+    const oTop = obs.y;
+    const oBottom = obs.y + obs.height;
+
+    // Route over the obstacle (top bypass)
+    candidates.push(
+      [source, sStub, { x: sStub.x, y: oTop }, { x: tStub.x, y: oTop }, tStub, target],
+    );
+    // Route under the obstacle (bottom bypass)
+    candidates.push(
+      [source, sStub, { x: sStub.x, y: oBottom }, { x: tStub.x, y: oBottom }, tStub, target],
+    );
+    // Route left of obstacle
+    candidates.push(
+      [source, sStub, { x: oLeft, y: sStub.y }, { x: oLeft, y: tStub.y }, tStub, target],
+    );
+    // Route right of obstacle
+    candidates.push(
+      [source, sStub, { x: oRight, y: sStub.y }, { x: oRight, y: tStub.y }, tStub, target],
+    );
+
+    // L-shape bypasses: go to obstacle corner then to target stub
+    candidates.push(
+      [source, sStub, { x: oLeft, y: sStub.y }, { x: oLeft, y: oTop }, { x: tStub.x, y: oTop }, tStub, target],
+      [source, sStub, { x: oRight, y: sStub.y }, { x: oRight, y: oTop }, { x: tStub.x, y: oTop }, tStub, target],
+      [source, sStub, { x: oLeft, y: sStub.y }, { x: oLeft, y: oBottom }, { x: tStub.x, y: oBottom }, tStub, target],
+      [source, sStub, { x: oRight, y: sStub.y }, { x: oRight, y: oBottom }, { x: tStub.x, y: oBottom }, tStub, target],
+    );
+  }
+
+  // Clean up duplicate consecutive points
+  const cleanedCandidates = candidates.map(removeDuplicatePoints);
+
+  const best = cleanedCandidates.reduce((winner, candidate) => (
     scorePolyline(candidate, bounds, sourceBounds.id, targetBounds.id) < scorePolyline(winner, bounds, sourceBounds.id, targetBounds.id)
       ? candidate
       : winner
@@ -565,20 +617,43 @@ function removeDuplicatePoints(points: Point[]): Point[] {
 
 function scorePolyline(points: Point[], bounds: NodeBounds[], sourceId: string, targetId: string): number {
   let score = 0;
+  let bends = 0;
+
   for (let i = 1; i < points.length; i++) {
     const start = points[i - 1];
     const end = points[i];
-    score += Math.hypot(end.x - start.x, end.y - start.y);
-    score += 18;
+    const segLen = Math.hypot(end.x - start.x, end.y - start.y);
+    
+    // Path length cost (prefer shorter paths)
+    score += segLen;
+    
+    // Bend penalty (each turn adds cost, prefer simpler routes)
+    if (i >= 2) {
+      const prev = points[i - 2];
+      const dx1 = start.x - prev.x;
+      const dy1 = start.y - prev.y;
+      const dx2 = end.x - start.x;
+      const dy2 = end.y - start.y;
+      // If direction changed, it's a bend
+      if (Math.abs(dx1 * dy2 - dy1 * dx2) > 0.01) {
+        bends++;
+      }
+    }
 
     for (const bound of bounds) {
       const isEndpointNode = bound.id === sourceId || bound.id === targetId;
+      // Skip collision check for first/last segment with their own node
       if (isEndpointNode && (i === 1 || i === points.length - 1)) continue;
       if (segmentIntersectsBounds(start, end, bound)) {
-        score += isEndpointNode ? 20000 : 12000;
+        // Massive penalty for crossing through any node
+        score += isEndpointNode ? 80000 : 50000;
       }
     }
   }
+  
+  // Small penalty per bend to prefer cleaner routes
+  score += bends * 30;
+
   return score;
 }
 

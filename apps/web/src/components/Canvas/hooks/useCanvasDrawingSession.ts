@@ -4,8 +4,8 @@ import { LivingNode, Relation, ToolMode } from '@canvio/core';
 import { useCanvasStore } from '../../../store/canvasStore';
 import { detectGeometricShape, detectGestureArrow } from '../../../utils/shapeDetection';
 
-const INK_SESSION_MAX_GAP_MS = 900;
-const INK_SESSION_PROXIMITY_PX = 120;
+const INK_SESSION_MAX_GAP_MS = 2000;
+const INK_SESSION_PROXIMITY_PX = 250;
 
 interface UseCanvasDrawingSessionProps {
   activeTool: ToolMode;
@@ -194,7 +194,7 @@ export function useCanvasDrawingSession({
       return;
     }
 
-    // 4. Closed Geometric Shape Detection
+    // 4. Closed Geometric Shape Detection (only when autoShape is ON)
     const detected = autoShapeEnabled ? detectGeometricShape(currentStroke) : null;
     if (detected) {
       const shapeNode: LivingNode = {
@@ -220,6 +220,8 @@ export function useCanvasDrawingSession({
       setActiveTool('select');
     } else {
       // 5. Standard Freehand Stroke (Ink Session Grouping)
+      // In freehand mode: DON'T select the node and DON'T switch to select tool.
+      // This lets the user keep drawing naturally stroke after stroke.
       const strokeMinX = Math.min(...currentStroke.map((p) => p[0]));
       const strokeMinY = Math.min(...currentStroke.map((p) => p[1]));
       const strokeMaxX = Math.max(...currentStroke.map((p) => p[0]));
@@ -283,7 +285,7 @@ export function useCanvasDrawingSession({
           },
           updatedAt: now,
         });
-        selectNode(session.nodeId);
+        // Don't select, don't switch tool — keep drawing!
 
         inkSessionRef.current = {
           nodeId: session.nodeId,
@@ -324,7 +326,7 @@ export function useCanvasDrawingSession({
           updatedAt: now,
         };
         addNode(node);
-        selectNode(node.id);
+        // Don't select, don't switch tool — keep drawing!
 
         inkSessionRef.current = {
           nodeId: node.id,
