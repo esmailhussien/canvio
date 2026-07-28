@@ -187,17 +187,24 @@ export function NodeInspector({ node }: NodeInspectorProps) {
 
   const viewport = useCanvasStore((s) => s.viewport);
   const scaleFactor = Math.max(0.65, Math.min(2.5, 1 / viewport.zoom));
-  // Gap between node top edge and bottom of the toolbar (in node-local px).
-  // Multiply by scaleFactor so the visual gap stays consistent across zoom levels.
-  const gap = 14 * scaleFactor;
+  
+  // Provide generous clearance (36px+) between node edge and toolbar bottom so
+  // top connection ports, resize handles, and text ascenders are never overlapped.
+  const gap = Math.max(36, 34 * scaleFactor);
+
+  // Calculate screen Y coordinate of node top to prevent off-screen or ceiling overlap
+  const screenY = (typeof window !== 'undefined' ? window.innerHeight / 2 : 500) + (node.position.y + viewport.y) * viewport.zoom;
+  const isNearTop = screenY < 140;
 
   return (
     <div
       className="node-inspector canvio-toolbar-enter"
       style={{
-        top: -gap,
-        transform: `translate(-50%, -100%) scale(${scaleFactor})`,
-        transformOrigin: 'bottom center',
+        top: isNearTop ? (node.size.height + gap) : -gap,
+        transform: isNearTop 
+          ? `translate(-50%, 0) scale(${scaleFactor})` 
+          : `translate(-50%, -100%) scale(${scaleFactor})`,
+        transformOrigin: isNearTop ? 'top center' : 'bottom center',
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}

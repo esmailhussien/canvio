@@ -34,6 +34,6 @@ wss.on('connection', (conn, req) => {
   setupWSConnection(conn, req, { docName: boardId });
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 Yjs WebSocket Server running at ws://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Yjs WebSocket Server running at ws://0.0.0.0:${PORT}`);
 });

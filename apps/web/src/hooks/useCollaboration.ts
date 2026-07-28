@@ -217,6 +217,30 @@ export function useCollaboration(worldId: string) {
         // Small delay before enabling local push to let the store settle
         window.setTimeout(() => {
           localPushEnabled = true;
+          
+          // CRITICAL: Push any local state that was created before sync completed.
+          // The store subscription only fires on future changes, so we need to
+          // manually push existing nodes/relations that were created while offline.
+          const store = useCanvasStore.getState();
+          const localNodes = store.nodes;
+          const localRelations = store.relations;
+          
+          doc.transact(() => {
+            // Push local nodes to Yjs
+            Object.entries(localNodes).forEach(([id, node]) => {
+              const existing = yNodes.get(id);
+              if (!existing || existing.get('updatedAt') !== node.updatedAt) {
+                yNodes.set(id, nodeToYMap(node));
+              }
+            });
+            
+            // Push local relations to Yjs
+            Object.entries(localRelations).forEach(([id, rel]) => {
+              if (!yRelations.has(id)) {
+                yRelations.set(id, relationToYMap(rel));
+              }
+            });
+          }, 'local-transaction');
         }, 100);
       }
     };
@@ -249,16 +273,13 @@ export function useCollaboration(worldId: string) {
     // ─── Local → Remote Sync ──────────────────────────────────────────
     const unsubscribeNodes = useCanvasStore.subscribe(
       (s) => s.nodes,
-      (nodes) => {
+      (nodes, prevNodes = {}) => {
         // CRITICAL: Don't push local state until remote sync is done
         if (isReceivingRemote || !localPushEnabled) return;
 
         doc.transact(() => {
-          const localNodeIds = new Set(Object.keys(nodes));
-
           Object.entries(nodes).forEach(([id, node]) => {
             const existing = yNodes.get(id);
-
             // Only sync if node is new or has been updated
             const needsSync = !existing || existing.get('updatedAt') !== node.updatedAt;
 
@@ -267,30 +288,25 @@ export function useCollaboration(worldId: string) {
             }
           });
 
-          // Only delete remote nodes that don't exist locally AFTER full sync
-          if (remoteSynced) {
-            yNodes.forEach((_, id) => {
-              if (!localNodeIds.has(id)) {
-                yNodes.delete(id);
-              }
-            });
-          }
+          // Only delete nodes that existed in our previous local state and were explicitly deleted
+          Object.keys(prevNodes).forEach((prevId) => {
+            if (!nodes[prevId] && yNodes.has(prevId)) {
+              yNodes.delete(prevId);
+            }
+          });
         }, 'local-transaction');
       }
     );
 
     const unsubscribeRelations = useCanvasStore.subscribe(
       (s) => s.relations,
-      (relations) => {
+      (relations, prevRelations = {}) => {
         // CRITICAL: Don't push local state until remote sync is done
         if (isReceivingRemote || !localPushEnabled) return;
 
         doc.transact(() => {
-          const localRelIds = new Set(Object.keys(relations));
-
           Object.entries(relations).forEach(([id, rel]) => {
             const existing = yRelations.get(id);
-
             if (!existing) {
               yRelations.set(id, relationToYMap(rel));
             } else {
@@ -302,13 +318,12 @@ export function useCollaboration(worldId: string) {
             }
           });
 
-          if (remoteSynced) {
-            yRelations.forEach((_, id) => {
-              if (!localRelIds.has(id)) {
-                yRelations.delete(id);
-              }
-            });
-          }
+          // Only delete relations that existed in our previous local state and were explicitly deleted
+          Object.keys(prevRelations).forEach((prevId) => {
+            if (!relations[prevId] && yRelations.has(prevId)) {
+              yRelations.delete(prevId);
+            }
+          });
         }, 'local-transaction');
       }
     );

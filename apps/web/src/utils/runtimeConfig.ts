@@ -25,9 +25,10 @@ export function getWebSocketUrl() {
   if (getRuntimeConfig().wsUrl) return getRuntimeConfig().wsUrl!.replace(/\/$/, '');
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL.replace(/\/$/, '');
   
-  // Connect directly to local Canvio server in local development or on localhost
+  // Connect directly to local Canvio server in local development or on localhost/LAN
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || import.meta.env.DEV)) {
-    return 'ws://localhost:4001';
+    const hostname = window.location.hostname || 'localhost';
+    return `ws://${hostname}:4001`;
   }
 
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

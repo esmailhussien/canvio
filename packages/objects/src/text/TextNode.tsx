@@ -57,7 +57,15 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
   const handleBlur = () => {
     setIsEditing(false);
     if (onChange) {
-      onChange(node.id, { data: { ...data, content } });
+      const actualHeight = textRef.current ? Math.max(56, textRef.current.scrollHeight + 4) : Math.max(56, node.size.height || 56);
+      if (Math.abs((node.size.height || 56) - actualHeight) > 4) {
+        onChange(node.id, { 
+          size: { ...node.size, height: actualHeight },
+          data: { ...data, content } 
+        });
+      } else {
+        onChange(node.id, { data: { ...data, content } });
+      }
     }
   };
 
@@ -103,12 +111,12 @@ export const textPlugin = {
   name: 'Text',
   icon: 'type',
   category: 'core' as const,
-  defaultSize: { width: 200, height: 40 },
+  defaultSize: { width: 240, height: 56 },
   create: (position: Point): LivingNode => ({
     id: nanoid(),
     type: 'text',
     position,
-    size: { width: 200, height: 40 },
+    size: { width: 240, height: 56 },
     rotation: 0,
     zIndex: 0,
     locked: false,

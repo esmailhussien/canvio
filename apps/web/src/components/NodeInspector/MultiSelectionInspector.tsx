@@ -57,7 +57,7 @@ export function MultiSelectionInspector() {
     <div 
       className="multi-selection-inspector"
       style={{
-        transform: `translate(${bounds.x + bounds.width / 2}px, ${bounds.y - 16}px)`,
+        transform: `translate(${bounds.x + bounds.width / 2}px, ${bounds.y - 38}px)`,
       }}
     >
       <div className="inspector-panel" onPointerDown={(e) => e.stopPropagation()}>

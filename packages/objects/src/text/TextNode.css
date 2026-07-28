@@ -1,17 +1,20 @@
 .text-node {
   width: 100%;
   height: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  box-sizing: border-box;
   position: relative;
   display: flex;
   align-items: flex-start;
   font-family: var(--font-sans, system-ui, sans-serif);
   outline: 2px solid transparent;
   transition: outline-color 0.2s ease;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .text-node--selected {
-  outline-color: rgba(14, 165, 233, 0.5); /* subtle accent outline */
+  outline: 2px solid rgba(99, 102, 241, 0.65); /* clear accent selection outline */
 }
 
 .text-node__content, .text-node__textarea {
@@ -36,8 +39,8 @@
 
 .text-node__placeholder {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 10px;
+  left: 14px;
   color: var(--text-muted, #9ca3af);
   pointer-events: none;
   z-index: 0;
