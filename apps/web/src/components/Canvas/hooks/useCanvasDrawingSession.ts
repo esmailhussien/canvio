@@ -26,7 +26,6 @@ export function useCanvasDrawingSession({
   const selectNode = useCanvasStore((s) => s.selectNode);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const nextZIndex = useCanvasStore((s) => s.nextZIndex);
-  const nodes = useCanvasStore((s) => s.nodes);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<number[][] | null>(null);
@@ -172,7 +171,8 @@ export function useCanvasDrawingSession({
     }
 
     // 3. Gesture Arrow (Node A -> Node B connection)
-    const gestureArrow = autoShapeEnabled ? detectGestureArrow(currentStroke, nodes) : null;
+    const currentNodes = useCanvasStore.getState().nodes;
+    const gestureArrow = autoShapeEnabled ? detectGestureArrow(currentStroke, currentNodes) : null;
     if (gestureArrow) {
       const relation: Relation = {
         id: nanoid(10),
@@ -347,7 +347,6 @@ export function useCanvasDrawingSession({
     currentStroke,
     isDrawing,
     nextZIndex,
-    nodes,
     selectNode,
     setActiveTool,
     strokeColor,

@@ -22,14 +22,6 @@
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
-.cursor__svg {
-  width: 24px;
-  height: 24px;
-  /* Slight drop shadow on the cursor tip */
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-  transform-origin: top left;
-}
-
 .remote-cursor__label {
   margin-top: 4px;
   margin-left: 12px;

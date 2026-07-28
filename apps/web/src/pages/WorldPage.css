@@ -164,6 +164,18 @@
   box-shadow: 0 0 16px rgba(52, 211, 153, 0.3);
 }
 
+.world-page__starter-card.ai-card {
+  background: linear-gradient(135deg, color-mix(in srgb, #a855f7 14%, var(--bg-surface)), color-mix(in srgb, #6366f1 14%, var(--bg-surface)));
+  border-color: color-mix(in srgb, #a855f7 40%, var(--border-subtle));
+  color: #c4b5fd;
+}
+
+.world-page__starter-card.ai-card:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, #a855f7 28%, var(--bg-surface)), color-mix(in srgb, #6366f1 28%, var(--bg-surface)));
+  border-color: #c084fc;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
 .connection-status {
   position: relative;
   top: auto;
@@ -607,6 +619,23 @@
     min-height: 60px;
     flex-direction: row;
     padding: 12px 16px;
+  }
+
+  .world-page__empty-launcher {
+    gap: 28px;
+  }
+
+  .world-page__empty-title {
+    font-size: 2rem;
+  }
+
+  .world-page__empty-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .world-page__empty-bg-glow {
+    width: 300px;
+    height: 300px;
   }
 }
 

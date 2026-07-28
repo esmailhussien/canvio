@@ -107,14 +107,15 @@
   justify-content: center;
   cursor: pointer;
   pointer-events: auto;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   opacity: 0;
+  scale: 0.5;
   animation: popInStagger 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes popInStagger {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-  100% { opacity: 1; }
+  0% { opacity: 0; scale: 0.5; }
+  100% { opacity: 1; scale: 1; }
 }
 
 .canvas__radial-circle-item:nth-child(2) { animation-delay: 0.03s; }
