@@ -128,9 +128,9 @@ export function WorldPage() {
       const mapNode = mapPlugin.create({ x: 0, y: 0 });
       const positionedNode = {
         ...mapNode,
-        position: { 
-          x: -(mapNode.size.width / 2), 
-          y: -(mapNode.size.height / 2) 
+        position: {
+          x: -(mapNode.size.width / 2),
+          y: -(mapNode.size.height / 2)
         },
         zIndex: nextZIndex(),
         createdAt: Date.now(),
@@ -198,6 +198,18 @@ export function WorldPage() {
 
       {Object.keys(nodes).length === 0 && !isStarterDismissed && (
         <div className="world-page__empty-launcher" aria-label="Start canvas">
+          {/* Subtle animated magical background for empty state */}
+          <div className="world-page__empty-bg-glow"></div>
+          
+          <div className="world-page__empty-hero">
+            <h1 className="world-page__empty-title">
+              Your mind, <span>unbounded</span>.
+            </h1>
+            <p className="world-page__empty-subtitle">
+              Start plotting your thoughts on an infinite spatial canvas.
+            </p>
+          </div>
+
           <div className="world-page__starter-panel">
             <button className="world-page__starter-card primary" onClick={() => handleStartFromScratch(false)}>
               <IconSticky size={22} />
@@ -218,14 +230,14 @@ export function WorldPage() {
               <span>Choose a model</span>
             </button>
             <button
-              className="world-page__starter-card"
+              className="world-page__starter-card ai-card"
               onClick={() => {
                 setIsAIOpen(true);
                 setIsStarterDismissed(true);
               }}
             >
-              <span aria-hidden="true">✨</span>
-              <span>Ask AI</span>
+              <AISparkleIcon size={22} />
+              <span>Ask Spatial AI</span>
             </button>
           </div>
         </div>

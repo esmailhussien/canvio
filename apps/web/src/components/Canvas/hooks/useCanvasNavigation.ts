@@ -22,8 +22,8 @@ export function useCanvasNavigation({ canvasRef, viewport }: UseCanvasNavigation
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return { x: 0, y: 0 };
       return {
-        x: (screenX - rect.width / 2) / viewport.zoom - viewport.x,
-        y: (screenY - rect.height / 2) / viewport.zoom - viewport.y,
+        x: (screenX - rect.left - rect.width / 2) / viewport.zoom - viewport.x,
+        y: (screenY - rect.top - rect.height / 2) / viewport.zoom - viewport.y,
       };
     },
     [canvasRef, viewport]

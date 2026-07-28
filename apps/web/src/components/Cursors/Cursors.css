@@ -8,17 +8,26 @@
 
 .remote-cursor {
   position: absolute;
-  top: 0;
-  left: 0;
+  pointer-events: none;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  transition: transform 80ms cubic-bezier(0.1, 0.8, 0.25, 1);
+  /* Spring physics transition for smooth gliding */
+  transition: transform 0.12s cubic-bezier(0.2, 0.9, 0.3, 1.1);
   will-change: transform;
 }
 
 .remote-cursor__pointer {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.cursor__svg {
+  width: 24px;
+  height: 24px;
+  /* Slight drop shadow on the cursor tip */
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  transform-origin: top left;
 }
 
 .remote-cursor__label {

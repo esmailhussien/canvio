@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@canvio/core": "*",
     "y-websocket": "^2.1.0",
     "yjs": "^13.6.0"
   },
