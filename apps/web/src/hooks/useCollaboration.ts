@@ -3,91 +3,25 @@ import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { useCanvasStore } from '../store/canvasStore';
 import { getWebSocketUrl } from '../utils/runtimeConfig';
+import { getStorageItem, setStorageItem } from '../utils/storageDB';
+import {
+  nodeToYMap,
+  yMapToNode,
+  relationToYMap,
+  yMapToRelation,
+  getRandomName,
+  getRandomColor,
+  type UserPresence,
+} from '@canvio/collaboration';
 import type { LivingNode, Relation, Viewport } from '@canvio/core';
 
 // Re-export for backward compat
-export type { LivingNode, Relation };
-
-// Custom animal names for anonymous users
-const ANIMALS = ['Fox', 'Owl', 'Bear', 'Wolf', 'Eagle', 'Dolphin', 'Panda', 'Tiger', 'Falcon', 'Lynx'];
-const COLORS = ['#6366f1', '#a78bfa', '#f472b6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#ec4899', '#8b5cf6'];
-
-function getRandomName() {
-  const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-  return `Anonymous ${animal}`;
-}
-
-function getRandomColor() {
-  return COLORS[Math.floor(Math.random() * COLORS.length)];
-}
-
-export interface UserPresence {
-  id: string;
-  name: string;
-  color: string;
-  avatar?: string;
-  cursor?: { x: number; y: number };
-  selectedNodeIds?: string[];
-}
+export type { LivingNode, Relation, UserPresence };
 
 function isStoredViewport(value: unknown): value is Viewport {
   if (!value || typeof value !== 'object') return false;
   const viewport = value as Viewport;
   return Number.isFinite(viewport.x) && Number.isFinite(viewport.y) && Number.isFinite(viewport.zoom);
-}
-
-/**
- * Serializes a LivingNode to a Y.Map for Yjs storage.
- * The `data` field is JSON-stringified to avoid nested Y.Map complexity.
- */
-function nodeToYMap(node: LivingNode): Y.Map<any> {
-  const ymap = new Y.Map();
-  Object.entries(node).forEach(([k, v]) => {
-    if (k === 'data') {
-      ymap.set(k, JSON.stringify(v));
-    } else {
-      ymap.set(k, v);
-    }
-  });
-  return ymap;
-}
-
-/**
- * Deserializes a Y.Map back to a LivingNode.
- * Parses the `data` field from JSON string.
- */
-function yMapToNode(ymap: Y.Map<any>): LivingNode {
-  const obj = ymap.toJSON() as LivingNode;
-  if (typeof obj.data === 'string') {
-    try { obj.data = JSON.parse(obj.data as unknown as string); } catch { obj.data = {}; }
-  }
-  return obj;
-}
-
-/**
- * Serializes a Relation to a Y.Map for Yjs storage.
- */
-function relationToYMap(relation: Relation): Y.Map<any> {
-  const ymap = new Y.Map();
-  Object.entries(relation).forEach(([k, v]) => {
-    if (typeof v === 'object' && v !== null) {
-      ymap.set(k, JSON.stringify(v));
-    } else {
-      ymap.set(k, v);
-    }
-  });
-  return ymap;
-}
-
-/**
- * Deserializes a Y.Map back to a Relation.
- */
-function yMapToRelation(ymap: Y.Map<any>): Relation {
-  const obj = ymap.toJSON() as any;
-  if (typeof obj.style === 'string') {
-    try { obj.style = JSON.parse(obj.style); } catch { obj.style = {}; }
-  }
-  return obj as Relation;
 }
 
 export function useCollaboration(worldId: string) {
@@ -111,9 +45,8 @@ export function useCollaboration(worldId: string) {
       maxBackoffTime: 30000,
     });
     setProvider(wsProvider);
-    
-    // Delay actual connection by 150ms to bypass React StrictMode's immediate unmount sequence,
-    // avoiding the "WebSocket is closed before the connection is established" console errors.
+
+    // Delay actual connection by 150ms to bypass React StrictMode's immediate unmount sequence
     const connectTimer = window.setTimeout(() => {
       wsProvider.connect();
     }, 150);
@@ -125,7 +58,6 @@ export function useCollaboration(worldId: string) {
     const yRelations = doc.getMap<Y.Map<any>>('relations');
 
     // ─── Remote → Local Sync ───────────────────────────────────────────
-    // Handles top-level add/delete events (node created or removed)
     const handleNodesObserve = (event: Y.YMapEvent<Y.Map<any>>) => {
       if (event.transaction.origin === 'local-transaction') return;
 
@@ -170,29 +102,29 @@ export function useCollaboration(worldId: string) {
     yNodes.observe(handleNodesObserve);
     yRelations.observe(handleRelationsObserve);
 
-    // ─── LocalStorage Preload ──────────────────────────────────────────
+    // ─── IndexedDB Preload (Quota-free local persistence) ─────────────
     const storageKey = `canvio_world_${worldId}`;
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.nodes) {
-          Object.values(parsed.nodes).forEach((node: any) => upsertNodeRemote(node));
+    getStorageItem<any>(storageKey)
+      .then((parsed) => {
+        if (parsed) {
+          if (parsed.nodes) {
+            Object.values(parsed.nodes).forEach((node: any) => upsertNodeRemote(node));
+          }
+          if (parsed.relations) {
+            Object.values(parsed.relations).forEach((rel: any) => upsertRelationRemote(rel));
+          }
+          if (isStoredViewport(parsed.viewport)) {
+            useCanvasStore.getState().setViewport({
+              x: parsed.viewport.x,
+              y: parsed.viewport.y,
+              zoom: Math.min(5, Math.max(0.1, parsed.viewport.zoom)),
+            });
+          }
         }
-        if (parsed.relations) {
-          Object.values(parsed.relations).forEach((rel: any) => upsertRelationRemote(rel));
-        }
-        if (isStoredViewport(parsed.viewport)) {
-          useCanvasStore.getState().setViewport({
-            x: parsed.viewport.x,
-            y: parsed.viewport.y,
-            zoom: Math.min(5, Math.max(0.1, parsed.viewport.zoom)),
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load local world state', e);
-    }
+      })
+      .catch((e) => {
+        console.error('Failed to load local world state from IndexedDB', e);
+      });
 
     // ─── Initial State Loading ─────────────────────────────────────────
     isReceivingRemote = true;
@@ -232,7 +164,7 @@ export function useCollaboration(worldId: string) {
       if (wsUrl.includes('localhost') || wsUrl.includes('127.0.0.1')) {
         wsProvider.off('connection-error', handleConnectionFailure);
         wsProvider.disconnect();
-        console.info('🔌 Canvio is running in Offline-First LocalStorage mode.');
+        console.info('🔌 Canvio is running in Offline-First IndexedDB mode.');
       }
     };
 
@@ -266,14 +198,6 @@ export function useCollaboration(worldId: string) {
     awareness.on('change', handleAwarenessChange);
 
     // ─── Local → Remote Sync ──────────────────────────────────────────
-    // FIX: Instead of updating individual keys on nested Y.Maps (which
-    // does NOT trigger the parent map's observer), we replace the entire
-    // Y.Map entry. This ensures remote clients receive the update via the
-    // top-level yNodes.observe() handler.
-    //
-    // We use `updatedAt` as a cheap change-detection signal to avoid
-    // replacing unchanged nodes.
-
     const unsubscribeNodes = useCanvasStore.subscribe(
       (s) => s.nodes,
       (nodes) => {
@@ -294,7 +218,6 @@ export function useCollaboration(worldId: string) {
           });
 
           if (remoteSynced) {
-            // Remove nodes deleted locally only after initial remote sync.
             yNodes.forEach((_, id) => {
               if (!localNodeIds.has(id)) {
                 yNodes.delete(id);
@@ -316,11 +239,9 @@ export function useCollaboration(worldId: string) {
           Object.entries(relations).forEach(([id, rel]) => {
             const existing = yRelations.get(id);
 
-            // Always replace the entry to ensure the observer fires remotely
             if (!existing) {
               yRelations.set(id, relationToYMap(rel));
             } else {
-              // Check if changed (relations don't have updatedAt, use JSON comparison)
               const currentStyle = existing.get('style');
               const currentLabel = existing.get('label');
               if (currentStyle !== JSON.stringify(rel.style) || currentLabel !== rel.label) {
@@ -347,7 +268,6 @@ export function useCollaboration(worldId: string) {
       const rect = document.querySelector('.canvas')?.getBoundingClientRect();
       if (!rect) return;
 
-      // Convert screen coords to world coords
       const worldX = (e.clientX - rect.left - rect.width / 2) / viewport.zoom - viewport.x;
       const worldY = (e.clientY - rect.top - rect.height / 2) / viewport.zoom - viewport.y;
 
@@ -366,21 +286,20 @@ export function useCollaboration(worldId: string) {
       handleSelectionChange
     );
 
+    // ─── Auto-save to IndexedDB ───────────────────────────────────────
     let saveTimeout: number | null = null;
     const saveLocalState = () => {
       if (saveTimeout !== null) window.clearTimeout(saveTimeout);
       saveTimeout = window.setTimeout(() => {
-        try {
-          const store = useCanvasStore.getState();
-          localStorage.setItem(storageKey, JSON.stringify({
-            nodes: store.nodes,
-            relations: store.relations,
-            viewport: store.viewport,
-            savedAt: Date.now(),
-          }));
-        } catch (err) {
-          // Ignore storage quota errors
-        }
+        const store = useCanvasStore.getState();
+        setStorageItem(storageKey, {
+          nodes: store.nodes,
+          relations: store.relations,
+          viewport: store.viewport,
+          savedAt: Date.now(),
+        }).catch((err) => {
+          console.warn('Failed to save state to IndexedDB', err);
+        });
       }, 400);
     };
 

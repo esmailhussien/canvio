@@ -1,12 +1,10 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
-import { LivingNode, Relation, useCanvasStore, ToolMode } from '../../store/canvasStore';
-import { detectGeometricShape, detectGestureArrow } from '../../utils/shapeDetection';
+import { LivingNode, Relation, useCanvasStore } from '../../store/canvasStore';
 import { NodeRenderer } from '../NodeRenderer/NodeRenderer';
 import { RelationRenderer } from '../RelationRenderer/RelationRenderer';
 import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from '../RelationRenderer/relationUtils';
 import { DrawingLayer } from '../DrawingLayer/DrawingLayer';
 import { nanoid } from 'nanoid';
-import { getPlugin } from '@canvio/objects';
 import {
   IconSticky,
   IconText,
@@ -16,6 +14,12 @@ import {
   IconSparkles,
   IconX,
 } from '@canvio/ui';
+import { useViewportCulling } from './hooks/useViewportCulling';
+import { useCanvasNavigation } from './hooks/useCanvasNavigation';
+import { useCanvasDrawingSession } from './hooks/useCanvasDrawingSession';
+import { useCanvasMarquee } from './hooks/useCanvasMarquee';
+import { useCanvasKeyboardShortcuts } from './hooks/useCanvasKeyboardShortcuts';
+import { useCanvasClipboard } from './hooks/useCanvasClipboard';
 import './Canvas.css';
 
 interface CanvasProps {
@@ -30,14 +34,11 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   const relations = useCanvasStore((s) => s.relations);
   const activeTool = useCanvasStore((s) => s.activeTool);
   const panBy = useCanvasStore((s) => s.panBy);
-  const zoomAtPoint = useCanvasStore((s) => s.zoomAtPoint);
   const addNode = useCanvasStore((s) => s.addNode);
-  const updateNode = useCanvasStore((s) => s.updateNode);
-  const addRelation = useCanvasStore((s) => s.addRelation);
   const selectNode = useCanvasStore((s) => s.selectNode);
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
-  const nextZIndex = useCanvasStore((s) => s.nextZIndex);
   const strokeColor = useCanvasStore((s) => s.strokeColor);
   const strokeWidth = useCanvasStore((s) => s.strokeWidth);
   const stickyColor = useCanvasStore((s) => s.stickyColor);
@@ -48,434 +49,214 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   const relationTargetPort = useCanvasStore((s) => s.relationTargetPort);
   const setRelationSourceId = useCanvasStore((s) => s.setRelationSourceId);
 
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentStroke, setCurrentStroke] = useState<number[][] | null>(null);
+  const [cursorWorldPos, setCursorWorldPos] = useState<{ x: number; y: number } | null>(null);
   const [radialMenu, setRadialMenu] = useState<{ screenX: number; screenY: number; worldPos: { x: number; y: number } } | null>(null);
-  // Tracks the "ink session" for the plain pen tool: while the user keeps
-  // writing/drawing nearby strokes in quick succession (e.g. letters in a word,
-  // or a sentence), we group them into the SAME drawing node instead of
-  // creating a brand-new independent object per pen lift. A long pause or a
-  // stroke far away from the last one starts a fresh node.
-  const inkSessionRef = useRef<{ nodeId: string; lastEndTime: number; minX: number; minY: number; maxX: number; maxY: number } | null>(null);
-  const INK_SESSION_MAX_GAP_MS = 900;
-  const INK_SESSION_PROXIMITY_PX = 120;
-
-  useEffect(() => {
-    if (activeTool !== 'draw') {
-      inkSessionRef.current = null;
-    }
-  }, [activeTool]);
-
-  const [cursorWorldPos, setCursorWorldPos] = useState<{ x: number, y: number } | null>(null);
-
-  // Marquee selection state
-  const [isMarqueeActive, setIsMarqueeActive] = useState(false);
-  const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
-  const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
 
   // Drag-to-Create Frame state
   const [isDrawingFrame, setIsDrawingFrame] = useState(false);
   const [frameStartPos, setFrameStartPos] = useState<{ x: number; y: number } | null>(null);
   const [frameCurrentPos, setFrameCurrentPos] = useState<{ x: number; y: number } | null>(null);
 
-  // Screen to world coordinate conversion
-  const screenToWorld = useCallback((screenX: number, screenY: number) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return {
-      x: (screenX - rect.width / 2) / viewport.zoom - viewport.x,
-      y: (screenY - rect.height / 2) / viewport.zoom - viewport.y,
-    };
-  }, [viewport]);
+  // Custom Navigation Hook
+  const {
+    screenToWorld,
+    isPanning,
+    setIsPanning,
+    lastMousePos,
+    setLastMousePos,
+    pinchStateRef,
+    handleWheel,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+  } = useCanvasNavigation({ canvasRef, viewport });
 
-  const createNodeFromPlugin = useCallback((type: string, worldPos: { x: number; y: number }, data?: Record<string, unknown>) => {
-    const plugin = getPlugin(type);
-    if (!plugin) return null;
+  // Custom Drawing Session Hook
+  const {
+    isDrawing,
+    currentStroke,
+    startDrawing,
+    updateStrokePoint,
+    finishDrawing,
+  } = useCanvasDrawingSession({
+    activeTool,
+    autoShapeEnabled,
+    strokeColor,
+    strokeWidth,
+  });
 
-    const node = plugin.create({ x: worldPos.x, y: worldPos.y });
-    const positionedNode: LivingNode = {
-      ...node,
-      position: {
-        x: worldPos.x - node.size.width / 2,
-        y: worldPos.y - node.size.height / 2,
-      },
-      zIndex: type === 'frame' ? -1 : nextZIndex(),
-      data: data ? { ...node.data, ...data } : node.data,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+  // Custom Marquee Hook
+  const {
+    isMarqueeActive,
+    marqueeStart,
+    marqueeEnd,
+    startMarquee,
+    updateMarquee,
+    finishMarquee,
+  } = useCanvasMarquee();
 
-    addNode(positionedNode);
-    selectNode(positionedNode.id);
-    setActiveTool('select');
-    return positionedNode;
-  }, [addNode, nextZIndex, selectNode, setActiveTool]);
+  // Custom Keyboard Shortcuts Hook
+  useCanvasKeyboardShortcuts();
 
-  const createImageFromFile = useCallback((file: File, worldPos: { x: number; y: number }) => {
-    if (!file.type.startsWith('image/')) return;
+  // Custom Clipboard & Drag-Drop Hook
+  const { createNodeFromPlugin, handleDragOver, handleDrop } = useCanvasClipboard({
+    canvasRef,
+    cursorWorldPos,
+    screenToWorld,
+  });
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      createNodeFromPlugin('image', worldPos, {
-        src: reader.result as string,
-        alt: file.name || 'Image',
-      });
-    };
-    reader.readAsDataURL(file);
-  }, [createNodeFromPlugin]);
+  // Viewport Culling Hook for 10x Performance Boost on Large Canvases
+  const visibleNodes = useViewportCulling({
+    nodes,
+    viewport,
+    canvasRef,
+    selectedNodeIds,
+    relationSourceId,
+    relationTargetId,
+  });
 
-  // Handle wheel zoom with exact pointer targeting & smooth exponential scaling
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
+  // Pointer Down
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!e.isPrimary || pinchStateRef.current) return;
+      if (radialMenu) setRadialMenu(null);
+      const target = e.target as HTMLElement;
+      const isCanvasSurface =
+        target === canvasRef.current ||
+        target.classList.contains('canvas__world') ||
+        target.classList.contains('canvas__grid');
+      if (!isCanvasSurface) return;
 
-      let delta = e.deltaY;
-      if (e.deltaMode === 1) delta *= 16;
-      if (e.deltaMode === 2) delta *= 100;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      const worldPos = screenToWorld(e.clientX, e.clientY);
 
-      // Clamp delta to avoid massive zoom steps from fast spinning
-      const clampedDelta = Math.max(-100, Math.min(100, delta));
-
-      // Calculate smooth zoom factor (0.9975 per pixel of scroll)
-      const factor = Math.pow(0.9975, clampedDelta);
-
-      zoomAtPoint(
-        factor,
-        { x: e.clientX, y: e.clientY },
-        { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-        true
-      );
-    } else {
-      // Pan
-      panBy(-e.deltaX / viewport.zoom, -e.deltaY / viewport.zoom);
-    }
-  }, [panBy, zoomAtPoint, viewport.zoom]);
-
-  // Two-finger pinch-to-zoom and pan for touchscreens. This is intentionally
-  // separate from the mouse-based handlers above: on touch devices, browsers
-  // only synthesize compatibility mouse events for a SINGLE touch point, so a
-  // second finger is invisible to onMouseDown/onMouseMove — there was
-  // previously no way to zoom the canvas at all on a phone or tablet.
-  // Note: a pointerdown that starts on an *interactive* Living Map Node calls
-  // stopPropagation (see MapNode.tsx), so these handlers never see touches
-  // that land on an unlocked map — Leaflet's own pinch-zoom handles those, and
-  // this canvas-level pinch only takes over once the map is locked or the
-  // fingers are elsewhere on the world. That keeps the existing lock/unlock
-  // affordance as the single source of truth for "who owns this gesture."
-  const pinchStateRef = useRef<{ distance: number; midpoint: { x: number; y: number } } | null>(null);
-
-  const getTouchDistance = (touches: React.TouchList) => {
-    const a = touches[0];
-    const b = touches[1];
-    return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-  };
-
-  const getTouchMidpoint = (touches: React.TouchList) => {
-    const a = touches[0];
-    const b = touches[1];
-    return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
-  };
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      // A second finger just landed — this is a navigation gesture. Cancel any
-      // single-finger action already in progress (a stroke, a marquee, a frame
-      // being drawn, single-finger panning) so the two never fight over the
-      // same movement.
-      setIsPanning(false);
-      setLastMousePos(null);
-      setIsDrawing(false);
-      setCurrentStroke(null);
-      setIsMarqueeActive(false);
-      setMarqueeStart(null);
-      setMarqueeEnd(null);
-      setIsDrawingFrame(false);
-      setFrameStartPos(null);
-      setFrameCurrentPos(null);
-
-      pinchStateRef.current = {
-        distance: getTouchDistance(e.touches),
-        midpoint: getTouchMidpoint(e.touches),
-      };
-    }
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchStateRef.current) {
-      e.preventDefault();
-      const distance = getTouchDistance(e.touches);
-      const midpoint = getTouchMidpoint(e.touches);
-      const rect = canvasRef.current?.getBoundingClientRect();
-
-      if (rect && pinchStateRef.current.distance > 0) {
-        const factor = distance / pinchStateRef.current.distance;
-        zoomAtPoint(
-          factor,
-          midpoint,
-          { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-          true
-        );
-
-        const dx = (midpoint.x - pinchStateRef.current.midpoint.x) / viewport.zoom;
-        const dy = (midpoint.y - pinchStateRef.current.midpoint.y) / viewport.zoom;
-        panBy(dx, dy);
-      }
-
-      pinchStateRef.current = { distance, midpoint };
-    }
-  }, [zoomAtPoint, panBy, viewport.zoom]);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length < 2) {
-      pinchStateRef.current = null;
-    }
-  }, []);
-
-  // Handle pointer down
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.isPrimary || pinchStateRef.current) return;
-    if (radialMenu) setRadialMenu(null);
-    const target = e.target as HTMLElement;
-    const isCanvasSurface =
-      target === canvasRef.current ||
-      target.classList.contains('canvas__world') ||
-      target.classList.contains('canvas__grid');
-    if (!isCanvasSurface) return;
-
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    const worldPos = screenToWorld(e.clientX, e.clientY);
-
-    if (activeTool === 'pan' || e.button === 1) {
-      e.preventDefault();
-      setIsPanning(true);
-      setLastMousePos({ x: e.clientX, y: e.clientY });
-      return;
-    }
-
-    if (activeTool === 'relation') {
-      // Clicked background in relation mode -> clear connection source
-      setRelationSourceId(null);
-      return;
-    }
-
-    if (activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow') {
-      e.preventDefault();
-      setIsDrawing(true);
-      setCurrentStroke([[worldPos.x, worldPos.y, 0.5]]);
-      return;
-    }
-
-    if (activeTool === 'sticky') {
-      createNodeFromPlugin('sticky', worldPos, { color: stickyColor });
-      return;
-    }
-
-    if (activeTool === 'map') {
-      createNodeFromPlugin('map', worldPos);
-      return;
-    }
-
-    if (activeTool === 'text') {
-      createNodeFromPlugin('text', worldPos, { color: 'var(--text-primary)' });
-      return;
-    }
-
-    if (activeTool === 'image') {
-      createNodeFromPlugin('image', worldPos);
-      return;
-    }
-
-    if (activeTool === 'shape') {
-      createNodeFromPlugin('shape', worldPos);
-      return;
-    }
-
-    if (activeTool === 'code') {
-      createNodeFromPlugin('code', worldPos);
-      return;
-    }
-
-    if (activeTool === 'frame') {
-      e.preventDefault();
-      setIsDrawingFrame(true);
-      setFrameStartPos(worldPos);
-      setFrameCurrentPos(worldPos);
-      return;
-    }
-
-    if (activeTool === 'select') {
-      e.preventDefault();
-      // Start marquee selection
-      setMarqueeStart(worldPos);
-      setMarqueeEnd(worldPos);
-      setIsMarqueeActive(true);
-      clearSelection();
-    }
-  }, [activeTool, screenToWorld, clearSelection, stickyColor, setRelationSourceId, createNodeFromPlugin, radialMenu]);
-
-  // Pointer move for panning and drawing
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.isPrimary || pinchStateRef.current) return;
-    const worldPos = screenToWorld(e.clientX, e.clientY);
-    setCursorWorldPos(worldPos);
-
-    if (isPanning && lastMousePos) {
-      const dx = (e.clientX - lastMousePos.x) / viewport.zoom;
-      const dy = (e.clientY - lastMousePos.y) / viewport.zoom;
-      panBy(dx, dy);
-      setLastMousePos({ x: e.clientX, y: e.clientY });
-      return;
-    }
-
-    if (isDrawing && currentStroke) {
-      setCurrentStroke(prev => {
-        const points = prev || [];
-        const last = points[points.length - 1];
-        if (last && Math.hypot(worldPos.x - last[0], worldPos.y - last[1]) < Math.max(0.75, strokeWidth * 0.2)) {
-          return points;
-        }
-        return [...points, [worldPos.x, worldPos.y, 0.5]];
-      });
-    }
-
-    if (isMarqueeActive) {
-      setMarqueeEnd(worldPos);
-    }
-
-    if (isDrawingFrame) {
-      setFrameCurrentPos(worldPos);
-    }
-  }, [activeTool, isPanning, lastMousePos, isDrawing, currentStroke, isMarqueeActive, isDrawingFrame, viewport.zoom, panBy, screenToWorld, strokeWidth]);
-
-  // Pointer up
-  const handlePointerUp = useCallback((e?: React.PointerEvent<HTMLDivElement>) => {
-    if (e && !e.isPrimary) return;
-    if (e?.currentTarget.hasPointerCapture?.(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-
-    if (isPanning) {
-      setIsPanning(false);
-      setLastMousePos(null);
-    }
-
-    // Finish Frame Creation
-    if (isDrawingFrame && frameStartPos && frameCurrentPos) {
-      const minX = Math.min(frameStartPos.x, frameCurrentPos.x);
-      const minY = Math.min(frameStartPos.y, frameCurrentPos.y);
-      const width = Math.max(80, Math.abs(frameCurrentPos.x - frameStartPos.x));
-      const height = Math.max(60, Math.abs(frameCurrentPos.y - frameStartPos.y));
-
-      const node = {
-        id: nanoid(10),
-        type: 'frame',
-        position: { x: minX, y: minY },
-        size: { width, height },
-        rotation: 0,
-        zIndex: -1,
-        locked: false,
-        data: {
-          title: 'Frame Section',
-          color: '#6366f1',
-          fill: 'rgba(255, 255, 255, 0.02)',
-        },
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      addNode(node);
-      selectNode(node.id);
-      setActiveTool('select');
-      setIsDrawingFrame(false);
-      setFrameStartPos(null);
-      setFrameCurrentPos(null);
-    }
-
-    if (isDrawing && currentStroke && currentStroke.length > 1) {
-      if (activeTool === 'arrow') {
-        const start = currentStroke[0];
-        const end = currentStroke[currentStroke.length - 1];
-        const distance = Math.hypot(end[0] - start[0], end[1] - start[1]);
-        if (distance > 10) {
-          const arrowWidth = Math.max(2.5, strokeWidth);
-          const padding = Math.max(28, arrowWidth * 8);
-          const minX = Math.min(...currentStroke.map((point) => point[0]));
-          const minY = Math.min(...currentStroke.map((point) => point[1]));
-          const maxX = Math.max(...currentStroke.map((point) => point[0]));
-          const maxY = Math.max(...currentStroke.map((point) => point[1]));
-          const normalizedPoints = currentStroke.map(([x, y, p]) => [
-            x - minX + padding,
-            y - minY + padding,
-            p,
-          ]);
-          const node: LivingNode = {
-            id: nanoid(10),
-            type: 'drawing',
-            position: { x: minX - padding, y: minY - padding },
-            size: {
-              width: Math.max(1, maxX - minX) + padding * 2,
-              height: Math.max(1, maxY - minY) + padding * 2,
-            },
-            rotation: 0,
-            zIndex: nextZIndex(),
-            locked: false,
-            data: {
-              kind: 'arrow',
-              strokes: [],
-              arrow: {
-                start: [start[0] - minX + padding, start[1] - minY + padding],
-                end: [end[0] - minX + padding, end[1] - minY + padding],
-                points: normalizedPoints,
-                color: strokeColor || '#6366f1',
-                width: arrowWidth,
-              },
-            },
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          };
-          addNode(node);
-          selectNode(node.id);
-          setActiveTool('select');
-        }
-        setIsDrawing(false);
-        setCurrentStroke(null);
+      if (activeTool === 'pan' || e.button === 1) {
+        e.preventDefault();
+        setIsPanning(true);
+        setLastMousePos({ x: e.clientX, y: e.clientY });
         return;
       }
 
-      if (activeTool === 'highlighter') {
-        const minX = Math.min(...currentStroke.map(p => p[0]));
-        const minY = Math.min(...currentStroke.map(p => p[1]));
-        const maxX = Math.max(...currentStroke.map(p => p[0]));
-        const maxY = Math.max(...currentStroke.map(p => p[1]));
-        const highlightWidth = Math.max(10, strokeWidth * 3);
-        const padding = Math.max(24, highlightWidth * 2);
-        const normalizedPoints = currentStroke.map(([x, y, p]) => [
-          x - minX + padding,
-          y - minY + padding,
-          p,
-        ]);
+      if (activeTool === 'relation') {
+        setRelationSourceId(null);
+        return;
+      }
 
-        const node: LivingNode = {
+      if (activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow') {
+        e.preventDefault();
+        startDrawing(worldPos);
+        return;
+      }
+
+      if (activeTool === 'sticky') { createNodeFromPlugin('sticky', worldPos, { color: stickyColor }); return; }
+      if (activeTool === 'map') { createNodeFromPlugin('map', worldPos); return; }
+      if (activeTool === 'text') { createNodeFromPlugin('text', worldPos, { color: 'var(--text-primary)' }); return; }
+      if (activeTool === 'image') { createNodeFromPlugin('image', worldPos); return; }
+      if (activeTool === 'shape') { createNodeFromPlugin('shape', worldPos); return; }
+      if (activeTool === 'code') { createNodeFromPlugin('code', worldPos); return; }
+
+      if (activeTool === 'frame') {
+        e.preventDefault();
+        setIsDrawingFrame(true);
+        setFrameStartPos(worldPos);
+        setFrameCurrentPos(worldPos);
+        return;
+      }
+
+      if (activeTool === 'select') {
+        e.preventDefault();
+        startMarquee(worldPos);
+      }
+    },
+    [
+      activeTool,
+      createNodeFromPlugin,
+      pinchStateRef,
+      radialMenu,
+      screenToWorld,
+      setIsPanning,
+      setLastMousePos,
+      setRelationSourceId,
+      startDrawing,
+      startMarquee,
+      stickyColor,
+    ]
+  );
+
+  // Pointer Move
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!e.isPrimary || pinchStateRef.current) return;
+      const worldPos = screenToWorld(e.clientX, e.clientY);
+      setCursorWorldPos(worldPos);
+
+      if (isPanning && lastMousePos) {
+        const dx = (e.clientX - lastMousePos.x) / viewport.zoom;
+        const dy = (e.clientY - lastMousePos.y) / viewport.zoom;
+        panBy(dx, dy);
+        setLastMousePos({ x: e.clientX, y: e.clientY });
+        return;
+      }
+
+      if (isDrawing) {
+        updateStrokePoint(worldPos);
+      }
+
+      if (isMarqueeActive) {
+        updateMarquee(worldPos);
+      }
+
+      if (isDrawingFrame) {
+        setFrameCurrentPos(worldPos);
+      }
+    },
+    [
+      isDrawing,
+      isDrawingFrame,
+      isMarqueeActive,
+      isPanning,
+      lastMousePos,
+      panBy,
+      pinchStateRef,
+      screenToWorld,
+      setLastMousePos,
+      updateMarquee,
+      updateStrokePoint,
+      viewport.zoom,
+    ]
+  );
+
+  // Pointer Up
+  const handlePointerUp = useCallback(
+    (e?: React.PointerEvent<HTMLDivElement>) => {
+      if (e && !e.isPrimary) return;
+      if (e?.currentTarget.hasPointerCapture?.(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+
+      if (isPanning) {
+        setIsPanning(false);
+        setLastMousePos(null);
+      }
+
+      if (isDrawingFrame && frameStartPos && frameCurrentPos) {
+        const minX = Math.min(frameStartPos.x, frameCurrentPos.x);
+        const minY = Math.min(frameStartPos.y, frameCurrentPos.y);
+        const width = Math.max(80, Math.abs(frameCurrentPos.x - frameStartPos.x));
+        const height = Math.max(60, Math.abs(frameCurrentPos.y - frameStartPos.y));
+
+        const node = {
           id: nanoid(10),
-          type: 'drawing',
-          position: { x: minX - padding, y: minY - padding },
-          size: { width: maxX - minX + padding * 2, height: maxY - minY + padding * 2 },
+          type: 'frame',
+          position: { x: minX, y: minY },
+          size: { width, height },
           rotation: 0,
-          zIndex: nextZIndex(),
+          zIndex: -1,
           locked: false,
           data: {
-            kind: 'highlighter',
-            strokes: [{
-              id: nanoid(6),
-              points: normalizedPoints,
-              color: strokeColor || '#f59e0b',
-              width: highlightWidth,
-              opacity: 0.34,
-              highlighter: true,
-              complete: true,
-            }],
+            title: 'Frame Section',
+            color: '#6366f1',
+            fill: 'rgba(255, 255, 255, 0.02)',
           },
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -483,223 +264,47 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
         addNode(node);
         selectNode(node.id);
         setActiveTool('select');
-        setIsDrawing(false);
-        setCurrentStroke(null);
-        return;
+        setIsDrawingFrame(false);
+        setFrameStartPos(null);
+        setFrameCurrentPos(null);
       }
 
-      // 1. Check if user drew a stroke connecting Node A -> Node B (Gesture Arrow)
-      const gestureArrow = autoShapeEnabled ? detectGestureArrow(currentStroke, nodes) : null;
-
-      if (gestureArrow) {
-        const relation: Relation = {
-          id: nanoid(10),
-          sourceId: gestureArrow.sourceId,
-          targetId: gestureArrow.targetId,
-          relationship: 'leads_to',
-          label: '',
-          style: {
-            type: 'orthogonal',
-            color: strokeColor || '#6366f1',
-            width: 2,
-            endArrow: 'arrow',
-          },
-        };
-        addRelation(relation);
-        setIsDrawing(false);
-        setCurrentStroke(null);
-        setActiveTool('select');
-        return;
+      if (isDrawing) {
+        finishDrawing();
       }
 
-      // 2. Check if user drew a closed shape (Circle, Rectangle, Triangle, Hexagon)
-      const detected = autoShapeEnabled ? detectGeometricShape(currentStroke) : null;
-
-      if (detected) {
-        const shapeNode: LivingNode = {
-          id: nanoid(10),
-          type: 'shape',
-          position: detected.position,
-          size: detected.size,
-          rotation: 0,
-          zIndex: nextZIndex(),
-          locked: false,
-          data: {
-            shape: detected.type,
-            fill: 'rgba(99, 102, 241, 0.15)',
-            stroke: strokeColor,
-            strokeWidth: Math.max(2, Math.round(strokeWidth / 2)),
-            label: '',
-          },
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        addNode(shapeNode);
-        selectNode(shapeNode.id);
-        setActiveTool('select');
-      } else {
-        // Standard Freehand Stroke
-        const strokeMinX = Math.min(...currentStroke.map(p => p[0]));
-        const strokeMinY = Math.min(...currentStroke.map(p => p[1]));
-        const strokeMaxX = Math.max(...currentStroke.map(p => p[0]));
-        const strokeMaxY = Math.max(...currentStroke.map(p => p[1]));
-        const padding = 20;
-
-        const session = inkSessionRef.current;
-        const now = Date.now();
-        const withinTime = session ? (now - session.lastEndTime) <= INK_SESSION_MAX_GAP_MS : false;
-        const withinProximity = session
-          ? strokeMinX < session.maxX + INK_SESSION_PROXIMITY_PX &&
-          strokeMaxX > session.minX - INK_SESSION_PROXIMITY_PX &&
-          strokeMinY < session.maxY + INK_SESSION_PROXIMITY_PX &&
-          strokeMaxY > session.minY - INK_SESSION_PROXIMITY_PX
-          : false;
-
-        const existingNode = session ? useCanvasStore.getState().nodes[session.nodeId] : null;
-
-        if (session && existingNode && withinTime && withinProximity) {
-          // Merge this stroke into the same node as the previous one (e.g. the
-          // next letter of the same word) instead of creating a new object.
-          const combinedMinX = Math.min(session.minX, strokeMinX);
-          const combinedMinY = Math.min(session.minY, strokeMinY);
-          const combinedMaxX = Math.max(session.maxX, strokeMaxX);
-          const combinedMaxY = Math.max(session.maxY, strokeMaxY);
-
-          const newPosition = { x: combinedMinX - padding, y: combinedMinY - padding };
-          const newSize = {
-            width: combinedMaxX - combinedMinX + padding * 2,
-            height: combinedMaxY - combinedMinY + padding * 2,
-          };
-
-          // Existing strokes are stored in local coordinates (world = local +
-          // node.position). Re-normalize them to the new, possibly-expanded
-          // bounding box by shifting every point by the origin's delta.
-          const shiftX = existingNode.position.x - newPosition.x;
-          const shiftY = existingNode.position.y - newPosition.y;
-          type InkStroke = { id: string; points: number[][]; color: string; width: number; complete: boolean };
-          const priorStrokes = ((existingNode.data?.strokes as InkStroke[] | undefined) || []);
-          const existingStrokes = priorStrokes.map((s) => ({
-            ...s,
-            points: s.points.map(([x, y, p]) => [x + shiftX, y + shiftY, p]),
-          }));
-
-          const newStrokeNormalized = currentStroke.map(([x, y, p]) => [
-            x - newPosition.x,
-            y - newPosition.y,
-            p,
-          ]);
-
-          updateNode(session.nodeId, {
-            position: newPosition,
-            size: newSize,
-            data: {
-              ...existingNode.data,
-              strokes: [...existingStrokes, {
-                id: nanoid(6),
-                points: newStrokeNormalized,
-                color: strokeColor,
-                width: strokeWidth,
-                complete: true,
-              }],
-            },
-            updatedAt: now,
-          });
-          selectNode(session.nodeId);
-
-          inkSessionRef.current = {
-            nodeId: session.nodeId,
-            lastEndTime: now,
-            minX: combinedMinX,
-            minY: combinedMinY,
-            maxX: combinedMaxX,
-            maxY: combinedMaxY,
-          };
-        } else {
-          const normalizedPoints = currentStroke.map(([x, y, p]) => [
-            x - strokeMinX + padding,
-            y - strokeMinY + padding,
-            p
-          ]);
-
-          const node = {
-            id: nanoid(10),
-            type: 'drawing',
-            position: { x: strokeMinX - padding, y: strokeMinY - padding },
-            size: { width: strokeMaxX - strokeMinX + padding * 2, height: strokeMaxY - strokeMinY + padding * 2 },
-            rotation: 0,
-            zIndex: nextZIndex(),
-            locked: false,
-            data: {
-              kind: 'freehand',
-              strokes: [{
-                id: nanoid(6),
-                points: normalizedPoints,
-                color: strokeColor,
-                width: strokeWidth,
-                complete: true,
-              }]
-            },
-            createdAt: now,
-            updatedAt: now,
-          };
-          addNode(node);
-          selectNode(node.id);
-
-          inkSessionRef.current = {
-            nodeId: node.id,
-            lastEndTime: now,
-            minX: strokeMinX,
-            minY: strokeMinY,
-            maxX: strokeMaxX,
-            maxY: strokeMaxY,
-          };
-        }
+      if (isMarqueeActive) {
+        finishMarquee();
       }
-    }
+    },
+    [
+      addNode,
+      finishDrawing,
+      finishMarquee,
+      frameCurrentPos,
+      frameStartPos,
+      isDrawing,
+      isDrawingFrame,
+      isMarqueeActive,
+      isPanning,
+      selectNode,
+      setActiveTool,
+      setIsPanning,
+      setLastMousePos,
+    ]
+  );
 
-    setIsDrawing(false);
-    setCurrentStroke(null);
+  // Radial Menu Context Handler
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!e.clientX && !e.clientY) return;
+      const worldPos = screenToWorld(e.clientX, e.clientY);
+      setRadialMenu({ screenX: e.clientX, screenY: e.clientY, worldPos });
+    },
+    [screenToWorld]
+  );
 
-    // Finish marquee selection
-    if (isMarqueeActive && marqueeStart && marqueeEnd) {
-      const x1 = Math.min(marqueeStart.x, marqueeEnd.x);
-      const y1 = Math.min(marqueeStart.y, marqueeEnd.y);
-      const x2 = Math.max(marqueeStart.x, marqueeEnd.x);
-      const y2 = Math.max(marqueeStart.y, marqueeEnd.y);
-
-      // Only select if the marquee is large enough (not just a click)
-      if (Math.abs(x2 - x1) > 5 || Math.abs(y2 - y1) > 5) {
-        const selectNodes = useCanvasStore.getState().selectNodes;
-        const allNodes = useCanvasStore.getState().nodes;
-        const ids = Object.values(allNodes)
-          .filter(n => {
-            const nx1 = n.position.x;
-            const ny1 = n.position.y;
-            const nx2 = n.position.x + n.size.width;
-            const ny2 = n.position.y + n.size.height;
-            // AABB intersection test
-            return nx1 < x2 && nx2 > x1 && ny1 < y2 && ny2 > y1;
-          })
-          .map(n => n.id);
-        if (ids.length > 0) {
-          selectNodes(ids);
-        }
-      }
-    }
-    setIsMarqueeActive(false);
-    setMarqueeStart(null);
-    setMarqueeEnd(null);
-  }, [activeTool, isPanning, isDrawing, currentStroke, isMarqueeActive, marqueeStart, marqueeEnd, isDrawingFrame, frameStartPos, frameCurrentPos, addNode, selectNode, setActiveTool, nextZIndex, strokeColor, strokeWidth, autoShapeEnabled, nodes, addRelation]);
-
-  // Handle context menu / long-press for radial menu
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!e.clientX && !e.clientY) return;
-    const worldPos = screenToWorld(e.clientX, e.clientY);
-    setRadialMenu({ screenX: e.clientX, screenY: e.clientY, worldPos });
-  }, [screenToWorld]);
-
-  // Close radial menu whenever clicking anywhere on frame, nodes, or canvas
   useEffect(() => {
     if (!radialMenu) return;
     const handleCloseRadial = (e: Event) => {
@@ -718,7 +323,6 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     };
   }, [radialMenu]);
 
-  // Prevent default scroll behavior
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -729,223 +333,15 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
     };
   }, []);
 
-  useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      const activeEl = document.activeElement as HTMLElement | null;
-      if (
-        activeEl?.isContentEditable ||
-        activeEl?.tagName === 'INPUT' ||
-        activeEl?.tagName === 'TEXTAREA'
-      ) {
-        return;
-      }
-
-      const imageItem = Array.from(e.clipboardData?.items || []).find((item) => item.type.startsWith('image/'));
-      const file = imageItem?.getAsFile();
-      if (!file) return;
-
-      e.preventDefault();
-      const rect = canvasRef.current?.getBoundingClientRect();
-      const target = cursorWorldPos || (
-        rect
-          ? screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2)
-          : { x: -viewport.x, y: -viewport.y }
-      );
-      createImageFromFile(file, target);
-    };
-
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
-  }, [createImageFromFile, cursorWorldPos, screenToWorld, viewport.x, viewport.y]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (Array.from(e.dataTransfer.items || []).some((item) => item.type.startsWith('image/'))) {
-      e.preventDefault();
-    }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    const file = Array.from(e.dataTransfer.files || []).find((item) => item.type.startsWith('image/'));
-    if (!file) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    createImageFromFile(file, screenToWorld(e.clientX, e.clientY));
-  }, [createImageFromFile, screenToWorld]);
-
-  // Temporary pan state for Spacebar holding
-  const previousToolRef = useRef<ToolMode | null>(null);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement as HTMLElement | null;
-      const isEditingText = Boolean(
-        activeEl &&
-        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)
-      );
-
-      const isDeleteKey = e.key === 'Delete' || e.key === 'Backspace' || e.code === 'Delete' || e.code === 'Backspace';
-
-      if (isDeleteKey) {
-        if (isEditingText) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const store = useCanvasStore.getState();
-        const selectedNodes = store.selectedNodeIds || [];
-        const selectedRel = store.selectedRelationId;
-
-        if (selectedRel) {
-          store.removeRelation(selectedRel);
-          store.selectRelation(null);
-        }
-        if (selectedNodes.length > 0) {
-          selectedNodes.forEach((id) => store.removeNode(id));
-          store.clearSelection();
-        }
-        return;
-      }
-
-      if (isEditingText) {
-        return;
-      }
-
-      const store = useCanvasStore.getState();
-
-      // Undo / Redo Shortcuts (Ctrl+Z, Ctrl+Y, Cmd+Shift+Z)
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          store.redo();
-        } else {
-          store.undo();
-        }
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
-        e.preventDefault();
-        store.redo();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
-        return;
-      }
-
-      // Spacebar for Pan (hold or press)
-      if (e.code === 'Space' || e.key === ' ') {
-        e.preventDefault();
-        if (store.activeTool !== 'pan' && !previousToolRef.current) {
-          previousToolRef.current = store.activeTool;
-          store.setActiveTool('pan');
-        }
-        return;
-      }
-
-      // Ctrl+G / Cmd+G for Grouping selected nodes into a Frame
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G')) {
-        e.preventDefault();
-        const selectedIds = store.selectedNodeIds;
-        if (selectedIds.length > 0) {
-          const selectedNodes = selectedIds.map(id => store.nodes[id]).filter(Boolean);
-          const minX = Math.min(...selectedNodes.map(n => n.position.x)) - 30;
-          const minY = Math.min(...selectedNodes.map(n => n.position.y)) - 40;
-          const maxX = Math.max(...selectedNodes.map(n => n.position.x + n.size.width)) + 30;
-          const maxY = Math.max(...selectedNodes.map(n => n.position.y + n.size.height)) + 30;
-
-          const frameNode = {
-            id: nanoid(10),
-            type: 'frame',
-            position: { x: minX, y: minY },
-            size: { width: Math.max(200, maxX - minX), height: Math.max(150, maxY - minY) },
-            rotation: 0,
-            zIndex: -1,
-            locked: false,
-            data: {
-              title: 'Grouped Frame',
-              color: '#6366f1',
-              fill: 'rgba(255, 255, 255, 0.02)',
-            },
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          };
-          store.addNode(frameNode);
-          store.selectNode(frameNode.id);
-        }
-        return;
-      }
-
-      switch (e.key) {
-        case 'v': case 'V': store.setActiveTool('select'); break;
-        case 'a': case 'A': store.setActiveTool('arrow'); break;
-        case 'k': case 'K': store.setActiveTool('highlighter'); break;
-        case 'h': case 'H': store.setActiveTool('pan'); break;
-        case 'd': case 'D': case 'p': case 'P': store.setActiveTool('draw'); break;
-        case 't': case 'T': store.setActiveTool('text'); break;
-        case 's': case 'S': case 'n': case 'N': store.setActiveTool('sticky'); break;
-        case 'r': case 'R': store.setActiveTool('shape'); break;
-        case 'i': case 'I': store.setActiveTool('image'); break;
-        case 'c': case 'C': store.setActiveTool('code'); break;
-        case 'f': case 'F': store.setActiveTool('frame'); break;
-        case 'm': case 'M': store.setActiveTool('map'); break;
-        case 'l': case 'L': store.setActiveTool('relation'); break;
-        case 'e': case 'E': store.setActiveTool('eraser'); break;
-        case 'Delete': case 'Backspace': {
-          const selectedNodes = store.selectedNodeIds;
-          const selectedRel = store.selectedRelationId;
-          if (selectedRel || selectedNodes.length > 0) {
-            e.preventDefault();
-          }
-          if (selectedRel) {
-            store.removeRelation(selectedRel);
-            store.selectRelation(null);
-          }
-          if (selectedNodes.length > 0) {
-            selectedNodes.forEach((id) => store.removeNode(id));
-            store.clearSelection();
-          }
-          break;
-        }
-        case 'Escape': {
-          // If editing text, blur the element instead of switching tool
-          const active = document.activeElement as HTMLElement;
-          if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.contentEditable === 'true')) {
-            active.blur();
-          } else {
-            store.setRelationSourceId(null);
-            store.clearSelection();
-            store.setActiveTool('select');
-          }
-          break;
-        }
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.key === ' ') {
-        const store = useCanvasStore.getState();
-        if (previousToolRef.current) {
-          store.setActiveTool(previousToolRef.current);
-          previousToolRef.current = null;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
-
   const transform = `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})`;
-  const relationStateClass = activeTool === 'relation'
-    ? relationSourceId
-      ? relationTargetId
-        ? 'canvas--relation-snapped'
-        : 'canvas--relation-aiming'
-      : 'canvas--relation-ready'
-    : '';
+  const relationStateClass =
+    activeTool === 'relation'
+      ? relationSourceId
+        ? relationTargetId
+          ? 'canvas--relation-snapped'
+          : 'canvas--relation-aiming'
+        : 'canvas--relation-ready'
+      : '';
 
   return (
     <div
@@ -964,10 +360,8 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Grid background */}
       <div className="canvas__grid" />
 
-      {/* Transformed world container */}
       <div className="canvas__world" style={{ transform }}>
         {/* Relation preview line */}
         {activeTool === 'relation' && relationSourceId && cursorWorldPos && (() => {
@@ -975,7 +369,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
           if (!sourceNode) return null;
           const hasSnapTarget = Boolean(
             relationTargetId &&
-            (relationTargetId !== relationSourceId || relationTargetPort !== relationSourcePort)
+              (relationTargetId !== relationSourceId || relationTargetPort !== relationSourcePort)
           );
           const snapTarget = hasSnapTarget && relationTargetId ? nodes[relationTargetId] : null;
           const previewTarget: LivingNode = snapTarget || {
@@ -1005,9 +399,10 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
           }));
           const sourceBounds = allBounds.find((bound) => bound.id === sourceNode.id);
           const targetBounds = snapTarget ? allBounds.find((bound) => bound.id === snapTarget.id) : undefined;
-          const pathResult = sourceBounds && targetBounds
-            ? generateSmartRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds)
-            : generateRelationPath(sourcePort, { ...targetPort, x: cursorWorldPos.x, y: cursorWorldPos.y }, 'curved');
+          const pathResult =
+            sourceBounds && targetBounds
+              ? generateSmartRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds)
+              : generateRelationPath(sourcePort, { ...targetPort, x: cursorWorldPos.x, y: cursorWorldPos.y }, 'curved');
           return (
             <svg
               style={{
@@ -1059,17 +454,17 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
           );
         })()}
 
-        {/* Nodes layer */}
-        <div style={{ pointerEvents: (activeTool === 'select' || activeTool === 'relation' || activeTool === 'eraser') ? 'auto' : 'none' }}>
-          {Object.values(nodes).map((node) => (
+        {/* Nodes layer (Virtualization / Viewport Culled for high performance) */}
+        <div style={{ pointerEvents: activeTool === 'select' || activeTool === 'relation' || activeTool === 'eraser' ? 'auto' : 'none' }}>
+          {visibleNodes.map((node) => (
             <NodeRenderer key={node.id} node={node} />
           ))}
         </div>
 
-        {/* Relations layer (SVG) */}
+        {/* Relations layer */}
         <RelationRenderer relations={relations} nodes={nodes} />
 
-        {/* Marquee Selection Rectangle */}
+        {/* Marquee Selection Box */}
         {isMarqueeActive && marqueeStart && marqueeEnd && (
           <div
             className="canvas__marquee"
@@ -1088,7 +483,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
           />
         )}
 
-        {/* Drag-to-Create Frame Preview Rectangle */}
+        {/* Drag-to-Create Frame Preview Box */}
         {isDrawingFrame && frameStartPos && frameCurrentPos && (
           <div
             style={{
@@ -1107,19 +502,25 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
         )}
       </div>
 
-      {/* Drawing preview layer (for current stroke being drawn) */}
+      {/* Drawing Preview Layer */}
       {isDrawing && currentStroke && (
         <DrawingLayer
           points={currentStroke}
           color={strokeColor}
-          width={activeTool === 'highlighter' ? Math.max(10, strokeWidth * 3) : activeTool === 'arrow' ? Math.max(2.5, strokeWidth) : strokeWidth}
+          width={
+            activeTool === 'highlighter'
+              ? Math.max(10, strokeWidth * 3)
+              : activeTool === 'arrow'
+              ? Math.max(2.5, strokeWidth)
+              : strokeWidth
+          }
           mode={activeTool === 'highlighter' ? 'highlighter' : activeTool === 'arrow' ? 'arrow' : 'draw'}
           opacity={activeTool === 'highlighter' ? 0.34 : 1}
           viewport={viewport}
         />
       )}
 
-      {/* Quick Spatial Radial Wheel Creation Menu */}
+      {/* Radial Menu */}
       {radialMenu && (() => {
         const RADIAL_ITEMS = [
           {
