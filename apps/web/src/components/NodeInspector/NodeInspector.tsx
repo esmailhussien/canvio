@@ -18,6 +18,7 @@ import {
   IconTriangle,
   IconHexagon
 } from '@canvio/ui';
+import './NodeInspector.css';
 
 const SHAPE_TYPES = [
   { id: 'rectangle', icon: IconRectangle, title: 'Rectangle' },
@@ -26,7 +27,6 @@ const SHAPE_TYPES = [
   { id: 'triangle', icon: IconTriangle, title: 'Triangle' },
   { id: 'hexagon', icon: IconHexagon, title: 'Hexagon' },
 ];
-import './NodeInspector.css';
 
 const STICKY_COLORS = [
   { id: 'yellow', value: '#fbbf24' },
