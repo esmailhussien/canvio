@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import './Minimap.css';
 
@@ -9,6 +9,8 @@ export const Minimap: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const renderRafRef = useRef<number | null>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -16,8 +18,13 @@ export const Minimap: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (renderRafRef.current !== null) {
+      cancelAnimationFrame(renderRafRef.current);
+    }
+
+    renderRafRef.current = requestAnimationFrame(() => {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const nodeValues = Object.values(nodes);
     if (nodeValues.length === 0) {
@@ -111,12 +118,21 @@ export const Minimap: React.FC = () => {
     ctx.lineWidth = 2;
     ctx.fillStyle = 'rgba(99, 102, 241, 0.05)';
     ctx.beginPath();
-    ctx.rect(viewMapPos.x, viewMapPos.y, viewMapWidth, viewMapHeight);
-    ctx.fill();
-    ctx.stroke();
+      ctx.rect(viewMapPos.x, viewMapPos.y, viewMapWidth, viewMapHeight);
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    return () => {
+      if (renderRafRef.current !== null) {
+        cancelAnimationFrame(renderRafRef.current);
+      }
+    };
   }, [nodes, viewport]);
 
-  const handleMapClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const updateViewportFromEvent = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -124,19 +140,13 @@ export const Minimap: React.FC = () => {
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // Calculate map coordinates
     const nodeValues = Object.values(nodes);
     if (nodeValues.length === 0) {
-      // Center viewport
       setViewport({ x: 0, y: 0, zoom: viewport.zoom });
       return;
     }
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
+    let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
     nodeValues.forEach((node) => {
       minX = Math.min(minX, node.position.x);
       minY = Math.min(minY, node.position.y);
@@ -145,31 +155,41 @@ export const Minimap: React.FC = () => {
     });
 
     const padding = 200;
-    minX -= padding;
-    minY -= padding;
-    maxX += padding;
-    maxY += padding;
+    minX -= padding; minY -= padding; maxX += padding; maxY += padding;
 
     const width = maxX - minX;
     const height = maxY - minY;
-
     const scaleX = canvas.width / width;
     const scaleY = canvas.height / height;
     const scale = Math.min(scaleX, scaleY);
-
     const offsetX = (canvas.width - width * scale) / 2;
     const offsetY = (canvas.height - height * scale) / 2;
 
-    // Convert map click back to world space
     const targetWorldX = (clickX - offsetX) / scale + minX;
     const targetWorldY = (clickY - offsetY) / scale + minY;
 
-    // Center screen on target
     setViewport({
       x: -targetWorldX,
       y: -targetWorldY,
       zoom: viewport.zoom,
     });
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    updateViewportFromEvent(e);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isDragging) {
+      updateViewportFromEvent(e);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setIsDragging(false);
   };
 
   return (
@@ -178,7 +198,11 @@ export const Minimap: React.FC = () => {
         ref={canvasRef}
         width={160}
         height={120}
-        onClick={handleMapClick}
+        onClick={undefined}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         className="minimap__canvas"
       />
     </div>

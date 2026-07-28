@@ -28,6 +28,7 @@ interface CanvasStore {
   updateNode: (id: string, updates: Partial<LivingNode>) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   removeNode: (id: string) => void;
+  removeNodes: (ids: string[]) => void;
   removeNodeRemote: (id: string) => void;
   duplicateNode: (id: string) => void;
   bringToFront: (id: string) => void;
@@ -49,6 +50,10 @@ interface CanvasStore {
   selectNodes: (ids: string[]) => void;
   selectRelation: (id: string | null) => void;
   clearSelection: () => void;
+  
+  // Auto-layout & Alignment
+  alignNodes: (alignment: 'top' | 'center' | 'bottom' | 'left' | 'middle' | 'right') => void;
+  tidyUpNodes: () => void;
 
   // Tool
   activeTool: ToolMode;
@@ -57,6 +62,10 @@ interface CanvasStore {
   // AI Assistant Modal
   isAIAssistantOpen: boolean;
   setAIAssistantOpen: (open: boolean) => void;
+
+  // Smart Snapping Guides
+  snapLines: { x?: number; y?: number } | null;
+  setSnapLines: (snap: { x?: number; y?: number } | null) => void;
 
   // Drawing settings
   strokeColor: string;
@@ -80,6 +89,7 @@ interface CanvasStore {
   future: Array<{ nodes: Record<string, LivingNode>; relations: Record<string, Relation> }>;
   undo: () => void;
   redo: () => void;
+  snapshot: () => void;
 
   // Relation creation helper
   relationSourceId: string | null;
@@ -211,6 +221,23 @@ export const useCanvasStore = create(
       selectedNodeIds: s.selectedNodeIds.filter(nid => nid !== id)
     };
   }),
+  removeNodes: (ids) => set((s) => {
+    const newNodes = { ...s.nodes };
+    ids.forEach(id => delete newNodes[id]);
+    const cleanRelations = { ...s.relations };
+    Object.keys(cleanRelations).forEach((relId) => {
+      if (ids.includes(cleanRelations[relId].sourceId) || ids.includes(cleanRelations[relId].targetId)) {
+        delete cleanRelations[relId];
+      }
+    });
+    return {
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      future: [],
+      nodes: newNodes,
+      relations: cleanRelations,
+      selectedNodeIds: s.selectedNodeIds.filter(nid => !ids.includes(nid))
+    };
+  }),
   removeNodeRemote: (id) => set((s) => {
     const { [id]: _, ...rest } = s.nodes;
     const cleanRelations = { ...s.relations };
@@ -259,11 +286,11 @@ export const useCanvasStore = create(
   sendToBack: (id) => set((s) => {
     const existing = s.nodes[id];
     if (!existing) return s;
-    const minZ = Object.values(s.nodes).reduce((min, n) => Math.min(min, n.zIndex), 1);
+    const minZ = Object.values(s.nodes).reduce((min, n) => Math.min(min, n.zIndex), 0);
     return {
       nodes: {
         ...s.nodes,
-        [id]: { ...existing, zIndex: Math.max(1, minZ - 1), updatedAt: Date.now() }
+        [id]: { ...existing, zIndex: minZ - 1, updatedAt: Date.now() }
       }
     };
   }),
@@ -319,6 +346,84 @@ export const useCanvasStore = create(
   selectRelation: (id) => set({ selectedRelationId: id, selectedNodeIds: [] }),
   clearSelection: () => set({ selectedNodeIds: [], selectedRelationId: null }),
 
+  // Auto-layout & Alignment
+  alignNodes: (alignment) => set((s) => {
+    if (s.selectedNodeIds.length < 2) return s;
+    const nodes = s.selectedNodeIds.map(id => s.nodes[id]).filter(Boolean);
+    
+    let target = 0;
+    if (alignment === 'top') target = Math.min(...nodes.map(n => n.position.y));
+    else if (alignment === 'bottom') target = Math.max(...nodes.map(n => n.position.y + n.size.height));
+    else if (alignment === 'center') {
+      const min = Math.min(...nodes.map(n => n.position.y));
+      const max = Math.max(...nodes.map(n => n.position.y + n.size.height));
+      target = min + (max - min) / 2;
+    }
+    else if (alignment === 'left') target = Math.min(...nodes.map(n => n.position.x));
+    else if (alignment === 'right') target = Math.max(...nodes.map(n => n.position.x + n.size.width));
+    else if (alignment === 'middle') {
+      const min = Math.min(...nodes.map(n => n.position.x));
+      const max = Math.max(...nodes.map(n => n.position.x + n.size.width));
+      target = min + (max - min) / 2;
+    }
+
+    const newNodes = { ...s.nodes };
+    nodes.forEach(n => {
+      let x = n.position.x;
+      let y = n.position.y;
+      if (alignment === 'top') y = target;
+      else if (alignment === 'bottom') y = target - n.size.height;
+      else if (alignment === 'center') y = target - n.size.height / 2;
+      else if (alignment === 'left') x = target;
+      else if (alignment === 'right') x = target - n.size.width;
+      else if (alignment === 'middle') x = target - n.size.width / 2;
+      
+      newNodes[n.id] = { ...n, position: { x, y } };
+    });
+
+    return {
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      future: [],
+      nodes: newNodes
+    };
+  }),
+
+  tidyUpNodes: () => set((s) => {
+    if (s.selectedNodeIds.length < 2) return s;
+    const nodes = s.selectedNodeIds.map(id => s.nodes[id]).filter(Boolean);
+    
+    // Determine if we should lay out horizontally or vertically based on bounding box aspect ratio
+    const minX = Math.min(...nodes.map(n => n.position.x));
+    const maxX = Math.max(...nodes.map(n => n.position.x + n.size.width));
+    const minY = Math.min(...nodes.map(n => n.position.y));
+    const maxY = Math.max(...nodes.map(n => n.position.y + n.size.height));
+    const isHorizontal = (maxX - minX) >= (maxY - minY);
+
+    // Sort nodes visually
+    nodes.sort((a, b) => isHorizontal ? a.position.x - b.position.x : a.position.y - b.position.y);
+
+    const GAP = 50;
+    const newNodes = { ...s.nodes };
+
+    let currentX = minX;
+    let currentY = minY;
+
+    nodes.forEach(n => {
+      newNodes[n.id] = { ...n, position: { x: isHorizontal ? currentX : n.position.x, y: isHorizontal ? n.position.y : currentY } };
+      if (isHorizontal) {
+        currentX += n.size.width + GAP;
+      } else {
+        currentY += n.size.height + GAP;
+      }
+    });
+
+    return {
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      future: [],
+      nodes: newNodes
+    };
+  }),
+
   // Tool
   activeTool: 'select',
   setActiveTool: (tool) => set((s) => ({
@@ -332,6 +437,10 @@ export const useCanvasStore = create(
   // AI Assistant Modal
   isAIAssistantOpen: false,
   setAIAssistantOpen: (open) => set({ isAIAssistantOpen: open }),
+
+  // Smart Snapping Guides
+  snapLines: null,
+  setSnapLines: (snap) => set({ snapLines: snap }),
 
   // Drawing settings
   strokeColor: '#f0f0f5',
@@ -400,6 +509,10 @@ export const useCanvasStore = create(
       relations: next.relations,
     };
   }),
+  snapshot: () => set((s) => ({
+    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+    future: [],
+  })),
 
   // Relation creation helper
   relationSourceId: null,

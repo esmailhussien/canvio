@@ -1,0 +1,52 @@
+.multi-selection-inspector {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: center bottom;
+  z-index: 1000;
+  pointer-events: auto;
+  animation: scaleIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.multi-selection-inspector .inspector-panel {
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.05);
+}
+
+.multi-selection-inspector .inspector-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.multi-selection-inspector .inspector-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.multi-selection-inspector .inspector-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.multi-selection-inspector .inspector-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-subtle);
+  margin: 0 4px;
+}

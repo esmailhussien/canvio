@@ -13,9 +13,10 @@ interface Props {
 
 export function NodeRenderer({ node }: Props) {
   const updateNode = useCanvasStore(s => s.updateNode);
-  const selectedNodeIds = useCanvasStore(s => s.selectedNodeIds);
+  const snapshot = useCanvasStore(s => s.snapshot);
+  const isSelected = useCanvasStore(useCallback(s => s.selectedNodeIds.includes(node.id), [node.id]));
+  const isOnlySelected = useCanvasStore(useCallback(s => s.selectedNodeIds.length === 1 && s.selectedNodeIds.includes(node.id), [node.id]));
   const selectNode = useCanvasStore(s => s.selectNode);
-  const isSelected = selectedNodeIds.includes(node.id);
   
   const activeTool = useCanvasStore(s => s.activeTool);
   const relationSourceId = useCanvasStore(s => s.relationSourceId);
@@ -41,6 +42,7 @@ export function NodeRenderer({ node }: Props) {
   // measure total displacement, so we can tell a real drag apart from a
   // stationary tap on a text field.
   const dragOriginRef = useRef<{ x: number, y: number } | null>(null);
+  const originalNodePosRef = useRef<{ x: number, y: number } | null>(null);
   const hasExceededDragThresholdRef = useRef(false);
   // If the pointerdown landed on a text field (sticky note / text node), we hold
   // a reference to it here instead of focusing immediately. We only focus it on
@@ -164,11 +166,13 @@ export function NodeRenderer({ node }: Props) {
     hasExceededDragThresholdRef.current = false;
     dragOriginRef.current = { x: e.clientX, y: e.clientY };
     if (!node.locked) {
+      snapshot();
       e.currentTarget.setPointerCapture?.(e.pointerId);
       setIsDragging(true);
       dragStartRef.current = { x: e.clientX, y: e.clientY };
+      originalNodePosRef.current = { x: node.position.x, y: node.position.y };
     }
-  }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationSourcePort, relationTargetId, relationTargetPort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode]);
+  }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationSourcePort, relationTargetId, relationTargetPort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode, snapshot, node.position]);
 
   const rafIdRef = useRef<number | null>(null);
 
@@ -192,22 +196,75 @@ export function NodeRenderer({ node }: Props) {
         }
       }
 
-      const zoom = useCanvasStore.getState().viewport.zoom;
-      const dx = (e.clientX - dragStartRef.current.x) / zoom;
-      const dy = (e.clientY - dragStartRef.current.y) / zoom;
-      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      const store = useCanvasStore.getState();
+      const zoom = store.viewport.zoom;
+      const totalDx = (e.clientX - dragStartRef.current.x) / zoom;
+      const totalDy = (e.clientY - dragStartRef.current.y) / zoom;
 
       if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = requestAnimationFrame(() => {
+        if (!originalNodePosRef.current) return;
+        
+        let targetX = originalNodePosRef.current.x + totalDx;
+        let targetY = originalNodePosRef.current.y + totalDy;
+        
+        // Smart Snapping Logic
+        const SNAP_DIST = 6 / zoom;
+        let snapX: number | undefined = undefined;
+        let snapY: number | undefined = undefined;
+
+        if (node.type !== 'frame') {
+          const allNodes = store.nodes;
+          const currentCenterY = targetY + node.size.height / 2;
+          const currentCenterX = targetX + node.size.width / 2;
+
+          for (const other of Object.values(allNodes)) {
+            if (other.id === node.id || other.type === 'frame' || other.type === 'drawing') continue;
+            
+            const otherCenterY = other.position.y + other.size.height / 2;
+            const otherCenterX = other.position.x + other.size.width / 2;
+
+            // Y snapping (Centers & Edges)
+            if (Math.abs(currentCenterY - otherCenterY) < SNAP_DIST) {
+              targetY = otherCenterY - node.size.height / 2;
+              snapY = otherCenterY;
+            } else if (Math.abs(targetY - other.position.y) < SNAP_DIST) {
+              targetY = other.position.y;
+              snapY = other.position.y;
+            } else if (Math.abs(targetY + node.size.height - (other.position.y + other.size.height)) < SNAP_DIST) {
+              targetY = other.position.y + other.size.height - node.size.height;
+              snapY = other.position.y + other.size.height;
+            }
+
+            // X snapping (Centers & Edges)
+            if (Math.abs(currentCenterX - otherCenterX) < SNAP_DIST) {
+              targetX = otherCenterX - node.size.width / 2;
+              snapX = otherCenterX;
+            } else if (Math.abs(targetX - other.position.x) < SNAP_DIST) {
+              targetX = other.position.x;
+              snapX = other.position.x;
+            } else if (Math.abs(targetX + node.size.width - (other.position.x + other.size.width)) < SNAP_DIST) {
+              targetX = other.position.x + other.size.width - node.size.width;
+              snapX = other.position.x + other.size.width;
+            }
+          }
+          store.setSnapLines(snapX !== undefined || snapY !== undefined ? { x: snapX, y: snapY } : null);
+        }
+
         if (node.type === 'frame') {
-          const allNodes = useCanvasStore.getState().nodes;
+          const allNodes = store.nodes;
           const fx1 = node.position.x;
           const fy1 = node.position.y;
           const fx2 = node.position.x + node.size.width;
           const fy2 = node.position.y + node.size.height;
 
+          // Note: using incremental dx/dy here for children since it's easier, 
+          // but computing it from current position vs last position
+          const dx = targetX - node.position.x;
+          const dy = targetY - node.position.y;
+
           updateNode(node.id, {
-            position: { x: node.position.x + dx, y: node.position.y + dy }
+            position: { x: targetX, y: targetY }
           });
 
           Object.values(allNodes).forEach((child) => {
@@ -222,15 +279,12 @@ export function NodeRenderer({ node }: Props) {
           });
         } else {
           updateNode(node.id, {
-            position: {
-              x: node.position.x + dx,
-              y: node.position.y + dy
-            }
+            position: { x: targetX, y: targetY }
           });
         }
       });
     }
-  }, [isDragging, node.id, node.position.x, node.position.y, node.size.width, node.size.height, node.type, updateNode]);
+  }, [isDragging, node.id, node.size.width, node.size.height, node.type, node.position.x, node.position.y, updateNode]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
@@ -248,12 +302,14 @@ export function NodeRenderer({ node }: Props) {
     }
     pendingTapEditTargetRef.current = null;
     hasExceededDragThresholdRef.current = false;
+    useCanvasStore.getState().setSnapLines(null);
   }, []);
 
   // Resizing handlers
   const handleResizeStart = useCallback((dir: 'tl' | 'tr' | 'bl' | 'br') => (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
+    snapshot();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     setResizeDir(dir);
     resizeStartRef.current = {
@@ -264,7 +320,7 @@ export function NodeRenderer({ node }: Props) {
       posX: node.position.x,
       posY: node.position.y
     };
-  }, [node.size.width, node.size.height, node.position.x, node.position.y]);
+  }, [node.size.width, node.size.height, node.position.x, node.position.y, snapshot]);
 
   const handleResizeMove = useCallback((e: PointerEvent) => {
     if (resizeDir && resizeStartRef.current) {
@@ -449,7 +505,7 @@ export function NodeRenderer({ node }: Props) {
       )}
 
       {/* Floating Context Toolbar (NodeInspector) */}
-      {isSelected && <NodeInspector node={node} />}
+      {isOnlySelected && <NodeInspector node={node} />}
 
       {isSelected && !node.locked && (
         <>

@@ -1,6 +1,7 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
 import { LivingNode, Relation, useCanvasStore } from '../../store/canvasStore';
 import { NodeRenderer } from '../NodeRenderer/NodeRenderer';
+import { MultiSelectionInspector } from '../NodeInspector/MultiSelectionInspector';
 import { RelationRenderer } from '../RelationRenderer/RelationRenderer';
 import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from '../RelationRenderer/relationUtils';
 import { DrawingLayer } from '../DrawingLayer/DrawingLayer';
@@ -42,6 +43,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   const strokeColor = useCanvasStore((s) => s.strokeColor);
   const strokeWidth = useCanvasStore((s) => s.strokeWidth);
   const stickyColor = useCanvasStore((s) => s.stickyColor);
+  const snapLines = useCanvasStore((s) => s.snapLines);
 
   const relationSourceId = useCanvasStore((s) => s.relationSourceId);
   const relationSourcePort = useCanvasStore((s) => s.relationSourcePort);
@@ -308,18 +310,21 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   useEffect(() => {
     if (!radialMenu) return;
     const handleCloseRadial = (e: Event) => {
+      if (e.type === 'keydown' && (e as KeyboardEvent).key !== 'Escape') return;
       const target = e.target as HTMLElement;
-      if (target.closest('.canvas__radial-ring')) return;
+      if (e.type !== 'keydown' && target.closest('.canvas__radial-ring')) return;
       setRadialMenu(null);
     };
     const timer = setTimeout(() => {
       window.addEventListener('pointerdown', handleCloseRadial, true);
       window.addEventListener('click', handleCloseRadial, true);
+      window.addEventListener('keydown', handleCloseRadial, true);
     }, 0);
     return () => {
       clearTimeout(timer);
       window.removeEventListener('pointerdown', handleCloseRadial, true);
       window.removeEventListener('click', handleCloseRadial, true);
+      window.removeEventListener('keydown', handleCloseRadial, true);
     };
   }, [radialMenu]);
 
@@ -360,7 +365,13 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="canvas__grid" />
+      <div 
+        className="canvas__grid" 
+        style={{
+          backgroundSize: `${24 * viewport.zoom}px ${24 * viewport.zoom}px`,
+          backgroundPosition: `calc(50% + ${viewport.x * viewport.zoom}px) calc(50% + ${viewport.y * viewport.zoom}px)`
+        }} 
+      />
 
       <div className="canvas__world" style={{ transform }}>
         {/* Relation preview line */}
@@ -460,6 +471,37 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
             <NodeRenderer key={node.id} node={node} />
           ))}
         </div>
+
+        {/* Smart Snapping Guides */}
+        {snapLines && (
+          <div style={{ pointerEvents: 'none', position: 'absolute', top: 0, left: 0, width: 0, height: 0, overflow: 'visible', zIndex: 9999 }}>
+            {snapLines.x !== undefined && (
+              <div style={{
+                position: 'absolute',
+                left: snapLines.x,
+                top: -50000,
+                width: 1,
+                height: 100000,
+                background: '#ef4444',
+                opacity: 0.7,
+              }} />
+            )}
+            {snapLines.y !== undefined && (
+              <div style={{
+                position: 'absolute',
+                left: -50000,
+                top: snapLines.y,
+                width: 100000,
+                height: 1,
+                background: '#ef4444',
+                opacity: 0.7,
+              }} />
+            )}
+          </div>
+        )}
+
+        {/* Multi-selection layout tools */}
+        <MultiSelectionInspector />
 
         {/* Relations layer */}
         <RelationRenderer relations={relations} nodes={nodes} />

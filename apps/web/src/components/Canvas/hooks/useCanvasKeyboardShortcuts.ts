@@ -30,7 +30,7 @@ export function useCanvasKeyboardShortcuts() {
           store.selectRelation(null);
         }
         if (selectedNodes.length > 0) {
-          selectedNodes.forEach((id) => store.removeNode(id));
+          store.removeNodes(selectedNodes);
           store.clearSelection();
         }
         return;
@@ -56,6 +56,22 @@ export function useCanvasKeyboardShortcuts() {
         return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        return;
+      }
+
+      // Select All (Ctrl+A / Cmd+A)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        store.selectNodes(Object.keys(store.nodes));
+        return;
+      }
+
+      // Duplicate (Ctrl+D / Cmd+D)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        const selectedIds = [...store.selectedNodeIds];
+        store.snapshot();
+        selectedIds.forEach((id) => store.duplicateNode(id));
         return;
       }
 

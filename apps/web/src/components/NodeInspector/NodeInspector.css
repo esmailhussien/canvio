@@ -24,6 +24,21 @@
   display: none;
 }
 
+@keyframes toolbarEnter {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -80%) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    /* transform is handled by inline style, but opacity and pop feeling is here */
+  }
+}
+
+.canvio-toolbar-enter {
+  animation: toolbarEnter 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
 .node-inspector__colors {
   display: flex;
   align-items: center;
