@@ -31,6 +31,6 @@ export function getWebSocketUrl() {
     return `ws://${hostname}:4001`;
   }
 
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${wsProtocol}//demos.yjs.dev`;
+  // Connect to the official Canvio Render production backend
+  return 'wss://canvio-l3bk.onrender.com';
 }
