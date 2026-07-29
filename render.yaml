@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: canvio-ws-server
+    env: node
+    plan: free
+    buildCommand: npm install && npm -w @canvio/server run build
+    startCommand: npm -w @canvio/server run start:ws
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NODE_ENV
+        value: production

@@ -9,6 +9,7 @@
     "dev:ws": "tsx watch src/ws-server.ts",
     "build": "tsc",
     "start": "concurrently \"node dist/index.js\" \"node dist/ws-server.js\"",
+    "start:ws": "node dist/combined-server.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
