@@ -212,8 +212,20 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const QUICK_PROMPTS = [
     {
-      title: '🎓 Academic Research Summary',
-      prompt: 'Write a comprehensive research paper summary of this board with Abstract, Methodology, Key Findings, Risks, and Academic Conclusion',
+      title: 'Lesson Board',
+      prompt: 'Create a teacher-ready lesson board with learning goal, warm-up, explanation, student activity, check for understanding, and exit ticket',
+    },
+    {
+      title: 'Study Guide',
+      prompt: 'Turn this topic into a student study board with definition, examples, common mistakes, key facts, practice task, and review questions',
+    },
+    {
+      title: 'Quiz Me',
+      prompt: 'Create a quiz and revision board with 5 questions, answer checks, misconception notes, and a short study plan',
+    },
+    {
+      title: 'Research Summary',
+      prompt: 'Write a comprehensive research summary of this board with abstract, key findings, evidence, risks, and conclusion',
     },
     {
       title: 'Field Ops',

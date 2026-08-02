@@ -29,6 +29,7 @@ export {
   IconShape,
   IconFrame,
   IconSparkles,
+  IconMoreHorizontal,
   IconPagePortrait,
   IconPageLandscape,
   IconSlideScreen,

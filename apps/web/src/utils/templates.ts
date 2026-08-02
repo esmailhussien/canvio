@@ -144,6 +144,236 @@ function relation(
 
 export const TEMPLATES: CanvasTemplate[] = [
   {
+    id: 'lesson-plan-board',
+    name: 'Lesson Plan Board',
+    description: 'A teacher-ready board with objectives, warm-up, instruction, activity, check for understanding, and exit ticket.',
+    outcome: 'Best for live lessons, flipped classrooms, tutoring sessions, and reusable lesson preparation.',
+    category: 'Education & Teaching',
+    icon: 'school',
+    accent: '#38bdf8',
+    nodes: 8,
+    relations: 7,
+    preview: 'flow',
+    generate: () => {
+      const frameId = nanoid(10);
+      const titleId = nanoid(10);
+      const goalId = nanoid(10);
+      const warmupId = nanoid(10);
+      const teachId = nanoid(10);
+      const activityId = nanoid(10);
+      const checkId = nanoid(10);
+      const exitId = nanoid(10);
+
+      const nodes: LivingNode[] = [
+        frame(frameId, -560, -280, 1120, 560, 'Live Lesson Flow', '#38bdf8'),
+        textBlock(titleId, -505, -245, 420, 58, 'Lesson Topic: Add your subject here', 1, 23),
+        shape(goalId, -500, -130, 240, 118, {
+          shape: 'hexagon',
+          fill: 'rgba(56, 189, 248, 0.16)',
+          stroke: '#38bdf8',
+          strokeWidth: 2,
+          label: 'Learning Goal',
+        }, 2),
+        sticky(warmupId, -210, -140, 'Warm-up\nOne quick question to activate prior knowledge.', 'yellow', 3),
+        sticky(teachId, 70, -140, 'Teach\nKey explanation, example, or mini demo.', 'blue', 4),
+        sticky(activityId, 350, -140, 'Student Activity\nPair work, practice task, discussion, or board response.', 'green', 5),
+        sticky(checkId, -210, 90, 'Check Understanding\nWhat evidence shows students got it?', 'purple', 6),
+        sticky(exitId, 170, 90, 'Exit Ticket\nOne prompt students answer before leaving.', 'pink', 7),
+      ];
+
+      return {
+        nodes,
+        relations: [
+          relation(titleId, goalId, 'sets', '#38bdf8', 'leads_to'),
+          relation(goalId, warmupId, 'starts with', '#f59e0b', 'leads_to'),
+          relation(warmupId, teachId, 'prepares', '#38bdf8', 'leads_to'),
+          relation(teachId, activityId, 'applies in', '#22c55e', 'leads_to'),
+          relation(activityId, checkId, 'reveals', '#8b5cf6', 'based_on'),
+          relation(checkId, exitId, 'ends with', '#ec4899', 'leads_to'),
+          relation(exitId, goalId, 'measures', '#38bdf8', 'based_on'),
+        ],
+      };
+    },
+  },
+  {
+    id: 'study-concept-map',
+    name: 'Study Concept Map',
+    description: 'A student-friendly concept map for turning a topic into definitions, examples, questions, mistakes, and review prompts.',
+    outcome: 'Best for revision, exam prep, tutoring, self-study, and explaining difficult topics visually.',
+    category: 'Education & Study',
+    icon: 'neurology',
+    accent: '#f59e0b',
+    nodes: 8,
+    relations: 7,
+    preview: 'radial',
+    generate: () => {
+      const topicId = nanoid(10);
+      const definitionId = nanoid(10);
+      const exampleId = nanoid(10);
+      const formulaId = nanoid(10);
+      const mistakeId = nanoid(10);
+      const questionId = nanoid(10);
+      const memoryId = nanoid(10);
+      const practiceId = nanoid(10);
+
+      const nodes: LivingNode[] = [
+        shape(topicId, -125, -70, 250, 130, {
+          shape: 'ellipse',
+          fill: 'rgba(245, 158, 11, 0.18)',
+          stroke: '#f59e0b',
+          strokeWidth: 2.5,
+          label: 'Topic to Study',
+        }, 5),
+        sticky(definitionId, -470, -220, 'Definition\nWrite the idea in your own words.', 'yellow', 1),
+        sticky(exampleId, -470, 40, 'Example\nShow a real or simple example.', 'green', 2),
+        sticky(formulaId, -110, -260, 'Key facts\nRules, formula, vocabulary, or dates.', 'blue', 3),
+        sticky(mistakeId, 260, -220, 'Common mistake\nWhat do learners often confuse?', 'pink', 4),
+        sticky(questionId, 260, 40, 'Open question\nWhat still feels unclear?', 'purple', 6),
+        sticky(memoryId, -110, 165, 'Memory cue\nAnalogy, sketch, or story that helps it stick.', 'orange', 7),
+        shape(practiceId, 260, 205, 240, 92, {
+          shape: 'rectangle',
+          fill: 'rgba(34, 197, 94, 0.14)',
+          stroke: '#22c55e',
+          strokeWidth: 2,
+          label: 'Practice Task',
+        }, 8),
+      ];
+
+      return {
+        nodes,
+        relations: [
+          relation(topicId, definitionId, 'defined by', '#f59e0b', 'part_of'),
+          relation(topicId, exampleId, 'shown by', '#22c55e', 'based_on'),
+          relation(topicId, formulaId, 'uses', '#38bdf8', 'depends_on'),
+          relation(topicId, mistakeId, 'watch out for', '#ef4444', 'contradicts'),
+          relation(topicId, questionId, 'ask next', '#8b5cf6', 'related_to'),
+          relation(topicId, memoryId, 'remember with', '#f97316', 'enables'),
+          relation(topicId, practiceId, 'practice through', '#22c55e', 'leads_to'),
+        ],
+      };
+    },
+  },
+  {
+    id: 'claim-evidence-reasoning',
+    name: 'Claim Evidence Reasoning',
+    description: 'A structured CER board that guides students from a claim to evidence, reasoning, counterpoint, and revision.',
+    outcome: 'Best for science, history, literature, debate, writing practice, and critical thinking activities.',
+    category: 'Education & Learning',
+    icon: 'fact_check',
+    accent: '#22c55e',
+    nodes: 9,
+    relations: 8,
+    preview: 'wall',
+    generate: () => {
+      const frameId = nanoid(10);
+      const promptId = nanoid(10);
+      const claimId = nanoid(10);
+      const evidenceAId = nanoid(10);
+      const evidenceBId = nanoid(10);
+      const reasoningId = nanoid(10);
+      const counterId = nanoid(10);
+      const reviseId = nanoid(10);
+      const finalId = nanoid(10);
+
+      const nodes: LivingNode[] = [
+        frame(frameId, -540, -290, 1080, 580, 'Claim Evidence Reasoning', '#22c55e'),
+        textBlock(promptId, -490, -245, 520, 58, 'Question: What are we trying to prove?', 1, 22),
+        shape(claimId, -445, -95, 250, 110, {
+          shape: 'rectangle',
+          fill: 'rgba(34, 197, 94, 0.14)',
+          stroke: '#22c55e',
+          strokeWidth: 2,
+          label: 'Claim',
+        }, 2),
+        sticky(evidenceAId, -105, -170, 'Evidence 1\nQuote, data, observation, source, or example.', 'blue', 3),
+        sticky(evidenceBId, -105, 20, 'Evidence 2\nSecond proof that strengthens the claim.', 'purple', 4),
+        sticky(reasoningId, 215, -95, 'Reasoning\nExplain how the evidence proves the claim.', 'green', 5),
+        sticky(counterId, -445, 115, 'Counterpoint\nWhat might someone argue against this?', 'pink', 6),
+        sticky(reviseId, -105, 210, 'Revision note\nWhat should be clearer or stronger?', 'yellow', 7),
+        shape(finalId, 215, 130, 250, 105, {
+          shape: 'hexagon',
+          fill: 'rgba(56, 189, 248, 0.14)',
+          stroke: '#38bdf8',
+          strokeWidth: 2,
+          label: 'Final Explanation',
+        }, 8),
+      ];
+
+      return {
+        nodes,
+        relations: [
+          relation(promptId, claimId, 'answers', '#22c55e', 'leads_to'),
+          relation(claimId, evidenceAId, 'supported by', '#38bdf8', 'based_on'),
+          relation(claimId, evidenceBId, 'supported by', '#8b5cf6', 'based_on'),
+          relation(evidenceAId, reasoningId, 'explained by', '#22c55e', 'leads_to'),
+          relation(evidenceBId, reasoningId, 'explained by', '#22c55e', 'leads_to'),
+          relation(counterId, reviseId, 'improves', '#f59e0b', 'leads_to'),
+          relation(reasoningId, finalId, 'builds', '#38bdf8', 'leads_to'),
+          relation(reviseId, finalId, 'refines', '#f59e0b', 'enables'),
+        ],
+      };
+    },
+  },
+  {
+    id: 'classroom-discussion-board',
+    name: 'Classroom Discussion Board',
+    description: 'A simple board for group responses, themes, questions, teacher synthesis, and next steps.',
+    outcome: 'Best for warm discussions, collaborative seminars, group activities, and remote classroom participation.',
+    category: 'Education & Classroom',
+    icon: 'groups',
+    accent: '#8b5cf6',
+    nodes: 9,
+    relations: 6,
+    preview: 'wall',
+    generate: () => {
+      const frameId = nanoid(10);
+      const questionId = nanoid(10);
+      const groupAId = nanoid(10);
+      const groupBId = nanoid(10);
+      const groupCId = nanoid(10);
+      const themeId = nanoid(10);
+      const questionBankId = nanoid(10);
+      const summaryId = nanoid(10);
+      const nextId = nanoid(10);
+
+      const nodes: LivingNode[] = [
+        frame(frameId, -560, -300, 1120, 600, 'Classroom Discussion', '#8b5cf6'),
+        textBlock(questionId, -500, -250, 620, 58, 'Discussion Question: Add your prompt here', 1, 22),
+        sticky(groupAId, -500, -105, 'Group A responses\nAdd ideas, examples, and questions.', 'blue', 2),
+        sticky(groupBId, -225, -105, 'Group B responses\nAdd ideas, examples, and questions.', 'green', 3),
+        sticky(groupCId, 50, -105, 'Group C responses\nAdd ideas, examples, and questions.', 'purple', 4),
+        shape(themeId, 345, -110, 220, 105, {
+          shape: 'hexagon',
+          fill: 'rgba(139, 92, 246, 0.16)',
+          stroke: '#8b5cf6',
+          strokeWidth: 2,
+          label: 'Shared Theme',
+        }, 5),
+        sticky(questionBankId, -500, 120, 'Open questions\nWhat should the class investigate next?', 'yellow', 6),
+        sticky(summaryId, -165, 120, 'Teacher synthesis\nCluster patterns, gaps, and strong evidence.', 'orange', 7),
+        shape(nextId, 190, 130, 250, 92, {
+          shape: 'rectangle',
+          fill: 'rgba(34, 197, 94, 0.14)',
+          stroke: '#22c55e',
+          strokeWidth: 2,
+          label: 'Next Activity',
+        }, 8),
+      ];
+
+      return {
+        nodes,
+        relations: [
+          relation(groupAId, themeId, 'contributes', '#38bdf8', 'part_of'),
+          relation(groupBId, themeId, 'contributes', '#22c55e', 'part_of'),
+          relation(groupCId, themeId, 'contributes', '#8b5cf6', 'part_of'),
+          relation(themeId, summaryId, 'summarized by', '#f59e0b', 'based_on'),
+          relation(questionBankId, summaryId, 'adds gaps', '#f59e0b', 'based_on'),
+          relation(summaryId, nextId, 'leads to', '#22c55e', 'leads_to'),
+        ],
+      };
+    },
+  },
+  {
     id: 'site-visit-map',
     name: 'Field Operations Map',
     description: 'A global map with field pins, issue notes, evidence, and semantic relations attached to exact locations.',

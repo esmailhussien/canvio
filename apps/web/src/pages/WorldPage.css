@@ -106,7 +106,7 @@
 
 .world-page__starter-panel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 12px;
   width: min(720px, calc(100vw - 32px));
   padding: 16px;
@@ -162,6 +162,30 @@
   background: color-mix(in srgb, #10b981 25%, var(--bg-surface));
   border-color: #34d399;
   box-shadow: 0 0 16px rgba(52, 211, 153, 0.3);
+}
+
+.world-page__starter-card.lesson-card {
+  background: color-mix(in srgb, #38bdf8 14%, var(--bg-surface));
+  border-color: color-mix(in srgb, #38bdf8 45%, var(--border-subtle));
+  color: #7dd3fc;
+}
+
+.world-page__starter-card.lesson-card:hover {
+  background: color-mix(in srgb, #38bdf8 25%, var(--bg-surface));
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+}
+
+.world-page__starter-card.study-card {
+  background: color-mix(in srgb, #f59e0b 14%, var(--bg-surface));
+  border-color: color-mix(in srgb, #f59e0b 45%, var(--border-subtle));
+  color: #fbbf24;
+}
+
+.world-page__starter-card.study-card:hover {
+  background: color-mix(in srgb, #f59e0b 25%, var(--bg-surface));
+  border-color: #f59e0b;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
 }
 
 .world-page__starter-card.ai-card {

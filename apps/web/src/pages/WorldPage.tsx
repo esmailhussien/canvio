@@ -9,6 +9,7 @@ import { ExportMenu } from '../components/ExportMenu/ExportMenu';
 import { TemplatePicker } from '../components/TemplatePicker/TemplatePicker';
 import { AIAssistantModal } from '../components/AIAssistantModal/AIAssistantModal';
 import { Minimap } from '../components/Minimap/Minimap';
+import { applyTemplate } from '../utils/templates';
 import { useCanvasStore } from '../store/canvasStore';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { touchBoard, updateBoardAppearance } from '../utils/api';
@@ -143,6 +144,12 @@ export function WorldPage() {
     }
   };
 
+  const handleStartTemplate = (templateId: string) => {
+    setIsStarterDismissed(true);
+    applyTemplate(templateId);
+    setActiveTool('select');
+  };
+
   useEffect(() => {
     if (!worldId || !boardAppearanceLoadedRef.current) return;
     if (saveAppearanceTimerRef.current !== null) {
@@ -203,10 +210,10 @@ export function WorldPage() {
           
           <div className="world-page__empty-hero">
             <h1 className="world-page__empty-title">
-              Your mind, <span>unbounded</span>.
+              Start a board in <span>seconds</span>.
             </h1>
             <p className="world-page__empty-subtitle">
-              Start plotting your thoughts on an infinite spatial canvas.
+              Teach, study, brainstorm, map, or build from a blank infinite canvas.
             </p>
           </div>
 
@@ -215,9 +222,17 @@ export function WorldPage() {
               <IconSticky size={22} />
               <span>Start from scratch</span>
             </button>
+            <button className="world-page__starter-card lesson-card" onClick={() => handleStartTemplate('lesson-plan-board')}>
+              <span className="material-symbols-outlined text-xl">school</span>
+              <span>Teach a lesson</span>
+            </button>
+            <button className="world-page__starter-card study-card" onClick={() => handleStartTemplate('study-concept-map')}>
+              <span className="material-symbols-outlined text-xl">neurology</span>
+              <span>Study a topic</span>
+            </button>
             <button className="world-page__starter-card map-card" onClick={handleDropMap}>
               <IconMap size={22} />
-              <span>Drop Living Map</span>
+              <span>Map activity</span>
             </button>
             <button
               className="world-page__starter-card"
@@ -227,7 +242,7 @@ export function WorldPage() {
               }}
             >
               <span className="material-symbols-outlined text-xl">space_dashboard</span>
-              <span>Choose a model</span>
+              <span>Choose template</span>
             </button>
             <button
               className="world-page__starter-card ai-card"

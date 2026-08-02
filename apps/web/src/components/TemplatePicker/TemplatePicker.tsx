@@ -13,6 +13,7 @@ interface TemplatePickerProps {
 
 const CATEGORIES = [
   { id: 'all', label: 'All Templates', icon: 'grid_view' },
+  { id: 'education', label: 'Teaching & Study', icon: 'school' },
   { id: 'strategy', label: 'Strategy & Brainstorming', icon: 'lightbulb' },
   { id: 'architecture', label: 'Architecture & Systems', icon: 'schema' },
   { id: 'operations', label: 'Operations & Execution', icon: 'view_kanban' },
@@ -28,7 +29,9 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
     return TEMPLATES.filter((t) => {
       // Filter by Category
       let matchesCat = true;
-      if (selectedCategory === 'strategy') {
+      if (selectedCategory === 'education') {
+        matchesCat = /education|learning|teaching|study|classroom/i.test(t.category);
+      } else if (selectedCategory === 'strategy') {
         matchesCat = /strategy|research|brainstorming/i.test(t.category);
       } else if (selectedCategory === 'architecture') {
         matchesCat = /engineering|architecture|system/i.test(t.category);
@@ -97,7 +100,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
               }}
             >
               <span className="material-symbols-outlined text-lg">add</span>
-              <span>Blank Canvas</span>
+              <span>Blank Board</span>
             </button>
           </div>
         </aside>
@@ -111,7 +114,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
               <input
                 type="text"
                 className="template-search__input"
-                placeholder="Search templates & models..."
+                placeholder="Search templates..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -131,8 +134,8 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
           <div className="template-main__body">
             {/* Library Hero Banner */}
             <div className="template-hero">
-              <h2>Canvas Models & Auto-Layout</h2>
-              <p>Authored spatial boards for decisions, research, operations, systems, and field work.</p>
+              <h2>Start With a Template</h2>
+              <p>Ready boards for lessons, study maps, research, operations, systems, decisions, and field work.</p>
             </div>
 
             {/* Auto-Layout Tools Section */}
@@ -178,7 +181,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
               <div className="template-section__header">
                 <h3 className="template-section__label">Ready-Made Templates</h3>
                 <span className="template-section__count">
-                  {filteredTemplates.length} model{filteredTemplates.length !== 1 ? 's' : ''} available
+                  {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''} available
                 </span>
               </div>
 

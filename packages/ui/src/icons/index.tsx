@@ -265,6 +265,14 @@ export const IconSparkles = (props: IconProps) => (
   </IconBase>
 );
 
+export const IconMoreHorizontal = (props: IconProps) => (
+  <IconBase {...props}>
+    <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+  </IconBase>
+);
+
 export const IconPagePortrait = (props: IconProps) => (
   <IconBase {...props}>
     <rect x="5" y="3" width="14" height="18" rx="2" />
@@ -327,4 +335,3 @@ export const IconHexagon = (props: IconProps) => (
     <polygon points="12 3 20.5 7.8 20.5 16.2 12 21 3.5 16.2 3.5 7.8" />
   </IconBase>
 );
-

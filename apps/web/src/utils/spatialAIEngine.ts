@@ -485,6 +485,44 @@ export function generateSpatialBoard(prompt: string): SpatialAIResult {
     };
   }
 
+  if (p.includes('lesson') || p.includes('study') || p.includes('quiz') || p.includes('student') || p.includes('teacher') || p.includes('classroom') || p.includes('education')) {
+    const frameId = nanoid(10);
+    const topicId = nanoid(10);
+    const goalId = nanoid(10);
+    const warmupId = nanoid(10);
+    const explainId = nanoid(10);
+    const activityId = nanoid(10);
+    const checkId = nanoid(10);
+    const quizId = nanoid(10);
+    const reviewId = nanoid(10);
+
+    const nodes: LivingNode[] = [
+      frame(frameId, cx - 540, cy - 290, 1080, 580, 'AI Learning Board', '#38bdf8'),
+      shape(topicId, cx - 125, cy - 80, 250, 130, prompt.slice(0, 42) || 'Learning Topic', 'rgba(56, 189, 248, 0.16)', '#38bdf8', 'ellipse', 5),
+      sticky(goalId, cx - 500, cy - 210, 250, 130, 'Learning goal\nWhat should learners understand or be able to do?', 'blue', 1),
+      sticky(warmupId, cx - 500, cy + 10, 250, 130, 'Warm-up\nOne quick question to activate prior knowledge.', 'yellow', 2),
+      sticky(explainId, cx - 135, cy - 245, 270, 130, 'Explanation\nKey idea, worked example, visual model, or mini demo.', 'purple', 3),
+      sticky(activityId, cx + 250, cy - 210, 250, 130, 'Student activity\nPractice, discussion, pair work, or board response.', 'green', 4),
+      sticky(checkId, cx + 250, cy + 10, 250, 130, 'Check understanding\nWhat evidence shows the idea is clear?', 'orange', 6),
+      sticky(quizId, cx - 135, cy + 150, 270, 130, 'Quiz prompts\n1. Recall\n2. Apply\n3. Explain the mistake\n4. Reflect', 'pink', 7),
+      shape(reviewId, cx + 250, cy + 210, 250, 92, 'Review Plan', 'rgba(34, 197, 94, 0.14)', '#22c55e', 'rectangle', 8),
+    ];
+
+    return {
+      title: 'AI Learning Board',
+      nodes,
+      relations: [
+        relation(goalId, topicId, 'sets focus', '#38bdf8', 'leads_to'),
+        relation(warmupId, topicId, 'prepares', '#f59e0b', 'leads_to'),
+        relation(topicId, explainId, 'explained by', '#8b5cf6', 'leads_to'),
+        relation(explainId, activityId, 'practiced in', '#22c55e', 'leads_to'),
+        relation(activityId, checkId, 'reveals', '#f59e0b', 'based_on'),
+        relation(checkId, quizId, 'turns into', '#ec4899', 'leads_to'),
+        relation(quizId, reviewId, 'drives', '#22c55e', 'leads_to'),
+      ],
+    };
+  }
+
   if (p.includes('field') || p.includes('site') || p.includes('emergency') || p.includes('incident') || p.includes('map') || p.includes('logistics')) {
     const frameId = nanoid(10);
     const mapId = nanoid(10);
