@@ -165,7 +165,7 @@ export const TEMPLATES: CanvasTemplate[] = [
       const exitId = nanoid(10);
 
       const nodes: LivingNode[] = [
-        frame(frameId, -560, -280, 1120, 560, 'Live Lesson Flow', '#38bdf8'),
+        frame(frameId, -590, -320, 1420, 700, 'Live Lesson Flow', '#38bdf8'),
         textBlock(titleId, -505, -245, 420, 58, 'Lesson Topic: Add your subject here', 1, 23),
         shape(goalId, -500, -130, 240, 118, {
           shape: 'hexagon',

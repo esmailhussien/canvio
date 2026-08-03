@@ -50,6 +50,24 @@
   animation: relationPulseGlow 1.8s ease-in-out infinite;
 }
 
+.relation-group--focus-dimmed {
+  opacity: 0.18;
+}
+
+.relation-group--focus-active .relation-line-casing {
+  stroke-width: 10px;
+}
+
+.relation-group--focus-active .relation-line-rim {
+  stroke-opacity: 0.25;
+}
+
+.relation-group--focus-active .relation-line-core {
+  filter:
+    drop-shadow(0 0 6px color-mix(in srgb, var(--accent-primary) 40%, transparent))
+    drop-shadow(0 1px 0 rgba(0, 0, 0, 0.1));
+}
+
 .relation-group--eraser:hover .relation-line-core {
   stroke: var(--accent-danger) !important;
   stroke-width: 4px !important;

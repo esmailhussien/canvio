@@ -136,6 +136,22 @@
   opacity: 0.85;
 }
 
+.node-inspector__segment .material-symbols-outlined {
+  width: 16px;
+  min-width: 16px;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.node-inspector__segment > span {
+  pointer-events: none;
+}
+
+.node-inspector__segment--fit {
+  min-width: 52px;
+}
+
 .node-inspector__segment:hover {
   background: var(--bg-hover);
   color: var(--text-primary);

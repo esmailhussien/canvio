@@ -569,9 +569,14 @@ export function generateSmartRelationPath(
       : winner
   ));
 
+  const routed = polylineHitsObstacles(best, obstacles)
+    ? routeOrthogonalAroundObstacles(source, sStub, tStub, target, obstacles, combined)
+    : null;
+  const finalPoints = routed || best;
+
   return {
-    pathD: roundedPolylinePath(best, 14),
-    midPoint: pointAtHalfLength(best),
+    pathD: roundedPolylinePath(finalPoints, 14),
+    midPoint: pointAtHalfLength(finalPoints),
     angle: 0
   };
 }
@@ -607,6 +612,215 @@ function getCombinedBounds(bounds: NodeBounds[], padding: number) {
   const top = Math.min(...bounds.map((bound) => bound.y)) - padding;
   const bottom = Math.max(...bounds.map((bound) => bound.y + bound.height)) + padding;
   return { left, right, top, bottom };
+}
+
+function routeOrthogonalAroundObstacles(
+  source: Point,
+  sourceStub: Point,
+  targetStub: Point,
+  target: Point,
+  obstacles: NodeBounds[],
+  combined: { left: number; right: number; top: number; bottom: number }
+): Point[] | null {
+  const looseEnvelope = {
+    x: Math.min(sourceStub.x, targetStub.x) - 720,
+    y: Math.min(sourceStub.y, targetStub.y) - 520,
+    width: Math.abs(targetStub.x - sourceStub.x) + 1440,
+    height: Math.abs(targetStub.y - sourceStub.y) + 1040,
+  };
+  const relevantObstacles = obstacles.filter((obstacle) => boundsOverlap(looseEnvelope, obstacle));
+  const lanePad = 12;
+  const xLanes = new Set<number>([
+    sourceStub.x,
+    targetStub.x,
+    (sourceStub.x + targetStub.x) / 2,
+    combined.left,
+    combined.right,
+  ]);
+  const yLanes = new Set<number>([
+    sourceStub.y,
+    targetStub.y,
+    (sourceStub.y + targetStub.y) / 2,
+    combined.top,
+    combined.bottom,
+  ]);
+
+  relevantObstacles.forEach((obstacle) => {
+    xLanes.add(obstacle.x - lanePad);
+    xLanes.add(obstacle.x + obstacle.width + lanePad);
+    yLanes.add(obstacle.y - lanePad);
+    yLanes.add(obstacle.y + obstacle.height + lanePad);
+  });
+
+  const sortedXs = trimLanes([...xLanes], sourceStub.x, targetStub.x, 70);
+  const sortedYs = trimLanes([...yLanes], sourceStub.y, targetStub.y, 70);
+  const points: Point[] = [];
+  const keyToIndex = new Map<string, number>();
+
+  const addPoint = (point: Point) => {
+    const normalized = { x: roundLane(point.x), y: roundLane(point.y) };
+    const key = pointKey(normalized);
+    if (keyToIndex.has(key)) return keyToIndex.get(key)!;
+    if (pointInsideAnyBounds(normalized, relevantObstacles)) return -1;
+    const index = points.length;
+    keyToIndex.set(key, index);
+    points.push(normalized);
+    return index;
+  };
+
+  const startIndex = addPoint(sourceStub);
+  const endIndex = addPoint(targetStub);
+  if (startIndex < 0 || endIndex < 0) return null;
+
+  sortedXs.forEach((x) => {
+    sortedYs.forEach((y) => addPoint({ x, y }));
+  });
+
+  const graph = new Map<number, Array<{ to: number; weight: number }>>();
+  const connect = (from: number, to: number) => {
+    const a = points[from];
+    const b = points[to];
+    if (segmentIntersectsAnyBounds(a, b, relevantObstacles)) return;
+    const weight = distance(a, b);
+    graph.set(from, [...(graph.get(from) || []), { to, weight }]);
+    graph.set(to, [...(graph.get(to) || []), { to: from, weight }]);
+  };
+
+  const pointsByX = new Map<number, number[]>();
+  const pointsByY = new Map<number, number[]>();
+  points.forEach((point, index) => {
+    const x = roundLane(point.x);
+    const y = roundLane(point.y);
+    pointsByX.set(x, [...(pointsByX.get(x) || []), index]);
+    pointsByY.set(y, [...(pointsByY.get(y) || []), index]);
+  });
+
+  pointsByX.forEach((indexes) => {
+    indexes.sort((a, b) => points[a].y - points[b].y);
+    for (let i = 1; i < indexes.length; i++) connect(indexes[i - 1], indexes[i]);
+  });
+  pointsByY.forEach((indexes) => {
+    indexes.sort((a, b) => points[a].x - points[b].x);
+    for (let i = 1; i < indexes.length; i++) connect(indexes[i - 1], indexes[i]);
+  });
+
+  const routeIndexes = shortestPath(graph, startIndex, endIndex);
+  if (!routeIndexes) return null;
+
+  const routePoints = simplifyPolyline(routeIndexes.map((index) => points[index]));
+  const candidate = removeDuplicatePoints([source, ...routePoints, target]);
+  return polylineHitsObstacles(candidate, relevantObstacles) ? null : candidate;
+}
+
+function trimLanes(lanes: number[], start: number, end: number, maxLanes: number): number[] {
+  const center = (start + end) / 2;
+  const mandatory = new Set([roundLane(start), roundLane(end), roundLane(center)]);
+  const unique = [...new Set(lanes.map(roundLane))].sort((a, b) => Math.abs(a - center) - Math.abs(b - center));
+  const trimmed = unique.slice(0, maxLanes);
+  mandatory.forEach((lane) => {
+    if (!trimmed.includes(lane)) trimmed.push(lane);
+  });
+  return trimmed.sort((a, b) => a - b);
+}
+
+function shortestPath(graph: Map<number, Array<{ to: number; weight: number }>>, start: number, end: number): number[] | null {
+  const dist = new Map<number, number>([[start, 0]]);
+  const prev = new Map<number, number>();
+  const visited = new Set<number>();
+  const queue = new Set<number>([start]);
+
+  while (queue.size > 0) {
+    let current = -1;
+    let bestDistance = Infinity;
+    queue.forEach((candidate) => {
+      const candidateDistance = dist.get(candidate) ?? Infinity;
+      if (candidateDistance < bestDistance) {
+        bestDistance = candidateDistance;
+        current = candidate;
+      }
+    });
+
+    if (current === -1) break;
+    if (current === end) break;
+    queue.delete(current);
+    visited.add(current);
+
+    (graph.get(current) || []).forEach((edge) => {
+      if (visited.has(edge.to)) return;
+      const nextDistance = bestDistance + edge.weight;
+      if (nextDistance < (dist.get(edge.to) ?? Infinity)) {
+        dist.set(edge.to, nextDistance);
+        prev.set(edge.to, current);
+        queue.add(edge.to);
+      }
+    });
+  }
+
+  if (!dist.has(end)) return null;
+  const path = [end];
+  let cursor = end;
+  while (cursor !== start) {
+    const previous = prev.get(cursor);
+    if (previous === undefined) return null;
+    path.unshift(previous);
+    cursor = previous;
+  }
+  return path;
+}
+
+function simplifyPolyline(points: Point[]): Point[] {
+  const deduped = removeDuplicatePoints(points);
+  if (deduped.length <= 2) return deduped;
+  const simplified: Point[] = [deduped[0]];
+
+  for (let i = 1; i < deduped.length - 1; i++) {
+    const prev = simplified[simplified.length - 1];
+    const current = deduped[i];
+    const next = deduped[i + 1];
+    const sameHorizontal = Math.abs(prev.y - current.y) < 0.01 && Math.abs(current.y - next.y) < 0.01;
+    const sameVertical = Math.abs(prev.x - current.x) < 0.01 && Math.abs(current.x - next.x) < 0.01;
+    if (!sameHorizontal && !sameVertical) simplified.push(current);
+  }
+
+  simplified.push(deduped[deduped.length - 1]);
+  return simplified;
+}
+
+function polylineHitsObstacles(points: Point[], obstacles: NodeBounds[]): boolean {
+  for (let i = 1; i < points.length; i++) {
+    if (segmentIntersectsAnyBounds(points[i - 1], points[i], obstacles)) return true;
+  }
+  return false;
+}
+
+function segmentIntersectsAnyBounds(start: Point, end: Point, bounds: NodeBounds[]): boolean {
+  return bounds.some((bound) => segmentIntersectsBounds(start, end, bound));
+}
+
+function pointInsideAnyBounds(point: Point, bounds: NodeBounds[]): boolean {
+  return bounds.some((bound) => (
+    point.x > bound.x &&
+    point.x < bound.x + bound.width &&
+    point.y > bound.y &&
+    point.y < bound.y + bound.height
+  ));
+}
+
+function boundsOverlap(a: Pick<NodeBounds, 'x' | 'y' | 'width' | 'height'>, b: Pick<NodeBounds, 'x' | 'y' | 'width' | 'height'>): boolean {
+  return !(
+    a.x + a.width < b.x ||
+    b.x + b.width < a.x ||
+    a.y + a.height < b.y ||
+    b.y + b.height < a.y
+  );
+}
+
+function pointKey(point: Point): string {
+  return `${roundLane(point.x)},${roundLane(point.y)}`;
+}
+
+function roundLane(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function removeDuplicatePoints(points: Point[]): Point[] {

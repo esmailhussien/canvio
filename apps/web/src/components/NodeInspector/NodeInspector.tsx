@@ -74,6 +74,8 @@ export function NodeInspector({ node }: NodeInspectorProps) {
   const [isExpanding, setIsExpanding] = useState(false);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const snapshot = useCanvasStore((s) => s.snapshot);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const bringToFront = useCanvasStore((s) => s.bringToFront);
   const sendToBack = useCanvasStore((s) => s.sendToBack);
@@ -131,6 +133,32 @@ export function NodeInspector({ node }: NodeInspectorProps) {
     updateNode(node.id, {
       size: { width, height },
       data: { ...node.data, title: label, pagePreset: preset },
+    });
+  };
+
+  const fitFrameToBoardContent = () => {
+    const contentNodes = Object.values(nodes).filter((n) => n.id !== node.id && n.type !== 'frame');
+    if (contentNodes.length === 0) return;
+
+    const marginX = 74;
+    const marginTop = 82;
+    const marginBottom = 74;
+    const minX = Math.min(...contentNodes.map((n) => n.position.x)) - marginX;
+    const minY = Math.min(...contentNodes.map((n) => n.position.y)) - marginTop;
+    const maxX = Math.max(...contentNodes.map((n) => n.position.x + n.size.width)) + marginX;
+    const maxY = Math.max(...contentNodes.map((n) => n.position.y + n.size.height)) + marginBottom;
+
+    snapshot();
+    updateNode(node.id, {
+      position: { x: minX, y: minY },
+      size: {
+        width: Math.max(240, maxX - minX),
+        height: Math.max(180, maxY - minY),
+      },
+      data: {
+        ...node.data,
+        pagePreset: undefined,
+      },
     });
   };
   const drawingKind = (node.data?.kind as string) || 'freehand';
@@ -383,6 +411,14 @@ export function NodeInspector({ node }: NodeInspectorProps) {
             >
               <IconLetter size={14} />
               <span>Letter</span>
+            </button>
+            <button
+              className="node-inspector__segment node-inspector__segment--fit"
+              onClick={(e) => { e.stopPropagation(); fitFrameToBoardContent(); }}
+              title="Fit frame around board content"
+            >
+              <span className="material-symbols-outlined">fit_screen</span>
+              <span>Fit</span>
             </button>
           </div>
           <div className="node-inspector__colors">

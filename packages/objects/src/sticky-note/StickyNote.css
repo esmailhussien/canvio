@@ -141,3 +141,23 @@
 
 .sticky-note--orange { background-color: #fed7aa; }
 .sticky-note--orange .sticky-note__fold { border-color: transparent transparent #fdba74 #fdba74; }
+
+@media (pointer: coarse) {
+  .sticky-note {
+    padding: 18px;
+  }
+
+  .sticky-note__drag-handle {
+    top: 7px;
+    right: 7px;
+    width: 42px;
+    height: 34px;
+    border-radius: 17px;
+    opacity: 0.9;
+  }
+
+  .sticky-note__text,
+  .sticky-note__textarea {
+    padding-right: 48px;
+  }
+}

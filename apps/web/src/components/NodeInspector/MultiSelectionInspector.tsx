@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
-import { IconTrash } from '@canvio/ui';
+import { IconCopy, IconTrash } from '@canvio/ui';
 import './MultiSelectionInspector.css';
 
 function IconGrid({ size = 16 }: { size?: number }) {
@@ -80,6 +80,7 @@ export function MultiSelectionInspector() {
   const tidyUpNodes = useCanvasStore((s) => s.tidyUpNodes);
   const alignNodes = useCanvasStore((s) => s.alignNodes);
   const removeNodes = useCanvasStore((s) => s.removeNodes);
+  const branchSelectionAsExperiment = useCanvasStore((s) => s.branchSelectionAsExperiment);
   const snapshot = useCanvasStore((s) => s.snapshot);
 
   const bounds = useMemo(() => {
@@ -125,6 +126,9 @@ export function MultiSelectionInspector() {
       <div className="inspector-panel" onPointerDown={(e) => e.stopPropagation()}>
         <button className="inspector-btn" onClick={handleAction(tidyUpNodes)} title="Tidy Up (Distribute Evenly)">
           <IconGrid size={16} />
+        </button>
+        <button className="inspector-btn" onClick={handleAction(branchSelectionAsExperiment)} title="Experiment Copy">
+          <IconCopy size={16} />
         </button>
         <div className="inspector-divider" />
         <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('top'))} title="Align Top">

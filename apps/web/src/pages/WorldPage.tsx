@@ -12,7 +12,7 @@ import { Minimap } from '../components/Minimap/Minimap';
 import { applyTemplate } from '../utils/templates';
 import { useCanvasStore } from '../store/canvasStore';
 import { useCollaboration } from '../hooks/useCollaboration';
-import { touchBoard, updateBoardAppearance } from '../utils/api';
+import { createBoard, touchBoard, updateBoardAppearance } from '../utils/api';
 import { RelationInspector } from '../components/RelationInspector/RelationInspector';
 import { PenInspector } from '../components/PenInspector/PenInspector';
 import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
@@ -54,6 +54,8 @@ export function WorldPage() {
   const setCanvasBackground = useCanvasStore((s) => s.setCanvasBackground);
   const setAppearance = useCanvasStore((s) => s.setAppearance);
   const replaceWorld = useCanvasStore((s) => s.replaceWorld);
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
+  const branchSelectionAsExperiment = useCanvasStore((s) => s.branchSelectionAsExperiment);
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
   const isAIOpen = useCanvasStore((s) => s.isAIAssistantOpen);
   const setIsAIOpen = useCanvasStore((s) => s.setAIAssistantOpen);
@@ -61,6 +63,8 @@ export function WorldPage() {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isStarterDismissed, setIsStarterDismissed] = useState(false);
   const [autoShapeEnabled, setAutoShapeEnabled] = useState(false);
+  const [isPresenting, setIsPresenting] = useState(false);
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const boardAppearanceLoadedRef = useRef(false);
@@ -97,6 +101,58 @@ export function WorldPage() {
     } else {
       setViewport({ x: 0, y: 0, zoom: 1 });
     }
+  };
+
+  const selectedFocusNodeId = selectedNodeIds[0] || null;
+
+  const handleFitPresentationView = () => {
+    if (focusNodeId && nodes[focusNodeId]) {
+      fitViewportToNodes([nodes[focusNodeId]], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
+      return;
+    }
+    handleFitToWorld();
+  };
+
+  const handleFocusSelectedNode = () => {
+    if (!selectedFocusNodeId || !nodes[selectedFocusNodeId]) return;
+    setFocusNodeId(selectedFocusNodeId);
+    fitViewportToNodes([nodes[selectedFocusNodeId]], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
+  };
+
+  const handleClearFocus = () => {
+    setFocusNodeId(null);
+    handleFitToWorld();
+  };
+
+  const handleEnterPresentation = () => {
+    setActiveTool('select');
+    setIsCanvioMenuOpen(false);
+    setIsExportMenuOpen(false);
+    setIsTemplateOpen(false);
+    setIsAIOpen(false);
+    setFocusNodeId(selectedFocusNodeId && nodes[selectedFocusNodeId] ? selectedFocusNodeId : null);
+    setIsPresenting(true);
+    window.setTimeout(() => {
+      if (selectedFocusNodeId && nodes[selectedFocusNodeId]) {
+        fitViewportToNodes([nodes[selectedFocusNodeId]], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
+      } else {
+        handleFitToWorld();
+      }
+    }, 0);
+  };
+
+  const handleExitPresentation = () => {
+    setIsPresenting(false);
+    setFocusNodeId(null);
+    setActiveTool('select');
+  };
+
+  const handleNewBlankBoard = () => {
+    const newId = nanoid(10);
+    createBoard().catch(() => {});
+    setIsCanvioMenuOpen(false);
+    setIsStarterDismissed(false);
+    navigate(`/w/${newId}`);
   };
 
   const handleStartFromScratch = (reset = false) => {
@@ -196,14 +252,37 @@ export function WorldPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (focusNodeId && !nodes[focusNodeId]) {
+      setFocusNodeId(null);
+    }
+  }, [focusNodeId, nodes]);
+
+  useEffect(() => {
+    if (!isPresenting) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleExitPresentation();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPresenting]);
+
   // Connect to collaboration
   const { connected, users } = useCollaboration(worldId || '');
 
   return (
-    <div className="world-page" data-tool={activeTool} style={worldStyle}>
-      <Canvas worldId={worldId || ''} autoShapeEnabled={autoShapeEnabled} />
+    <div className={`world-page ${isPresenting ? 'is-presenting' : ''}`} data-tool={activeTool} style={worldStyle}>
+      <Canvas
+        worldId={worldId || ''}
+        autoShapeEnabled={autoShapeEnabled}
+        presentationMode={isPresenting}
+        focusNodeId={focusNodeId}
+      />
 
-      {Object.keys(nodes).length === 0 && !isStarterDismissed && (
+      {Object.keys(nodes).length === 0 && !isStarterDismissed && !isPresenting && (
         <div className="world-page__empty-launcher" aria-label="Start canvas">
           {/* Subtle animated magical background for empty state */}
           <div className="world-page__empty-bg-glow"></div>
@@ -259,15 +338,50 @@ export function WorldPage() {
       )}
 
       <Cursors users={users} />
-      <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
-      <PenInspector
-        autoShapeEnabled={autoShapeEnabled}
-        onToggleAutoShape={() => setAutoShapeEnabled((prev) => !prev)}
-      />
-      <RelationInspector />
+      {!isPresenting && (
+        <>
+          <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
+          <PenInspector
+            autoShapeEnabled={autoShapeEnabled}
+            onToggleAutoShape={() => setAutoShapeEnabled((prev) => !prev)}
+          />
+          <RelationInspector />
+        </>
+      )}
+
+      {isPresenting && (
+        <div className="presentation-controls" role="toolbar" aria-label="Presentation controls">
+          <button className="presentation-control-btn presentation-control-btn--primary" onClick={handleExitPresentation} title="Exit presentation">
+            <span className="material-symbols-outlined">close_fullscreen</span>
+            <span>Exit</span>
+          </button>
+          <button
+            className="presentation-control-btn"
+            onClick={handleFocusSelectedNode}
+            disabled={!selectedFocusNodeId}
+            title="Focus selected element"
+          >
+            <span className="material-symbols-outlined">filter_center_focus</span>
+            <span>Focus</span>
+          </button>
+          <button
+            className="presentation-control-btn"
+            onClick={handleClearFocus}
+            disabled={!focusNodeId}
+            title="Clear focus"
+          >
+            <span className="material-symbols-outlined">visibility</span>
+            <span>All</span>
+          </button>
+          <button className="presentation-control-btn" onClick={handleFitPresentationView} title="Fit view">
+            <span className="material-symbols-outlined">fit_screen</span>
+            <span>Fit</span>
+          </button>
+        </div>
+      )}
 
       {/* Modern Compact Top Navigation Header Bar */}
-      <header className="world-header">
+      {!isPresenting && <header className="world-header">
         {/* Left: Canvio Brand Menu & Export */}
         <div className="world-header__left" ref={menuRef}>
           <button
@@ -291,6 +405,11 @@ export function WorldPage() {
                 <span>All Workspaces</span>
               </button>
 
+              <button className="canvio-menu-item" onClick={handleNewBlankBoard}>
+                <span className="material-symbols-outlined text-sm">add_circle</span>
+                <span>New Blank Board</span>
+              </button>
+
               <button
                 className="canvio-menu-item"
                 onClick={() => {
@@ -312,6 +431,27 @@ export function WorldPage() {
                 <span className="material-symbols-outlined text-sm">fit_screen</span>
                 <span>Fit Viewport to Canvas</span>
               </button>
+
+              <button
+                className="canvio-menu-item"
+                onClick={handleEnterPresentation}
+              >
+                <span className="material-symbols-outlined text-sm">present_to_all</span>
+                <span>Present Board</span>
+              </button>
+
+              {selectedNodeIds.length > 0 && (
+                <button
+                  className="canvio-menu-item"
+                  onClick={() => {
+                    branchSelectionAsExperiment();
+                    setIsCanvioMenuOpen(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-sm">content_copy</span>
+                  <span>Experiment With Selection</span>
+                </button>
+              )}
 
               <button
                 className="canvio-menu-item"
@@ -409,6 +549,15 @@ export function WorldPage() {
 
           <button
             className="header-ai-btn"
+            onClick={handleEnterPresentation}
+            aria-label="Present Board"
+            title="Present Board"
+          >
+            <span className="material-symbols-outlined text-base">present_to_all</span>
+          </button>
+
+          <button
+            className="header-ai-btn"
             onClick={() => setIsAIOpen(true)}
             aria-label="Spatial AI Assistant"
             title="Open Spatial AI Assistant"
@@ -449,7 +598,7 @@ export function WorldPage() {
             )}
           </div>
         </div>
-      </header>
+      </header>}
 
       <TemplatePicker
         isOpen={isTemplateOpen}
@@ -461,7 +610,7 @@ export function WorldPage() {
       />
 
       <AIAssistantModal isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
-      <Minimap />
+      {!isPresenting && <Minimap />}
     </div>
   );
 }

@@ -30,9 +30,9 @@
   max-width: 84%;
   max-height: 84%;
   overflow: hidden;
-  cursor: text;
+  cursor: inherit;
   line-height: 1.35;
-  user-select: text;
+  user-select: none;
 }
 
 .shape-node__label--empty {

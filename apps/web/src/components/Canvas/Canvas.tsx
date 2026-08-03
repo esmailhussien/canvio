@@ -26,9 +26,11 @@ import './Canvas.css';
 interface CanvasProps {
   worldId: string;
   autoShapeEnabled?: boolean;
+  presentationMode?: boolean;
+  focusNodeId?: string | null;
 }
 
-export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
+export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = false, focusNodeId = null }: CanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const viewport = useCanvasStore((s) => s.viewport);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -53,6 +55,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
 
   const [cursorWorldPos, setCursorWorldPos] = useState<{ x: number; y: number } | null>(null);
   const [radialMenu, setRadialMenu] = useState<{ screenX: number; screenY: number; worldPos: { x: number; y: number } } | null>(null);
+  const touchPanStartRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   // Drag-to-Create Frame state
   const [isDrawingFrame, setIsDrawingFrame] = useState(false);
@@ -132,6 +135,14 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       e.currentTarget.setPointerCapture?.(e.pointerId);
       const worldPos = screenToWorld(e.clientX, e.clientY);
 
+      if (presentationMode) {
+        e.preventDefault();
+        touchPanStartRef.current = { x: e.clientX, y: e.clientY, moved: false };
+        setIsPanning(true);
+        setLastMousePos({ x: e.clientX, y: e.clientY });
+        return;
+      }
+
       if (activeTool === 'pan' || e.button === 1) {
         e.preventDefault();
         setIsPanning(true);
@@ -167,12 +178,19 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
 
       if (activeTool === 'select') {
         e.preventDefault();
+        if (e.pointerType === 'touch') {
+          touchPanStartRef.current = { x: e.clientX, y: e.clientY, moved: false };
+          setIsPanning(true);
+          setLastMousePos({ x: e.clientX, y: e.clientY });
+          return;
+        }
         startMarquee(worldPos);
       }
     },
     [
       activeTool,
       createNodeFromPlugin,
+      presentationMode,
       pinchStateRef,
       radialMenu,
       screenToWorld,
@@ -193,6 +211,13 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       setCursorWorldPos(worldPos);
 
       if (isPanning && lastMousePos) {
+        if (touchPanStartRef.current) {
+          const totalDx = e.clientX - touchPanStartRef.current.x;
+          const totalDy = e.clientY - touchPanStartRef.current.y;
+          if (Math.hypot(totalDx, totalDy) > 8) {
+            touchPanStartRef.current.moved = true;
+          }
+        }
         const dx = (e.clientX - lastMousePos.x) / viewport.zoom;
         const dy = (e.clientY - lastMousePos.y) / viewport.zoom;
         panBy(dx, dy);
@@ -237,6 +262,10 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       }
 
       if (isPanning) {
+        if (touchPanStartRef.current && !touchPanStartRef.current.moved) {
+          clearSelection();
+        }
+        touchPanStartRef.current = null;
         setIsPanning(false);
         setLastMousePos(null);
       }
@@ -291,6 +320,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
       isPanning,
       selectNode,
       setActiveTool,
+      clearSelection,
       setIsPanning,
       setLastMousePos,
     ]
@@ -340,7 +370,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
 
   const transform = `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})`;
   const relationStateClass =
-    activeTool === 'relation'
+    !presentationMode && activeTool === 'relation'
       ? relationSourceId
         ? relationTargetId
           ? 'canvas--relation-snapped'
@@ -351,7 +381,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
   return (
     <div
       ref={canvasRef}
-      className={`canvas ${relationStateClass}`}
+      className={`canvas ${relationStateClass} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -375,7 +405,7 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
 
       <div className="canvas__world" style={{ transform }}>
         {/* Relation preview line */}
-        {activeTool === 'relation' && relationSourceId && cursorWorldPos && (() => {
+        {!presentationMode && activeTool === 'relation' && relationSourceId && cursorWorldPos && (() => {
           const sourceNode = nodes[relationSourceId];
           if (!sourceNode) return null;
           const hasSnapTarget = Boolean(
@@ -401,13 +431,15 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
             relationSourcePort || undefined,
             snapTarget ? relationTargetPort || undefined : undefined
           );
-          const allBounds: NodeBounds[] = Object.values(nodes).map((node) => ({
-            id: node.id,
-            x: node.position.x,
-            y: node.position.y,
-            width: node.size.width,
-            height: node.size.height,
-          }));
+          const allBounds: NodeBounds[] = Object.values(nodes)
+            .filter((node) => node.type !== 'frame')
+            .map((node) => ({
+              id: node.id,
+              x: node.position.x,
+              y: node.position.y,
+              width: node.size.width,
+              height: node.size.height,
+            }));
           const sourceBounds = allBounds.find((bound) => bound.id === sourceNode.id);
           const targetBounds = snapTarget ? allBounds.find((bound) => bound.id === snapTarget.id) : undefined;
           const pathResult =
@@ -466,9 +498,9 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
         })()}
 
         {/* Nodes layer (Virtualization / Viewport Culled for high performance) */}
-        <div style={{ pointerEvents: activeTool === 'select' || activeTool === 'relation' || activeTool === 'eraser' ? 'auto' : 'none' }}>
+        <div style={{ pointerEvents: presentationMode || activeTool === 'select' || activeTool === 'relation' || activeTool === 'eraser' ? 'auto' : 'none' }}>
           {visibleNodes.map((node) => (
-            <NodeRenderer key={node.id} node={node} />
+            <NodeRenderer key={node.id} node={node} presentationMode={presentationMode} focusNodeId={focusNodeId} />
           ))}
         </div>
 
@@ -501,10 +533,10 @@ export function Canvas({ worldId, autoShapeEnabled = false }: CanvasProps) {
         )}
 
         {/* Multi-selection layout tools */}
-        <MultiSelectionInspector />
+        {!presentationMode && <MultiSelectionInspector />}
 
         {/* Relations layer */}
-        <RelationRenderer relations={relations} nodes={nodes} />
+        <RelationRenderer relations={relations} nodes={nodes} presentationMode={presentationMode} focusNodeId={focusNodeId} />
 
         {/* Marquee Selection Box */}
         {isMarqueeActive && marqueeStart && marqueeEnd && (

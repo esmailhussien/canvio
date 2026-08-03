@@ -169,7 +169,7 @@ export const DrawingNode: React.FC<DrawingNodeProps> = ({ node }) => {
               d={arrowPath}
               fill="none"
               stroke="transparent"
-              strokeWidth={Math.max(22, data.arrow.width + 16)}
+              strokeWidth={Math.max(32, data.arrow.width + 24)}
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{ pointerEvents: 'stroke' }}
@@ -208,7 +208,7 @@ export const DrawingNode: React.FC<DrawingNodeProps> = ({ node }) => {
             simulatePressure: stroke.complete,
           });
           const pathData = getSvgPathFromStroke(outlinePoints);
-          const hitWidth = Math.max(18, stroke.width + 14);
+          const hitWidth = Math.max(30, stroke.width + 22);
           return (
             <g key={stroke.id}>
               <path

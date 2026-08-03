@@ -20,6 +20,18 @@
   cursor: alias;
 }
 
+.canvas--presenting {
+  cursor: grab;
+}
+
+.canvas--presenting:active {
+  cursor: grabbing;
+}
+
+.canvas--presenting .canvas__grid {
+  opacity: 0.72;
+}
+
 .canvas__grid {
   position: absolute;
   inset: 0;

@@ -6,6 +6,8 @@ import './RelationRenderer.css';
 interface Props {
   relations: Record<string, Relation>;
   nodes: Record<string, LivingNode>;
+  presentationMode?: boolean;
+  focusNodeId?: string | null;
 }
 
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
@@ -52,7 +54,7 @@ function getNodeGeoCoords(node: LivingNode, portId?: string): [number, number] |
   return null;
 }
 
-export function RelationRenderer({ relations, nodes }: Props) {
+export function RelationRenderer({ relations, nodes, presentationMode = false, focusNodeId = null }: Props) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const selectedRelationId = useCanvasStore((s) => s.selectedRelationId);
   const selectRelation = useCanvasStore((s) => s.selectRelation);
@@ -116,17 +118,21 @@ export function RelationRenderer({ relations, nodes }: Props) {
         const isSelected = selectedRelationId === rel.id;
         const isEraser = activeTool === 'eraser';
         const isSelectTool = activeTool === 'select';
+        const isFocusDimmed = Boolean(focusNodeId && rel.sourceId !== focusNodeId && rel.targetId !== focusNodeId);
+        const isFocusActive = Boolean(focusNodeId && (rel.sourceId === focusNodeId || rel.targetId === focusNodeId));
 
         const { sourcePort, targetPort } = resolveRelationPorts(source, target, rel.sourcePort, rel.targetPort);
 
         const style = rel.style || { type: 'straight', color: 'var(--relation-default)', width: 2 };
-        const allBounds: NodeBounds[] = Object.values(nodes).map((node) => ({
-          id: node.id,
-          x: node.position.x,
-          y: node.position.y,
-          width: node.size.width,
-          height: node.size.height,
-        }));
+        const allBounds: NodeBounds[] = Object.values(nodes)
+          .filter((node) => node.type !== 'frame')
+          .map((node) => ({
+            id: node.id,
+            x: node.position.x,
+            y: node.position.y,
+            width: node.size.width,
+            height: node.size.height,
+          }));
         const sourceBounds = allBounds.find((bound) => bound.id === source.id);
         const targetBounds = allBounds.find((bound) => bound.id === target.id);
         const pathResult = sourceBounds && targetBounds && style.type !== 'curved'
@@ -162,10 +168,10 @@ export function RelationRenderer({ relations, nodes }: Props) {
           <g
             key={rel.id}
             style={{
-              pointerEvents: (isEraser || isSelectTool) ? 'auto' : 'none',
+              pointerEvents: (isEraser || isSelectTool || presentationMode) ? 'auto' : 'none',
               cursor: isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
             }}
-            className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''}`}
+            className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''}`}
             onMouseEnter={() => setHoveredRelationId(rel.id)}
             onMouseLeave={() => setHoveredRelationId((id) => id === rel.id ? null : id)}
             onClick={(e) => {
@@ -178,7 +184,7 @@ export function RelationRenderer({ relations, nodes }: Props) {
               }
             }}
             onDoubleClick={(e) => {
-              if (!isSelectTool) return;
+              if (!isSelectTool || presentationMode) return;
               e.stopPropagation();
               const nextLabel = window.prompt('Relation label', rel.label || '');
               if (nextLabel !== null) {
@@ -192,7 +198,7 @@ export function RelationRenderer({ relations, nodes }: Props) {
               d={pathResult.pathD}
               fill="none"
               stroke="transparent"
-              strokeWidth={Math.max(18, lineWidth + 14)}
+              strokeWidth={Math.max(28, lineWidth + 20)}
             />
 
             {/* Selection glow highlight line */}

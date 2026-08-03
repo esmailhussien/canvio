@@ -7,6 +7,34 @@ import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
 import { IconTheme } from '@canvio/ui';
 import './HomePage.css';
 
+function HomeGlyph({ value }: { value: string }) {
+  return (
+    <span className="home-glyph" aria-hidden="true">
+      {value}
+    </span>
+  );
+}
+
+const PRODUCT_STEPS = [
+  { glyph: '01', title: 'Start', text: 'Open a blank board, a model, or an AI draft.' },
+  { glyph: '02', title: 'Build', text: 'Add notes, frames, ink, shapes, maps, media, and code.' },
+  { glyph: '03', title: 'Connect', text: 'Show meaning with routed relations and labels.' },
+  { glyph: '04', title: 'Deliver', text: 'Present, collaborate, export, and revisit the work.' },
+];
+
+const START_OPTIONS = [
+  { glyph: 'BL', title: 'Blank canvas', text: 'Start open-ended work from scratch.', action: 'create' as const },
+  { glyph: 'DE', title: 'Demo board', text: 'Explore the experience with sample content.', action: 'demo' as const },
+  { glyph: 'HW', title: 'How it works', text: 'See the workflow before opening a board.', action: 'how' as const },
+];
+
+const USE_CASES = [
+  { glyph: 'ED', title: 'Teaching', text: 'Plan lessons, explain relationships, focus attention, and export class artifacts.' },
+  { glyph: 'ST', title: 'Studying', text: 'Map topics, examples, questions, mistakes, and review prompts visually.' },
+  { glyph: 'PM', title: 'Planning', text: 'Turn project goals, dependencies, decisions, and risks into a shared workspace.' },
+  { glyph: 'RS', title: 'Research', text: 'Connect evidence, places, notes, papers, and conclusions on one canvas.' },
+];
+
 export function HomePage() {
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
@@ -18,31 +46,39 @@ export function HomePage() {
   }, [theme]);
 
   const handleCreateWorld = () => {
+    if (isCreating) return;
+    setIsCreating(true);
     const newId = nanoid(10);
     createBoard().catch(() => {});
     navigate(`/w/${newId}`);
   };
 
+  const handleStartOption = (action: 'create' | 'demo' | 'how') => {
+    if (action === 'create') {
+      handleCreateWorld();
+      return;
+    }
+    if (action === 'demo') {
+      navigate(`/w/demo-${nanoid(6)}`);
+      return;
+    }
+    navigate('/how-it-works');
+  };
+
   return (
     <div className="home-page dot-grid">
-      {/* Top Navigation */}
       <nav className="home-nav">
-        <div className="home-logo">
+        <button className="home-logo" onClick={() => navigate('/')} aria-label="Canvio home">
           <CanvioLogoIcon size={26} />
           <span className="home-logo__text">Canvio</span>
-        </div>
+        </button>
         <div className="home-nav__links">
-          <button className="home-nav__link" onClick={handleCreateWorld} disabled={isCreating}>
-            Workspace
-          </button>
-          <button className="home-nav__link" onClick={() => navigate('/how-it-works')}>
-            How It Works
-          </button>
-          <button className="home-nav__link" onClick={() => navigate('/support')}>
-            Support
-          </button>
-          <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
-            {isCreating ? 'Creating...' : '+ Launch Canvas'}
+          <button className="home-nav__link" onClick={handleCreateWorld} disabled={isCreating}>Workspace</button>
+          <button className="home-nav__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
+          <button className="home-nav__link" onClick={() => navigate('/support')}>Support</button>
+          <button className="home-btn-primary home-nav__launch" onClick={handleCreateWorld} disabled={isCreating}>
+            <HomeGlyph value="+" />
+            <span>{isCreating ? 'Opening...' : 'Launch Canvas'}</span>
           </button>
           <button
             className="home-theme-btn"
@@ -55,153 +91,137 @@ export function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="home-hero">
-        <div className="home-hero__badge">
-          <span className="home-hero__badge-dot" />
-          <span className="home-hero__badge-text">A Visual Knowledge Workspace</span>
-        </div>
-        <h1 className="home-hero__title">
-          Connect ideas. <span>Create knowledge.</span>
-        </h1>
-        <p className="home-hero__subtitle">
-          An infinite collaborative canvas powered by spatial AI, freehand drawing, vector shape recognition, and real-time multiplayer.
-        </p>
-        <div className="home-hero__cta">
-          <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
-            <span className="material-symbols-outlined">add_circle</span>
-            {isCreating ? 'Creating World...' : 'Launch Canvas Now'}
-          </button>
-          <button className="home-btn-secondary" onClick={() => navigate(`/w/demo-${nanoid(6)}`)}>
-            <span className="material-symbols-outlined">play_circle</span>
-            Explore Demo World
-          </button>
-        </div>
-
-        {/* Interactive Preview Frame */}
-        <div className="home-preview">
-          <div className="home-preview__grid" />
-          
-          <div className="preview-sticky preview-sticky-1">
-            <strong>Project Vision: Spatial AI</strong>
-            <p style={{ opacity: 0.8, marginTop: 4 }}>Focus on seamless interactions & infinite canvas flexibility.</p>
-          </div>
-
-          <div className="preview-sticky preview-sticky-2">
-            <strong>Team Sync @ 10am</strong>
-            <p style={{ opacity: 0.8, marginTop: 4 }}>Discuss component hierarchy & features.</p>
-          </div>
-
-          <div className="preview-sticky preview-sticky-3">
-            <strong>Sprint Tasks</strong>
-            <ul style={{ listStyle: 'none', padding: 0, marginTop: 6, lineHeight: 1.4 }}>
-              <li>✓ Design System</li>
-              <li>✓ Ink-to-Shape Engine</li>
-              <li>✓ Real-time Multiplayer</li>
-            </ul>
-          </div>
-
-          <div className="preview-shape-rect">
-            <span>Frontend App</span>
-          </div>
-
-          <div className="preview-shape-circle">
-            <span>Spatial Engine</span>
-          </div>
-
-          {/* SVG Connection Lines Simulation */}
-          <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-            <path d="M 280 180 Q 450 120 700 160" fill="none" stroke="rgba(99,102,241,0.5)" strokeDasharray="6,6" strokeWidth="2" />
-            <path d="M 400 320 C 550 320, 680 280, 750 360" fill="none" stroke="rgba(34,197,94,0.5)" strokeWidth="2.5" />
-            <path d="M 220 280 Q 300 450 450 380" fill="none" stroke="#ec4899" strokeWidth="3" style={{ filter: 'drop-shadow(0 0 8px rgba(236,72,153,0.8))' }} />
-          </svg>
-        </div>
-      </section>
-
-      {/* Features Grid */}
-      <section className="home-features">
-        <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-card__icon feature-card__icon--draw">
-              <span className="material-symbols-outlined">edit</span>
+      <main className="home-main">
+        <section className="home-hero">
+          <div className="home-hero__copy">
+            <div className="home-hero__badge">
+              <span className="home-hero__badge-dot" />
+              <span>Visual knowledge workspace for learning, planning, and research</span>
             </div>
-            <h3 className="feature-card__title">Vector Freehand & Gesture Drawing</h3>
-            <p className="feature-card__desc">
-              Draw smooth pressure-sensitive strokes, arrows, and shapes with instant gesture detection and automatic shape recognition.
+            <h1 className="home-hero__title">
+              A whiteboard that turns ideas into <span>connected work.</span>
+            </h1>
+            <p className="home-hero__subtitle">
+              Canvio combines an infinite canvas, smart ink, living objects, relation mapping, spatial AI, presentation mode, and export-ready frames in one familiar workspace.
             </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-card__icon feature-card__icon--collab">
-              <span className="material-symbols-outlined">group</span>
-            </div>
-            <h3 className="feature-card__title">Real-Time Multiplayer & PDF Engine</h3>
-            <p className="feature-card__desc">
-              Collaborate live with zero signup, instant URL sharing, and multi-page A4 PDF document export.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-card__icon feature-card__icon--map">
-              <span className="material-symbols-outlined">map</span>
-            </div>
-            <h3 className="feature-card__title">Spatial AI & Living Maps</h3>
-            <p className="feature-card__desc">
-              Embed interactive Leaflet maps, code snippets, frames, and spatial AI navigators directly onto your workspace.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Recent Worlds Section */}
-      <section className="home-worlds">
-        <div className="home-worlds__header">
-          <h2 className="home-worlds__title">Recent Workspaces</h2>
-          <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
-            <span className="material-symbols-outlined">add</span> Create New World
-          </button>
-        </div>
-
-        <div className="worlds-grid">
-          <div className="world-card--create world-card" onClick={handleCreateWorld}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36 }}>add_box</span>
-            <span style={{ fontWeight: 600 }}>Create Blank Canvas</span>
-          </div>
-
-          <div className="world-card" onClick={() => navigate(`/w/operations-hub`)}>
-            <div className="world-card__preview">
-              <span className="material-symbols-outlined" style={{ fontSize: 40 }}>schema</span>
-            </div>
-            <div className="world-card__info">
-              <div className="world-card__name">Operations Hub</div>
-              <div className="world-card__date">Active workspace</div>
+            <div className="home-hero__cta">
+              <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
+                <HomeGlyph value="GO" />
+                <span>{isCreating ? 'Opening board...' : 'Start a blank board'}</span>
+              </button>
+              <button className="home-btn-secondary" onClick={() => navigate(`/w/demo-${nanoid(6)}`)}>
+                <HomeGlyph value="DE" />
+                <span>Open demo board</span>
+              </button>
             </div>
           </div>
 
-          <div className="world-card" onClick={() => navigate(`/w/strategy-sprint`)}>
-            <div className="world-card__preview">
-              <span className="material-symbols-outlined" style={{ fontSize: 40 }}>space_dashboard</span>
+          <div className="home-preview" aria-label="Canvio canvas preview">
+            <div className="home-preview__toolbar">
+              <span>Select</span>
+              <span>Pen</span>
+              <span>Frame</span>
+              <span>Relation</span>
+              <span>Present</span>
             </div>
-            <div className="world-card__info">
-              <div className="world-card__name">Strategy Sprint Q3</div>
-              <div className="world-card__date">Active workspace</div>
+            <div className="home-preview__frame">
+              <span className="home-preview__frame-label">Project Learning Board</span>
+              <div className="preview-node preview-node--question">
+                <strong>Question</strong>
+                <p>What should the team understand?</p>
+              </div>
+              <div className="preview-node preview-node--evidence">
+                <strong>Evidence</strong>
+                <p>Notes, examples, screenshots, maps, and code.</p>
+              </div>
+              <div className="preview-node preview-node--decision">
+                <strong>Decision</strong>
+                <p>What changes after we connect the facts?</p>
+              </div>
+              <div className="preview-shape">
+                <span>Goal</span>
+              </div>
+              <svg className="preview-relations" viewBox="0 0 780 440" aria-hidden="true">
+                <path className="preview-relation preview-relation--blue" d="M182 168 C270 112 396 112 488 160" />
+                <path className="preview-relation preview-relation--green" d="M564 226 C526 312 420 348 302 314" />
+                <path className="preview-relation preview-relation--pink" d="M256 284 C208 260 180 230 166 194" />
+              </svg>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
+        <section className="home-loop" aria-label="Canvio workflow">
+          {PRODUCT_STEPS.map((step) => (
+            <div className="home-loop__item" key={step.title}>
+              <HomeGlyph value={step.glyph} />
+              <h3>{step.title}</h3>
+              <p>{step.text}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="home-start">
+          <div className="home-section-heading">
+            <span className="home-section-kicker">Start your way</span>
+            <h2>No blank-page panic.</h2>
+            <p>Choose a board entry point that matches how much structure you want right now.</p>
+          </div>
+          <div className="home-start__grid">
+            {START_OPTIONS.map((option) => (
+              <button className="home-start-card" key={option.title} onClick={() => handleStartOption(option.action)}>
+                <HomeGlyph value={option.glyph} />
+                <span>
+                  <strong>{option.title}</strong>
+                  <small>{option.text}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="home-use-cases">
+          <div className="home-section-heading">
+            <span className="home-section-kicker">Built for real work</span>
+            <h2>One canvas, many jobs.</h2>
+            <p>The landing page should not make Canvio feel like only a map tool or only an AI tool. It is a flexible workspace.</p>
+          </div>
+          <div className="home-use-cases__grid">
+            {USE_CASES.map((item) => (
+              <div className="home-use-card" key={item.title}>
+                <HomeGlyph value={item.glyph} />
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="home-cta-band">
+          <div>
+            <span className="home-section-kicker">Ready when you are</span>
+            <h2>Open the canvas and start moving ideas around.</h2>
+          </div>
+          <div className="home-cta-band__actions">
+            <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
+              <HomeGlyph value="+" />
+              <span>Launch Canvas</span>
+            </button>
+            <button className="home-btn-secondary" onClick={() => navigate('/how-it-works')}>
+              <HomeGlyph value="HW" />
+              <span>How it works</span>
+            </button>
+          </div>
+        </section>
+      </main>
+
       <footer className="home-footer">
         <div className="home-footer__brand">
           <CanvioLogoIcon size={20} />
-          <span>Canvio — Connect ideas. Create knowledge.</span>
+          <span>Canvio - Connect ideas. Create knowledge.</span>
         </div>
         <div className="home-footer__links">
           <button className="home-footer__link" onClick={() => navigate('/support')}>Support Canvio</button>
-          <span className="home-footer__divider">•</span>
-          <span className="home-footer__link">AGPL-3.0 License</span>
-          <span className="home-footer__divider">•</span>
-          <span className="home-footer__link">Privacy</span>
+          <button className="home-footer__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
         </div>
       </footer>
     </div>

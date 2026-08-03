@@ -9,9 +9,11 @@ import './NodeRenderer.css';
 
 interface Props {
   node: LivingNode;
+  presentationMode?: boolean;
+  focusNodeId?: string | null;
 }
 
-export function NodeRenderer({ node }: Props) {
+export function NodeRenderer({ node, presentationMode = false, focusNodeId = null }: Props) {
   const updateNode = useCanvasStore(s => s.updateNode);
   const snapshot = useCanvasStore(s => s.snapshot);
   const isSelected = useCanvasStore(useCallback(s => s.selectedNodeIds.includes(node.id), [node.id]));
@@ -35,6 +37,8 @@ export function NodeRenderer({ node }: Props) {
   const isRelationTarget = activeTool === 'relation' &&
     relationTargetId === node.id &&
     (relationSourceId !== node.id || relationTargetPort !== relationSourcePort);
+  const isFocusDimmed = Boolean(focusNodeId && focusNodeId !== node.id);
+  const isFocusActive = focusNodeId === node.id;
 
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number, y: number } | null>(null);
@@ -106,6 +110,13 @@ export function NodeRenderer({ node }: Props) {
     ) {
       return;
     }
+
+    if (presentationMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      selectNode(node.id, e.shiftKey);
+      return;
+    }
     
     // Eraser Tool
     if (activeTool === 'eraser') {
@@ -141,15 +152,16 @@ export function NodeRenderer({ node }: Props) {
     // Text fields and editable inputs:
     const targetTag = target.tagName.toLowerCase();
     const isEditingField = targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file') || Boolean(target.closest('.shape-node__textarea, .sticky-note__textarea, .text-node__editor, .code-node__textarea'));
+    const isStickyTextarea = Boolean(target.closest('.sticky-note__textarea'));
     const isClickableTarget = Boolean(target.closest('.image-node__placeholder, .image-node__replace-btn, .image-node--empty'));
 
-    if (isEditingField) {
+    if (isEditingField && (!isStickyTextarea || document.activeElement === target)) {
       e.stopPropagation();
       selectNode(node.id, e.shiftKey);
       return;
     }
 
-    if (isClickableTarget) {
+    if (isClickableTarget || isStickyTextarea) {
       e.preventDefault();
       pendingTapEditTargetRef.current = target;
     } else {
@@ -172,7 +184,7 @@ export function NodeRenderer({ node }: Props) {
       dragStartRef.current = { x: e.clientX, y: e.clientY };
       originalNodePosRef.current = { x: node.position.x, y: node.position.y };
     }
-  }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationSourcePort, relationTargetId, relationTargetPort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode, snapshot, node.position]);
+  }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationSourcePort, relationTargetId, relationTargetPort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode, snapshot, node.position, presentationMode]);
 
   const rafIdRef = useRef<number | null>(null);
 
@@ -460,7 +472,7 @@ export function NodeRenderer({ node }: Props) {
 
   return (
     <div
-      className={`node-renderer node-type-${node.type} ${isSelected ? 'selected' : ''} ${isRelationSource ? 'relation-source' : ''} ${isRelationTarget ? 'relation-target' : ''} ${activeTool === 'relation' ? 'relation-mode' : ''} ${isInteractionBusy ? 'is-interacting' : ''}`}
+      className={`node-renderer node-type-${node.type} ${isSelected ? 'selected' : ''} ${isRelationSource ? 'relation-source' : ''} ${isRelationTarget ? 'relation-target' : ''} ${!presentationMode && activeTool === 'relation' ? 'relation-mode' : ''} ${isInteractionBusy ? 'is-interacting' : ''} ${presentationMode ? 'presentation-mode' : ''} ${isFocusDimmed ? 'focus-dimmed' : ''} ${isFocusActive ? 'focus-active' : ''}`}
       style={{
         transform: `translate(${node.position.x}px, ${node.position.y}px)`,
         width: node.size.width,
@@ -481,7 +493,7 @@ export function NodeRenderer({ node }: Props) {
             node={node as any}
             selected={isSelected}
             onChange={updateNode as any}
-            relationMode={activeTool === 'relation'}
+            relationMode={!presentationMode && activeTool === 'relation'}
             relationSourcePort={relationSourceId === node.id ? relationSourcePort : null}
             onMarkerRelation={handleMarkerRelation}
             onMarkerRelationHover={handleMarkerRelationHover}
@@ -495,7 +507,7 @@ export function NodeRenderer({ node }: Props) {
       </div>
 
       {/* Interactive Connection Ports (rendered on hover, selection, or relation mode) */}
-      {(isHovered || isSelected || activeTool === 'relation') && (
+      {!presentationMode && (isHovered || isSelected || activeTool === 'relation') && (
         <>
           <div className={`node-port top ${relationSourcePort === 'top' || (isRelationTarget && relationTargetPort === 'top') ? 'active' : ''}`} title="Top connection" onMouseEnter={handlePortEnter('top')} onPointerEnter={handlePortEnter('top')} onPointerDown={handlePortStart('top')} />
           <div className={`node-port right ${relationSourcePort === 'right' || (isRelationTarget && relationTargetPort === 'right') ? 'active' : ''}`} title="Right connection" onMouseEnter={handlePortEnter('right')} onPointerEnter={handlePortEnter('right')} onPointerDown={handlePortStart('right')} />
@@ -505,9 +517,9 @@ export function NodeRenderer({ node }: Props) {
       )}
 
       {/* Floating Context Toolbar (NodeInspector) */}
-      {isOnlySelected && <NodeInspector node={node} />}
+      {!presentationMode && isOnlySelected && <NodeInspector node={node} />}
 
-      {isSelected && !node.locked && (
+      {!presentationMode && isSelected && !node.locked && (
         <>
           <div className="resize-handle tl" onPointerDown={handleResizeStart('tl')} />
           <div className="resize-handle tr" onPointerDown={handleResizeStart('tr')} />

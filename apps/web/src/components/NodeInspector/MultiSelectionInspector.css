@@ -50,3 +50,21 @@
   background: var(--border-subtle);
   margin: 0 4px;
 }
+
+@media (pointer: coarse) {
+  .multi-selection-inspector .inspector-panel {
+    gap: 6px;
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  .multi-selection-inspector .inspector-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+  }
+
+  .multi-selection-inspector .inspector-divider {
+    height: 28px;
+  }
+}

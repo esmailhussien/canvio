@@ -30,6 +30,8 @@ const PRIMARY_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?:
   { id: 'select', icon: IconSelect, label: 'Select (V)', group: '1' },
   { id: 'pan', icon: IconPan, label: 'Pan (Space)', group: '1' },
   { id: 'draw', icon: IconDraw, label: 'Draw (P)', group: '2' },
+  { id: 'highlighter', icon: IconHighlighter, label: 'Highlighter (K)', group: '2' },
+  { id: 'arrow', icon: IconArrowTool, label: 'Arrow (A)', group: '2' },
   { id: 'text', icon: IconText, label: 'Text (T)', group: '3' },
   { id: 'sticky', icon: IconSticky, label: 'Sticky (S)', group: '3' },
   { id: 'shape', icon: IconShape, label: 'Shape (R)', group: '3' },
@@ -37,8 +39,6 @@ const PRIMARY_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?:
 ];
 
 const ADVANCED_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?: string }[] = [
-  { id: 'highlighter', icon: IconHighlighter, label: 'Highlighter (K)', group: 'ink' },
-  { id: 'arrow', icon: IconArrowTool, label: 'Arrow (A)', group: 'ink' },
   { id: 'eraser', icon: IconEraser, label: 'Eraser (E)', group: 'ink' },
   { id: 'image', icon: IconImage, label: 'Image (I)', group: '3' },
   { id: 'frame', icon: IconFrame, label: 'Frame (F)', group: '3' },
@@ -81,6 +81,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
 
   return (
     <div className="canvio-toolbar-container canvio-toolbar-enter" ref={toolbarRef}>
+      {isMoreOpen && (
+        <div className="canvio-toolbar-more__menu" role="menu" aria-label="Advanced tools">
+          {ADVANCED_TOOLS.map((tool) => renderToolButton(tool, true))}
+        </div>
+      )}
+
       <div className="canvio-toolbar">
         {PRIMARY_TOOLS.map((tool, index) => {
           const isNextDifferentGroup = index < PRIMARY_TOOLS.length - 1 && PRIMARY_TOOLS[index + 1].group !== tool.group;
@@ -107,12 +113,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
               <IconMoreHorizontal size={20} />
             </button>
           </Tooltip>
-
-          {isMoreOpen && (
-            <div className="canvio-toolbar-more__menu" role="menu" aria-label="Advanced tools">
-              {ADVANCED_TOOLS.map((tool) => renderToolButton(tool, true))}
-            </div>
-          )}
         </div>
       </div>
     </div>

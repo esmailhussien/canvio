@@ -31,6 +31,7 @@ interface CanvasStore {
   removeNodes: (ids: string[]) => void;
   removeNodeRemote: (id: string) => void;
   duplicateNode: (id: string) => void;
+  branchSelectionAsExperiment: () => void;
   bringToFront: (id: string) => void;
   sendToBack: (id: string) => void;
   toggleLockNode: (id: string) => void;
@@ -270,6 +271,60 @@ export const useCanvasStore = create(
       future: [],
       nodes: { ...s.nodes, [newId]: duplicated },
       selectedNodeIds: [newId]
+    };
+  }),
+  branchSelectionAsExperiment: () => set((s) => {
+    const selectedNodes = s.selectedNodeIds.map((id) => s.nodes[id]).filter(Boolean);
+    if (selectedNodes.length === 0) return s;
+
+    const minX = Math.min(...selectedNodes.map((n) => n.position.x));
+    const maxX = Math.max(...selectedNodes.map((n) => n.position.x + n.size.width));
+    const offset = { x: Math.max(320, maxX - minX + 140), y: 36 };
+    const maxZ = Object.values(s.nodes).reduce((max, n) => Math.max(max, n.zIndex), 0);
+    const idMap = new Map<string, string>();
+    const newNodes: Record<string, LivingNode> = {};
+
+    selectedNodes.forEach((node, index) => {
+      const newId = nanoid(10);
+      idMap.set(node.id, newId);
+      newNodes[newId] = {
+        ...node,
+        id: newId,
+        position: {
+          x: node.position.x + offset.x,
+          y: node.position.y + offset.y,
+        },
+        zIndex: maxZ + index + 1,
+        data: typeof structuredClone === 'function'
+          ? structuredClone(node.data)
+          : JSON.parse(JSON.stringify(node.data ?? {})),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+    });
+
+    const newRelations: Record<string, Relation> = {};
+    Object.values(s.relations).forEach((relation) => {
+      const sourceId = idMap.get(relation.sourceId);
+      const targetId = idMap.get(relation.targetId);
+      if (!sourceId || !targetId) return;
+      const newId = nanoid(10);
+      newRelations[newId] = {
+        ...relation,
+        id: newId,
+        sourceId,
+        targetId,
+      };
+    });
+
+    return {
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      future: [],
+      nodes: { ...s.nodes, ...newNodes },
+      relations: { ...s.relations, ...newRelations },
+      selectedNodeIds: Object.keys(newNodes),
+      selectedRelationId: null,
+      activeTool: 'select',
     };
   }),
   bringToFront: (id) => set((s) => {

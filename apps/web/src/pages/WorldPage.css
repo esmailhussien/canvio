@@ -522,6 +522,82 @@
   color: var(--accent-primary, #8083ff);
 }
 
+.world-page.is-presenting {
+  cursor: grab;
+}
+
+.presentation-controls {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-toolbar) + 2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--glass-bg) 92%, transparent);
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.24);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.presentation-control-btn {
+  min-width: 72px;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 750;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+.presentation-control-btn .material-symbols-outlined {
+  width: 20px;
+  min-width: 20px;
+  font-size: 19px;
+  line-height: 1;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.presentation-control-btn > span {
+  pointer-events: none;
+}
+
+.presentation-control-btn:hover:not(:disabled),
+.presentation-control-btn:focus-visible {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.presentation-control-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.presentation-control-btn--primary {
+  background: color-mix(in srgb, var(--accent-primary) 18%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--accent-primary) 42%, var(--border-subtle));
+}
+
 .template-trigger-btn--icon {
   width: 40px !important;
   min-width: 40px !important;
@@ -661,6 +737,23 @@
     width: 300px;
     height: 300px;
   }
+
+  .presentation-controls {
+    top: 10px;
+    width: calc(100vw - 20px);
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 14px;
+  }
+
+  .presentation-control-btn {
+    min-width: 0;
+    flex: 1 1 0;
+    height: 46px;
+    padding: 0 8px;
+    font-size: 0.78rem;
+  }
 }
 
 @media (max-width: 520px) {
@@ -699,7 +792,8 @@
   }
 
   .canvio-menu-item,
-  .world-page__starter-card {
+  .world-page__starter-card,
+  .presentation-control-btn {
     min-height: 44px;
     touch-action: manipulation;
   }

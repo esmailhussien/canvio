@@ -36,6 +36,16 @@ export function useCollaboration(worldId: string) {
 
   useEffect(() => {
     if (!worldId) return;
+    const currentStore = useCanvasStore.getState();
+    currentStore.replaceWorld({
+      nodes: {},
+      relations: {},
+      viewport: { x: 0, y: 0, zoom: 1 },
+      appearance: {
+        theme: currentStore.theme,
+        canvasBackground: currentStore.canvasBackground,
+      },
+    });
 
     // Create Yjs Doc
     const doc = new Y.Doc();
@@ -393,4 +403,3 @@ export function useCollaboration(worldId: string) {
 
   return { connected, users, provider };
 }
-

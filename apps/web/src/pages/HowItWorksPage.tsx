@@ -1,42 +1,130 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { nanoid } from 'nanoid';
+import { createBoard } from '../utils/api';
 import { useCanvasStore } from '../store/canvasStore';
 import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
 import { IconTheme } from '@canvio/ui';
 import './HowItWorksPage.css';
 
-type FeatureTab = 'spatial-nodes' | 'gesture-ink' | 'spatial-ai' | 'pdf-collab';
+type FeatureTab = 'start' | 'build' | 'connect' | 'deliver';
+
+function GuideGlyph({ value, color }: { value: string; color?: string }) {
+  return (
+    <span className="guide-glyph" style={color ? { color } : undefined} aria-hidden="true">
+      {value}
+    </span>
+  );
+}
+
+const TAB_CONTENT: Record<FeatureTab, {
+  icon: string;
+  label: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  points: Array<{ glyph: string; title: string; text: string; color: string }>;
+}> = {
+  start: {
+    icon: '+',
+    label: 'Start',
+    eyebrow: '01 / Begin anywhere',
+    title: 'Open a blank board, use a model, or ask AI to draft the first structure.',
+    description: 'Canvio should feel familiar from the first click: choose a blank canvas, a ready-made board, or a guided AI start without learning a complicated workflow.',
+    points: [
+      { glyph: 'B', title: 'Blank canvas', text: 'Start from scratch when the idea is still open and messy.', color: '#38bdf8' },
+      { glyph: 'M', title: 'Ready-made models', text: 'Use lesson, study, strategy, flow, and planning boards as clean starting points.', color: '#22c55e' },
+      { glyph: 'AI', title: 'AI first draft', text: 'Ask the navigator to create a useful board structure from a prompt.', color: '#a855f7' },
+      { glyph: 'T', title: 'Readable themes', text: 'Switch dark, light, and board background colors for different rooms and devices.', color: '#f59e0b' },
+    ],
+  },
+  build: {
+    icon: 'B',
+    label: 'Build',
+    eyebrow: '02 / Think visually',
+    title: 'Add notes, shapes, ink, highlights, frames, maps, images, and code as living objects.',
+    description: 'Everything on the canvas is an object you can move, resize, connect, focus, present, export, or reuse. The board stays flexible without becoming chaotic.',
+    points: [
+      { glyph: 'N', title: 'Notes and text', text: 'Capture ideas quickly, then edit and arrange them like real whiteboard material.', color: '#facc15' },
+      { glyph: 'P', title: 'Pen and highlighter', text: 'Draw, mark, annotate, and turn rough shapes or arrows into cleaner visual elements.', color: '#ef4444' },
+      { glyph: 'F', title: 'Frames and pages', text: 'Wrap content into pages, sections, lessons, slides, or export-ready groups.', color: '#6366f1' },
+      { glyph: 'O', title: 'Rich objects', text: 'Bring in maps, images, code, and structured blocks when the board needs more than text.', color: '#06b6d4' },
+    ],
+  },
+  connect: {
+    icon: 'C',
+    label: 'Connect',
+    eyebrow: '03 / Make meaning',
+    title: 'Draw relationships between ideas, places, decisions, activities, and evidence.',
+    description: 'Relations are not decoration. They explain cause, sequence, proof, dependency, and flow. Smart routing keeps connections readable as the board changes.',
+    points: [
+      { glyph: '->', title: 'Dynamic arrows', text: 'Connect objects with readable routed lines that avoid important content.', color: '#38bdf8' },
+      { glyph: 'L', title: 'Meaningful labels', text: 'Name the relation: starts with, proves, prepares, depends on, or reveals.', color: '#f472b6' },
+      { glyph: 'PIN', title: 'Pin-level context', text: 'Map pins can act like real canvas anchors for site visits and place-based work.', color: '#22c55e' },
+      { glyph: 'F', title: 'Focus mode', text: 'Spotlight one object and its connected context during review or teaching.', color: '#a855f7' },
+    ],
+  },
+  deliver: {
+    icon: 'D',
+    label: 'Deliver',
+    eyebrow: '04 / Share the result',
+    title: 'Present, collaborate, export, and keep the board useful after the session ends.',
+    description: 'A good whiteboard is not only a place to draw. It becomes a lesson artifact, study map, meeting record, planning document, or shared reference.',
+    points: [
+      { glyph: 'P', title: 'Present mode', text: 'Hide editing tools, focus the discussion, and move through the board calmly.', color: '#6366f1' },
+      { glyph: 'CO', title: 'Live collaboration', text: 'Share a board URL and work together with cursors, selection, and presence.', color: '#22c55e' },
+      { glyph: 'PDF', title: 'PDF pages', text: 'Export frame pages for lessons, reports, handouts, and structured documents.', color: '#ef4444' },
+      { glyph: 'EX', title: 'PNG and JSON', text: 'Save visuals or portable board data when you need to reuse or archive work.', color: '#f59e0b' },
+    ],
+  },
+};
+
+const CORE_STEPS: Array<{ id: FeatureTab; glyph: string; title: string; text: string }> = [
+  { id: 'start', glyph: '01', title: 'Start', text: 'Blank, model, or AI draft.' },
+  { id: 'build', glyph: '02', title: 'Add', text: 'Notes, shapes, ink, frames, media.' },
+  { id: 'connect', glyph: '03', title: 'Connect', text: 'Relations show how ideas work.' },
+  { id: 'deliver', glyph: '04', title: 'Use', text: 'Present, share, export, revisit.' },
+];
+
+const USE_CASES = [
+  { glyph: 'ED', title: 'Teach a lesson', text: 'Plan the flow, show relationships, focus the class, and export the result.' },
+  { glyph: 'ST', title: 'Study a topic', text: 'Turn a messy subject into a concept map with examples and review prompts.' },
+  { glyph: 'PR', title: 'Plan a project', text: 'Map goals, dependencies, decisions, risks, and delivery steps in one place.' },
+  { glyph: 'MAP', title: 'Work with places', text: 'Use maps when location matters, without making the whole product only about maps.' },
+];
 
 export function HowItWorksPage() {
   const navigate = useNavigate();
   const theme = useCanvasStore((s) => s.theme);
   const toggleTheme = useCanvasStore((s) => s.toggleTheme);
-  const [activeTab, setActiveTab] = useState<FeatureTab>('spatial-nodes');
+  const [activeTab, setActiveTab] = useState<FeatureTab>('start');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  const handleCreateWorld = () => {
+    const newId = nanoid(10);
+    createBoard().catch(() => {});
+    navigate(`/w/${newId}`);
+  };
+
+  const tab = TAB_CONTENT[activeTab];
+
   return (
     <div className="guide-page dot-grid">
-      {/* Navigation Bar */}
       <nav className="guide-nav">
-        <div className="guide-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+        <button className="guide-logo" onClick={() => navigate('/')} aria-label="Go to home">
           <CanvioLogoIcon size={26} />
           <span className="guide-logo__text">Canvio</span>
-        </div>
+        </button>
         <div className="guide-nav__links">
-          <button className="guide-nav__link" onClick={() => navigate('/')}>
-            Workspace
-          </button>
-          <button className="guide-nav__link" onClick={() => navigate('/how-it-works')}>
-            How It Works
-          </button>
-          <button className="guide-nav__link" onClick={() => navigate('/support')}>
-            Support
-          </button>
-          <button className="guide-btn-primary" onClick={() => navigate('/w/demo-workspace')}>
-            + Launch Canvas
+          <button className="guide-nav__link" onClick={() => navigate('/')}>Workspace</button>
+          <button className="guide-nav__link active" onClick={() => navigate('/how-it-works')}>How It Works</button>
+          <button className="guide-nav__link" onClick={() => navigate('/support')}>Support</button>
+          <button className="guide-btn-primary" onClick={handleCreateWorld}>
+            <GuideGlyph value="+" />
+            <span>Launch Canvas</span>
           </button>
           <button
             className="guide-theme-btn"
@@ -49,402 +137,169 @@ export function HowItWorksPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <header className="guide-hero">
-        <div className="guide-hero__badge">
-          <span className="material-symbols-outlined text-sm" style={{ color: '#6366f1' }}>school</span>
-          <span>Interactive Feature Guide & Capabilities</span>
+        <div className="guide-hero__copy">
+          <div className="guide-hero__badge">
+            <GuideGlyph value="ED" />
+            <span>Simple enough to start. Powerful enough to keep thinking.</span>
+          </div>
+          <h1 className="guide-hero__title">How Canvio works</h1>
+          <p className="guide-hero__subtitle">
+            Canvio is a visual knowledge workspace: start with a board, add living elements, connect the meaning, then present or export the result.
+          </p>
+          <div className="guide-hero__actions">
+            <button className="guide-btn-action" onClick={handleCreateWorld}>
+              <GuideGlyph value="GO" />
+              <span>Start a blank board</span>
+            </button>
+            <button className="guide-btn-secondary" onClick={() => navigate(`/w/demo-${nanoid(6)}`)}>
+              <GuideGlyph value="DE" />
+              <span>Open demo board</span>
+            </button>
+          </div>
         </div>
-        <h1 className="guide-hero__title">
-          Master <span>Canvio</span> in Minutes
-        </h1>
-        <p className="guide-hero__subtitle">
-          An intuitive visual workspace combining spatial AI, vector drawing, living maps, and multi-page PDF generation.
-        </p>
+
+        <div className="guide-hero__preview" aria-hidden="true">
+          <div className="preview-frame">
+            <div className="preview-frame__label">Lesson, project, map, or research board</div>
+            <div className="preview-card preview-card--yellow">
+              <strong>Question</strong>
+              <span>What are we trying to understand?</span>
+            </div>
+            <div className="preview-card preview-card--blue">
+              <strong>Evidence</strong>
+              <span>Notes, maps, images, code, and examples.</span>
+            </div>
+            <div className="preview-card preview-card--green">
+              <strong>Outcome</strong>
+              <span>Present, share, export, revisit.</span>
+            </div>
+            <svg className="preview-lines" viewBox="0 0 620 360">
+              <path d="M150 138 C235 98 310 102 392 132" />
+              <path d="M396 178 C344 260 272 278 178 242" />
+              <path d="M178 214 C236 200 296 202 346 212" />
+            </svg>
+          </div>
+        </div>
       </header>
 
-      {/* Feature Selector Tabs */}
-      <div className="guide-tabs-nav">
-        <button
-          className={`guide-tab-btn ${activeTab === 'spatial-nodes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('spatial-nodes')}
-        >
-          <span className="material-symbols-outlined">space_dashboard</span>
-          <span>Spatial Nodes</span>
-        </button>
-        <button
-          className={`guide-tab-btn ${activeTab === 'gesture-ink' ? 'active' : ''}`}
-          onClick={() => setActiveTab('gesture-ink')}
-        >
-          <span className="material-symbols-outlined">edit</span>
-          <span>Smart Gesture Ink</span>
-        </button>
-        <button
-          className={`guide-tab-btn ${activeTab === 'spatial-ai' ? 'active' : ''}`}
-          onClick={() => setActiveTab('spatial-ai')}
-        >
-          <span className="material-symbols-outlined">auto_awesome</span>
-          <span>Spatial AI</span>
-        </button>
-        <button
-          className={`guide-tab-btn ${activeTab === 'pdf-collab' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pdf-collab')}
-        >
-          <span className="material-symbols-outlined">group</span>
-          <span>Multiplayer & PDF</span>
-        </button>
-      </div>
-
-      {/* Main Guide Content */}
       <main className="guide-main">
-        {/* TAB 1: SPATIAL NODES */}
-        {activeTab === 'spatial-nodes' && (
-          <section className="guide-feature-detail fade-in">
+        <section className="guide-loop">
+          {CORE_STEPS.map((step, index) => (
+            <button
+              className={`guide-loop__step ${activeTab === step.id ? 'active' : ''}`}
+              key={step.title}
+              onClick={() => setActiveTab(step.id)}
+              aria-label={`Show ${step.title} details`}
+            >
+              <span className="guide-loop__index">{index + 1}</span>
+              <GuideGlyph value={step.glyph} />
+              <h3>{step.title}</h3>
+              <p>{step.text}</p>
+            </button>
+          ))}
+        </section>
+
+        <section className="guide-explorer">
+          <div className="guide-tabs-nav" role="tablist" aria-label="Canvio workflow">
+            {(Object.keys(TAB_CONTENT) as FeatureTab[]).map((id) => (
+              <button
+                key={id}
+                className={`guide-tab-btn ${activeTab === id ? 'active' : ''}`}
+                onClick={() => setActiveTab(id)}
+                role="tab"
+                aria-selected={activeTab === id}
+              >
+                <GuideGlyph value={TAB_CONTENT[id].icon} />
+                <span>{TAB_CONTENT[id].label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="guide-feature-detail fade-in">
             <div className="guide-detail__info">
-              <span className="guide-detail__tag">01 / Infinite Canvas</span>
-              <h2>Flexible Spatial Nodes & Living Embeds</h2>
-              <p>
-                Break free from linear documents. Canvio lets you position, organize, and nest diverse node types across an infinite 2D plane:
-              </p>
-
-              <div className="capabilities-grid">
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#f59e0b' }}>sticky_note_2</span>
-                  <h4>Sticky Notes & Markdown</h4>
-                  <p>Capture quick thoughts, color-code ideas, and format rich text with full GFM Markdown support.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#6366f1' }}>map</span>
-                  <h4>Living Map Embeds</h4>
-                  <p>Embed interactive spatial Leaflet maps with custom coordinates, markers, and live tile layers.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#10b981' }}>code</span>
-                  <h4>Executable Code Snippets</h4>
-                  <p>Write and display code with automatic syntax highlighting and execution wrappers.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#ec4899' }}>crop_free</span>
-                  <h4>Frames & Sectioning</h4>
-                  <p>Group related objects inside frames for clean multi-page document pagination and exports.</p>
-                </div>
-              </div>
+              <span className="guide-detail__tag">{tab.eyebrow}</span>
+              <h2>{tab.title}</h2>
+              <p>{tab.description}</p>
             </div>
 
-            {/* Visual Canvas Demo Container */}
-            <div className="guide-detail__visual-canvas">
-              <div className="visual-canvas-header">
-                <div className="visual-canvas-dots">
-                  <span />
-                  <span />
-                  <span />
+            <div className="capabilities-grid">
+              {tab.points.map((point) => (
+                <div className="cap-card" key={point.title}>
+                  <GuideGlyph value={point.glyph} color={point.color} />
+                  <h4>{point.title}</h4>
+                  <p>{point.text}</p>
                 </div>
-                <div className="visual-canvas-title">Infinite Canvas — Spatial Preview</div>
-                <span className="material-symbols-outlined text-xs opacity-50">pan_tool</span>
-              </div>
-              <div className="visual-canvas-body dot-grid">
-                <div className="visual-node demo-sticky">
-                  <div className="visual-node-bar">
-                    <span>Sticky Note</span>
-                    <span className="material-symbols-outlined text-xs">pin</span>
-                  </div>
-                  <div className="visual-node-content">
-                    💡 <strong>Architecture Goal Q3</strong>
-                    <p>Decouple node rendering logic into high-performance web workers.</p>
-                  </div>
-                </div>
-
-                <div className="visual-node demo-map">
-                  <div className="visual-node-bar">
-                    <span>Living Map Widget</span>
-                    <span className="material-symbols-outlined text-xs text-indigo-400">location_on</span>
-                  </div>
-                  <div className="visual-node-map-bg">
-                    <span className="material-symbols-outlined text-2xl text-indigo-400">my_location</span>
-                    <span>San Francisco Hub</span>
-                  </div>
-                </div>
-
-                <div className="visual-connector-line">
-                  <span className="material-symbols-outlined text-sm text-indigo-400">arrow_forward</span>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* TAB 2: SMART GESTURE INK */}
-        {activeTab === 'gesture-ink' && (
-          <section className="guide-feature-detail fade-in">
-            <div className="guide-detail__info">
-              <span className="guide-detail__tag">02 / Gesture Engine</span>
-              <h2>Ink-to-Shape & Gesture Arrow Recognition</h2>
-              <p>
-                Draw naturally with a mouse, stylus, or touch screen. Canvio's smart gesture engine translates hand-drawn strokes into perfect vector geometry.
-              </p>
-
-              <div className="capabilities-grid">
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#3b82f6' }}>gesture</span>
-                  <h4>Ink-to-Shape Conversion</h4>
-                  <p>Draw a rough circle, rectangle, or diamond; Canvio instantly snaps it into clean vector paths.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#8b5cf6' }}>trending_flat</span>
-                  <h4>Gesture Connections</h4>
-                  <p>Draw a single line stroke between any two nodes to create an intelligent routed arrow.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#ec4899' }}>brush</span>
-                  <h4>Pressure Vector Strokes</h4>
-                  <p>Smooth, pressure-sensitive freehand ink powered by optimized Bezier curve interpolation.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#f59e0b' }}>polyline</span>
-                  <h4>Polyline Routing</h4>
-                  <p>Connection lines automatically adjust and re-route as you move or resize canvas nodes.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Visual Ink Demo */}
-            <div className="guide-detail__visual-canvas">
-              <div className="visual-canvas-header">
-                <div className="visual-canvas-dots">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <div className="visual-canvas-title">Gesture Engine — Live Stroke Snap</div>
-              </div>
-              <div className="visual-canvas-body dot-grid center-content">
-                <div className="visual-sketch-demo">
-                  <div className="rough-sketch">
-                    <span className="sketch-label">Hand Sketch</span>
-                    <div className="rough-box">✏️ Rough Circle</div>
-                  </div>
-                  <span className="material-symbols-outlined snap-arrow">east</span>
-                  <div className="snapped-shape">
-                    <span className="sketch-label">Vector Snap</span>
-                    <div className="perfect-circle">
-                      <span className="material-symbols-outlined text-emerald-400">check</span>
-                      <span>Vector Path</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* TAB 3: SPATIAL AI */}
-        {activeTab === 'spatial-ai' && (
-          <section className="guide-feature-detail fade-in">
-            <div className="guide-detail__info">
-              <span className="guide-detail__tag">03 / AI Co-Pilot & BYOK</span>
-              <h2>Spatial AI Engine, BYOK & Auto-Synthesis</h2>
-              <p>
-                Use AI as an active spatial collaborator. Connect your own API keys (Google Gemini, OpenAI, or Anthropic Claude) with zero server tracking, and transform your infinite canvas into structured knowledge.
-              </p>
-
-              <div className="capabilities-grid">
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#a855f7' }}>key</span>
-                  <h4>Bring Your Own Key (BYOK)</h4>
-                  <p>Support for Google Gemini (2.5 & 3 Flash/Pro), OpenAI (GPT-4o), and Anthropic Claude with local, private key storage.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#6366f1' }}>summarize</span>
-                  <h4>✨ Summarize & Research Papers</h4>
-                  <p>Summarize the entire canvas into executive boards or academic research paper outlines (Abstract, Methodology, Findings, Conclusion).</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#06b6d4' }}>auto_awesome</span>
-                  <h4>✨ AI Expand & Brainstorm</h4>
-                  <p>Click any node to spawn 3 related sub-topics and automatically link them with labeled semantic relations.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#10b981' }}>grid_view</span>
-                  <h4>✨ Organize & Cluster</h4>
-                  <p>Group messy whiteboard notes into thematic, color-coded section frames automatically on command.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Visual AI Demo */}
-            <div className="guide-detail__visual-canvas">
-              <div className="visual-canvas-header">
-                <div className="visual-canvas-dots">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <div className="visual-canvas-title">Spatial AI — BYOK Engine & Brainstorming</div>
-              </div>
-              <div className="visual-canvas-body dot-grid">
-                <div className="visual-ai-prompt">
-                  <span className="material-symbols-outlined text-purple-400">auto_awesome</span>
-                  <span>"Google Gemini 2.5 Flash • BYOK Connected"</span>
-                </div>
-                <div className="visual-ai-results">
-                  <div className="ai-node">✨ AI Executive Summary</div>
-                  <div className="ai-node">⚡ Key Decisions & Risks</div>
-                  <div className="ai-node">🎓 Academic Research Paper</div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* TAB 4: MULTIPLAYER & PDF */}
-        {activeTab === 'pdf-collab' && (
-          <section className="guide-feature-detail fade-in">
-            <div className="guide-detail__info">
-              <span className="guide-detail__tag">04 / Export & Sync</span>
-              <h2>Real-Time Multiplayer & A4 Multi-Page PDF</h2>
-              <p>
-                Collaborate seamlessly in real-time with zero signup required, then export your canvas into production-ready PDF documents.
-              </p>
-
-              <div className="capabilities-grid">
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#ec4899' }}>group</span>
-                  <h4>Multiplayer Cursors</h4>
-                  <p>Real-time cursor presence, selection highlights, and zero-latency YJS WebSocket synchronization.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#ef4444' }}>picture_as_pdf</span>
-                  <h4>Multi-Page A4 PDF Export</h4>
-                  <p>Export canvas frames into crisp, multi-page vector A4 PDFs for reports and presentations.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#10b981' }}>share</span>
-                  <h4>Zero-Signup Share Links</h4>
-                  <p>Share a simple URL to let anyone join and contribute immediately without friction.</p>
-                </div>
-                <div className="cap-card">
-                  <span className="material-symbols-outlined cap-icon" style={{ color: '#f59e0b' }}>file_download</span>
-                  <h4>High-Res PNG & SVG</h4>
-                  <p>Export individual nodes, selected frames, or the full canvas in PNG or scalable SVG formats.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Visual Collab & PDF Demo */}
-            <div className="guide-detail__visual-canvas">
-              <div className="visual-canvas-header">
-                <div className="visual-canvas-dots">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <div className="visual-canvas-title">Multiplayer & Vector PDF Export</div>
-              </div>
-              <div className="visual-canvas-body dot-grid center-content">
-                <div className="visual-pdf-preview-box">
-                  <div className="pdf-page-mockup">
-                    <span className="pdf-page-num">Page 1 / A4</span>
-                    <div className="pdf-page-content">
-                      <div className="pdf-line long" />
-                      <div className="pdf-line short" />
-                      <div className="pdf-line medium" />
-                    </div>
-                  </div>
-                  <div className="pdf-action-tag">
-                    <span className="material-symbols-outlined text-red-400">picture_as_pdf</span>
-                    <span>100% Vector PDF Output</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Pro Tips Section */}
-        <section className="guide-protips-section">
-          <h2>
-            <span className="material-symbols-outlined text-amber-400">tips_and_updates</span>
-            <span>Pro Tips for Power Users</span>
-          </h2>
-          <div className="protips-grid">
-            <div className="protip-card">
-              <div className="protip-icon">💡</div>
-              <h4>Frame Page Layouts for PDF</h4>
-              <p>Wrap related notes in an A4 Aspect Frame before exporting to ensure perfectly formatted pages.</p>
-            </div>
-            <div className="protip-card">
-              <div className="protip-icon">⚡</div>
-              <h4>Instant Arrow Connection</h4>
-              <p>Draw a quick freehand stroke from Node A to Node B — Canvio instantly creates a routed connector.</p>
-            </div>
-            <div className="protip-card">
-              <div className="protip-icon">🎯</div>
-              <h4>Angle Snapping</h4>
-              <p>Hold <kbd>Shift</kbd> while drawing lines to snap to exact 45° and 90° straight angles.</p>
-            </div>
-            <div className="protip-card">
-              <div className="protip-icon">🚀</div>
-              <h4>Instant Share URLs</h4>
-              <p>Copy your browser workspace URL and send it to a teammate for instant live multiplayer.</p>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Complete Keyboard & Mouse Gesture Index */}
+        <section className="guide-use-cases">
+          <div className="guide-section-heading">
+            <GuideGlyph value="USE" />
+            <h2>One board, many familiar jobs</h2>
+            <p>The main idea is not one feature. It is a flexible visual workspace that adapts to the task.</p>
+          </div>
+          <div className="use-case-grid">
+            {USE_CASES.map((item) => (
+              <div className="use-case-card" key={item.title}>
+                <GuideGlyph value={item.glyph} />
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="guide-quality-section">
+          <div>
+            <span className="guide-detail__tag">Built for real devices</span>
+            <h2>Designed for mouse, touch, tablet, and pen.</h2>
+            <p>
+              The interaction model is centered on large targets, direct manipulation, focus mode, present mode, and simple recovery through undo, redo, fit view, and start-over flows.
+            </p>
+          </div>
+          <div className="device-strip">
+            <div><GuideGlyph value="PC" /><strong>PC</strong><small>Precise editing</small></div>
+            <div><GuideGlyph value="TB" /><strong>Tablet</strong><small>Touch planning</small></div>
+            <div><GuideGlyph value="PN" /><strong>Pen</strong><small>Ink and markups</small></div>
+            <div><GuideGlyph value="MO" /><strong>Mobile</strong><small>Review and present</small></div>
+          </div>
+        </section>
+
         <section className="guide-shortcuts-section">
-          <h2>Keyboard & Mouse Gesture Shortcuts</h2>
+          <h2>Quick controls</h2>
           <div className="shortcuts-grid">
-            <div className="shortcut-card">
-              <kbd>V</kbd>
-              <span>Select & Move Tool</span>
-            </div>
-            <div className="shortcut-card">
-              <kbd>P</kbd>
-              <span>Vector Pen Tool</span>
-            </div>
-            <div className="shortcut-card">
-              <kbd>Space + Drag</kbd>
-              <span>Pan Infinite Canvas</span>
-            </div>
-            <div className="shortcut-card">
-              <kbd>Scroll Wheel</kbd>
-              <span>Infinite Zoom In / Out</span>
-            </div>
-            <div className="shortcut-card">
-              <kbd>Shift + Click</kbd>
-              <span>Multi-Select Nodes</span>
-            </div>
-            <div className="shortcut-card">
-              <kbd>Cmd / Ctrl + Z</kbd>
-              <span>Undo Action</span>
-            </div>
-            <div className="shortcut-card">
-              <kbd>Delete / Backspace</kbd>
-              <span>Delete Selected Nodes</span>
-            </div>
-            <div className="shortcut-card">
-              <kbd>Double Click Canvas</kbd>
-              <span>Quick Create Sticky Note</span>
-            </div>
+            <div className="shortcut-card"><kbd>V</kbd><span>Select and move</span></div>
+            <div className="shortcut-card"><kbd>P</kbd><span>Draw with pen</span></div>
+            <div className="shortcut-card"><kbd>A</kbd><span>Draw arrow</span></div>
+            <div className="shortcut-card"><kbd>K</kbd><span>Highlighter</span></div>
+            <div className="shortcut-card"><kbd>Space + drag</kbd><span>Pan canvas</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + Z</kbd><span>Undo</span></div>
           </div>
         </section>
 
-        {/* Bottom CTA */}
         <section className="guide-cta-section">
-          <h2>Experience Canvio in Action</h2>
-          <p>Launch your infinite canvas now — no registration required.</p>
-          <button className="guide-btn-action" onClick={() => navigate('/w/demo-workspace')}>
-            <span className="material-symbols-outlined">rocket_launch</span>
-            <span>Launch Canvio Canvas</span>
-          </button>
+          <h2>Try the full workflow on a real board</h2>
+          <p>Start with a blank canvas or open a demo and move through the loop yourself.</p>
+          <div className="guide-cta-actions">
+            <button className="guide-btn-action" onClick={handleCreateWorld}>
+              <GuideGlyph value="+" />
+              <span>Launch Canvas</span>
+            </button>
+            <button className="guide-btn-secondary" onClick={() => navigate('/')}>
+              <GuideGlyph value="HM" />
+              <span>Back to workspace</span>
+            </button>
+          </div>
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="guide-footer">
         <div className="guide-footer__brand">
           <CanvioLogoIcon size={20} />
-          <span>Canvio — Connect ideas. Create knowledge.</span>
+          <span>Canvio - Connect ideas. Create knowledge.</span>
         </div>
         <div className="guide-footer__links">
           <button className="guide-footer__link" onClick={() => navigate('/')}>Home</button>

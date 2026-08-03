@@ -29,6 +29,7 @@
   font-weight: 650;
   user-select: none;
   cursor: grab;
+  touch-action: none;
   flex-shrink: 0;
   z-index: 10;
 }
@@ -194,6 +195,62 @@
 .map-node__marker-row button:hover {
   background: rgba(239, 68, 68, 0.14);
   color: #dc2626;
+}
+
+@media (pointer: coarse) {
+  .map-node__header {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+
+  .map-node__header-coords {
+    display: none;
+  }
+
+  .map-node__controls {
+    top: 56px;
+    right: 10px;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 12px;
+  }
+
+  .map-node__action-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .map-node__marker-panel {
+    left: 12px;
+    bottom: 12px;
+    width: min(280px, calc(100% - 24px));
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .map-node__marker-row {
+    grid-template-columns: 28px minmax(0, 1fr) 34px 34px 34px;
+    gap: 6px;
+    padding: 4px;
+  }
+
+  .map-node__marker-dot {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .map-node__marker-row input {
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .map-node__marker-row button {
+    height: 34px;
+    border-radius: 9px;
+    font-size: 16px;
+  }
 }
 
 [data-theme="dark"] .map-node__marker-panel {
