@@ -33,6 +33,7 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     fontSize: typeof rawData.fontSize === 'number' ? rawData.fontSize : 16,
   };
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const lastPointerTypeRef = useRef<string>('mouse');
 
   const baseRotation = useMemo(() => getRotationOffset(node.id), [node.id]);
 
@@ -41,6 +42,17 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
       textRef.current.focus();
     }
   }, [data.text, node.createdAt]);
+
+  useEffect(() => {
+    const handleEditRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ nodeId?: string }>).detail;
+      if (detail?.nodeId === node.id) {
+        textRef.current?.focus();
+      }
+    };
+    window.addEventListener('canvio:edit-node', handleEditRequest);
+    return () => window.removeEventListener('canvio:edit-node', handleEditRequest);
+  }, [node.id]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
@@ -58,6 +70,7 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
   // note could only ever be dragged from a tiny sliver of non-text border —
   // nearly impossible to hit accurately with a finger on mobile.
   const handlePointerDown = (e: React.PointerEvent) => {
+    lastPointerTypeRef.current = e.pointerType;
     if (document.activeElement === textRef.current) {
       e.stopPropagation();
     }
@@ -84,7 +97,11 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
       className={`sticky-note ${colorClass} ${selected ? 'sticky-note--selected' : ''}`}
       style={{ transform: `rotate(${baseRotation}deg)` }}
       onDoubleClick={() => textRef.current?.focus()}
-      onClick={() => textRef.current?.focus()}
+      onClick={() => {
+        if (lastPointerTypeRef.current !== 'touch' && lastPointerTypeRef.current !== 'pen') {
+          textRef.current?.focus();
+        }
+      }}
     >
       <button
         type="button"

@@ -18,6 +18,71 @@ export interface BoardRecord {
   url?: string;
 }
 
+export type AIProvider = 'gemini' | 'openai' | 'anthropic';
+
+export interface AIContextNode {
+  id: string;
+  type: string;
+  text: string;
+}
+
+export interface AIContextRelation {
+  sourceId: string;
+  targetId: string;
+  label?: string;
+  relationship?: string;
+}
+
+export interface RawAIBoardNode {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  data: Record<string, unknown>;
+}
+
+export interface RawAIBoardRelation {
+  sourceId: string;
+  targetId: string;
+  sourcePort?: string;
+  targetPort?: string;
+  label?: string;
+  relationship?: string;
+  color?: string;
+}
+
+export interface AIBoardResponse {
+  source: 'server-ai';
+  provider: AIProvider;
+  model: string;
+  title: string;
+  nodes: RawAIBoardNode[];
+  relations: RawAIBoardRelation[];
+}
+
+export interface AIClusterResponse {
+  source: 'server-ai';
+  provider: AIProvider;
+  model: string;
+  clusters: Array<{
+    title: string;
+    color: string;
+    nodeIds: string[];
+  }>;
+}
+
+export class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export async function createBoard() {
   const response = await fetch(apiUrl('/api/boards'), { method: 'POST' });
   if (!response.ok) throw new Error(`Failed to create board: ${response.status}`);
@@ -41,4 +106,50 @@ export async function updateBoardAppearance(
   });
   if (!response.ok) throw new Error(`Failed to update board appearance: ${response.status}`);
   return response.json() as Promise<BoardRecord>;
+}
+
+export async function generateAIBoard(request: {
+  prompt: string;
+  provider?: AIProvider;
+  model?: string;
+  context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
+}) {
+  return postAI<AIBoardResponse>('/api/ai/generate', request);
+}
+
+export async function summarizeAIBoard(request: {
+  provider?: AIProvider;
+  model?: string;
+  context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
+}) {
+  return postAI<AIBoardResponse>('/api/ai/summarize', request);
+}
+
+export async function organizeAIClusters(request: {
+  provider?: AIProvider;
+  model?: string;
+  context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
+}) {
+  return postAI<AIClusterResponse>('/api/ai/organize', request);
+}
+
+async function postAI<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let code: string | undefined;
+    try {
+      const errorBody = await response.json() as { error?: string };
+      code = errorBody.error;
+    } catch {
+      code = undefined;
+    }
+    throw new ApiRequestError(`AI request failed: ${response.status}`, response.status, code);
+  }
+
+  return response.json() as Promise<T>;
 }

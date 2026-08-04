@@ -38,6 +38,8 @@ const PRIMARY_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?:
   { id: 'relation', icon: IconRelation, label: 'Relation (L)', group: '4' }
 ];
 
+const MOBILE_PRIMARY_TOOLS = new Set<ToolMode>(['select', 'draw', 'sticky', 'relation']);
+
 const ADVANCED_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?: string }[] = [
   { id: 'eraser', icon: IconEraser, label: 'Eraser (E)', group: 'ink' },
   { id: 'image', icon: IconImage, label: 'Image (I)', group: '3' },
@@ -50,6 +52,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const isAdvancedActive = ADVANCED_TOOLS.some((tool) => tool.id === activeTool);
+  const isMobileSecondaryActive = PRIMARY_TOOLS.some((tool) => tool.id === activeTool && !MOBILE_PRIMARY_TOOLS.has(tool.id));
+  const mobileMenuTools = [
+    ...PRIMARY_TOOLS.filter((tool) => !MOBILE_PRIMARY_TOOLS.has(tool.id)),
+    ...ADVANCED_TOOLS,
+  ];
 
   useEffect(() => {
     if (!isMoreOpen) return;
@@ -62,10 +69,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
     return () => window.removeEventListener('pointerdown', handlePointerDown);
   }, [isMoreOpen]);
 
-  const renderToolButton = (tool: { id: ToolMode; icon: React.FC<any>; label: string }, compact = false) => (
-    <Tooltip key={tool.id} content={tool.label} position={compact ? 'right' : 'top'}>
+  const renderToolButton = (
+    tool: { id: ToolMode; icon: React.FC<any>; label: string },
+    compact = false,
+    className = ''
+  ) => (
+    <Tooltip key={`${className || 'toolbar'}-${tool.id}`} content={tool.label} position={compact ? 'right' : 'top'}>
       <button
-        className={`canvio-toolbar-button ${compact ? 'canvio-toolbar-button--menu' : ''} ${activeTool === tool.id ? 'active' : ''}`}
+        className={`canvio-toolbar-button ${compact ? 'canvio-toolbar-button--menu' : ''} ${className} ${activeTool === tool.id ? 'active' : ''}`}
+        data-tool-id={tool.id}
         onClick={() => {
           onToolChange(tool.id);
           setIsMoreOpen(false);
@@ -83,6 +95,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
     <div className="canvio-toolbar-container canvio-toolbar-enter" ref={toolbarRef}>
       {isMoreOpen && (
         <div className="canvio-toolbar-more__menu" role="menu" aria-label="Advanced tools">
+          {mobileMenuTools.map((tool) => renderToolButton(tool, true, 'canvio-toolbar-button--mobile-menu'))}
           {ADVANCED_TOOLS.map((tool) => renderToolButton(tool, true))}
         </div>
       )}
@@ -93,7 +106,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
 
           return (
             <React.Fragment key={tool.id}>
-              {renderToolButton(tool)}
+              {renderToolButton(tool, false, MOBILE_PRIMARY_TOOLS.has(tool.id) ? '' : 'canvio-toolbar-button--mobile-secondary')}
               {isNextDifferentGroup && <div className="canvio-toolbar-divider" />}
             </React.Fragment>
           );
@@ -103,7 +116,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
         <div className="canvio-toolbar-more">
           <Tooltip content="More tools" position="top">
             <button
-              className={`canvio-toolbar-button ${isMoreOpen || isAdvancedActive ? 'active' : ''}`}
+              className={`canvio-toolbar-button ${isMoreOpen || isAdvancedActive || isMobileSecondaryActive ? 'active' : ''}`}
               onClick={() => setIsMoreOpen((prev) => !prev)}
               aria-label="More tools"
               aria-haspopup="menu"

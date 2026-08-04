@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import dotenv from 'dotenv';
 import { boardRoutes } from './routes/boards.js';
+import { aiRoutes } from './routes/ai.js';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.get('/', async () => {
     version: '1.0.0',
     endpoints: {
       boards: '/api/boards',
+      ai: '/api/ai',
     },
   };
 });
@@ -29,6 +31,7 @@ app.get('/health', async () => {
 });
 
 app.register(boardRoutes, { prefix: '/api/boards' });
+app.register(aiRoutes, { prefix: '/api/ai' });
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 

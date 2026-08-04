@@ -16,7 +16,8 @@ import {
   IconCircle,
   IconDiamond,
   IconTriangle,
-  IconHexagon
+  IconHexagon,
+  IconMoreHorizontal
 } from '@canvio/ui';
 import './NodeInspector.css';
 
@@ -72,6 +73,8 @@ interface NodeInspectorProps {
 
 export function NodeInspector({ node }: NodeInspectorProps) {
   const [isExpanding, setIsExpanding] = useState(false);
+  const [isFrameColorOpen, setIsFrameColorOpen] = useState(false);
+  const [isFrameMoreOpen, setIsFrameMoreOpen] = useState(false);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -182,6 +185,7 @@ export function NodeInspector({ node }: NodeInspectorProps) {
   const currentDrawingOpacity = isArrowDrawing
     ? Number(drawingArrow?.opacity ?? 1)
     : Number(drawingStrokes[0]?.opacity ?? 1);
+  const currentFrameColor = (node.data?.color as string) || '#6366f1';
 
   const updateDrawingColor = (color: string) => {
     if (isArrowDrawing && drawingArrow) {
@@ -214,25 +218,58 @@ export function NodeInspector({ node }: NodeInspectorProps) {
   };
 
   const viewport = useCanvasStore((s) => s.viewport);
-  const scaleFactor = Math.max(0.65, Math.min(2.5, 1 / viewport.zoom));
-  
-  // Provide generous clearance (36px+) between node edge and toolbar bottom so
-  // top connection ports, resize handles, and text ascenders are never overlapped.
-  const gap = Math.max(36, 34 * scaleFactor);
+  const zoom = Math.max(0.05, viewport.zoom);
+  const scaleFactor = Math.max(0.65, Math.min(2.5, 1 / zoom));
 
-  // Calculate screen Y coordinate of node top to prevent off-screen or ceiling overlap
-  const screenY = (typeof window !== 'undefined' ? window.innerHeight / 2 : 500) + (node.position.y + viewport.y) * viewport.zoom;
-  const isNearTop = screenY < 140;
+  // The node inspector lives inside the zoomed canvas, so offsets are converted
+  // from screen-safe measurements back into local world coordinates.
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1000;
+  const isCoarsePointer = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+  const nodeScreenTop = viewportHeight / 2 + (node.position.y + viewport.y) * zoom;
+  const nodeScreenBottom = nodeScreenTop + node.size.height * zoom;
+  const nodeScreenHeight = node.size.height * zoom;
+  const topSafe = isCoarsePointer ? 86 : 70;
+  const bottomSafe = viewportHeight - (isCoarsePointer ? 150 : 118);
+  const inspectorScreenHeight = isCoarsePointer ? 54 : 42;
+  const gap = Math.max(36, 34 * scaleFactor);
+  const screenGap = Math.max(isCoarsePointer ? 16 : 12, Math.min(44, gap * zoom));
+  const hasRoomAbove = nodeScreenTop - topSafe >= inspectorScreenHeight + screenGap;
+  const hasRoomBelow = bottomSafe - nodeScreenBottom >= inspectorScreenHeight + screenGap;
+  const fillsViewport = nodeScreenHeight > viewportHeight * 0.52;
+
+  const inspectorPlacement: 'above' | 'below' | 'inside' =
+    hasRoomAbove
+      ? 'above'
+      : isFrame && fillsViewport
+        ? 'inside'
+        : hasRoomBelow
+          ? 'below'
+          : 'inside';
+
+  const insideScreenTop = Math.min(
+    Math.max(nodeScreenTop + screenGap, topSafe),
+    Math.max(topSafe, bottomSafe - inspectorScreenHeight)
+  );
+  const insideLocalTop = (insideScreenTop - nodeScreenTop) / zoom;
+  const inspectorTop =
+    inspectorPlacement === 'above'
+      ? -gap
+      : inspectorPlacement === 'below'
+        ? node.size.height + gap
+        : Math.max(10 / zoom, insideLocalTop);
+  const inspectorTransform =
+    inspectorPlacement === 'above'
+      ? `translate(-50%, -100%) scale(${scaleFactor})`
+      : `translate(-50%, 0) scale(${scaleFactor})`;
+  const inspectorTransformOrigin = inspectorPlacement === 'above' ? 'bottom center' : 'top center';
 
   return (
     <div
-      className="node-inspector canvio-toolbar-enter"
+      className={`node-inspector node-inspector--${inspectorPlacement} canvio-toolbar-enter`}
       style={{
-        top: isNearTop ? (node.size.height + gap) : -gap,
-        transform: isNearTop 
-          ? `translate(-50%, 0) scale(${scaleFactor})` 
-          : `translate(-50%, -100%) scale(${scaleFactor})`,
-        transformOrigin: isNearTop ? 'top center' : 'bottom center',
+        top: inspectorTop,
+        transform: inspectorTransform,
+        transformOrigin: inspectorTransformOrigin,
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
@@ -379,14 +416,14 @@ export function NodeInspector({ node }: NodeInspectorProps) {
       {/* Frame header color picker & Page Presets */}
       {isFrame && (
         <>
-          <div className="node-inspector__segments">
+          <div className="node-inspector__segments node-inspector__segments--frame">
             <button
               className={`node-inspector__segment ${node.data?.pagePreset === 'a4-portrait' ? 'selected' : ''}`}
               onClick={(e) => { e.stopPropagation(); setFramePagePreset('a4-portrait'); }}
               title="A4 Portrait Page (595x842)"
             >
               <IconPagePortrait size={14} />
-              <span>A4</span>
+              <span>Portrait</span>
             </button>
             <button
               className={`node-inspector__segment ${node.data?.pagePreset === 'a4-landscape' ? 'selected' : ''}`}
@@ -394,7 +431,7 @@ export function NodeInspector({ node }: NodeInspectorProps) {
               title="A4 Landscape Page (842x595)"
             >
               <IconPageLandscape size={14} />
-              <span>A4</span>
+              <span>Landscape</span>
             </button>
             <button
               className={`node-inspector__segment ${node.data?.pagePreset === 'slide' ? 'selected' : ''}`}
@@ -421,20 +458,90 @@ export function NodeInspector({ node }: NodeInspectorProps) {
               <span>Fit</span>
             </button>
           </div>
-          <div className="node-inspector__colors">
-            {SHAPE_COLORS.map((c) => (
-              <button
-                key={c.id}
-                className={`node-inspector__color-btn ${(node.data?.color as string) === c.stroke ? 'selected' : ''}`}
-                style={{ backgroundColor: c.stroke }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateNodeData(node.id, { color: c.stroke });
-                }}
-                title={`Change frame color to ${c.id}`}
-              />
-            ))}
-            <div className="node-inspector__divider" />
+          <div className="node-inspector__frame-color">
+            <button
+              className="node-inspector__color-btn node-inspector__color-btn--frame selected"
+              style={{ backgroundColor: currentFrameColor }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFrameColorOpen((prev) => !prev);
+                setIsFrameMoreOpen(false);
+              }}
+              title="Frame color"
+            />
+            {isFrameColorOpen && (
+              <div className="node-inspector__popover node-inspector__frame-color-popover" role="menu" aria-label="Frame colors">
+                {SHAPE_COLORS.map((c) => (
+                  <button
+                    key={c.id}
+                    className={`node-inspector__color-btn ${currentFrameColor === c.stroke ? 'selected' : ''}`}
+                    style={{ backgroundColor: c.stroke }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateNodeData(node.id, { color: c.stroke });
+                      setIsFrameColorOpen(false);
+                    }}
+                    title={`Change frame color to ${c.id}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="node-inspector__divider" />
+          <div className="node-inspector__frame-more">
+            <button
+              className={`node-inspector__btn ${isFrameMoreOpen ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFrameMoreOpen((prev) => !prev);
+                setIsFrameColorOpen(false);
+              }}
+              title="More frame actions"
+              aria-label="More frame actions"
+              aria-haspopup="menu"
+              aria-expanded={isFrameMoreOpen}
+            >
+              <IconMoreHorizontal size={15} />
+            </button>
+            {isFrameMoreOpen && (
+              <div className="node-inspector__popover node-inspector__action-popover" role="menu" aria-label="Frame actions">
+                <button
+                  className="node-inspector__menu-btn"
+                  onClick={(e) => { e.stopPropagation(); duplicateNode(node.id); setIsFrameMoreOpen(false); }}
+                >
+                  <IconCopy size={15} />
+                  <span>Duplicate</span>
+                </button>
+                <button
+                  className="node-inspector__menu-btn"
+                  onClick={(e) => { e.stopPropagation(); bringToFront(node.id); setIsFrameMoreOpen(false); }}
+                >
+                  <IconArrowUp size={15} />
+                  <span>Bring front</span>
+                </button>
+                <button
+                  className="node-inspector__menu-btn"
+                  onClick={(e) => { e.stopPropagation(); sendToBack(node.id); setIsFrameMoreOpen(false); }}
+                >
+                  <IconArrowDown size={15} />
+                  <span>Send back</span>
+                </button>
+                <button
+                  className="node-inspector__menu-btn"
+                  onClick={(e) => { e.stopPropagation(); toggleLockNode(node.id); setIsFrameMoreOpen(false); }}
+                >
+                  {node.locked ? <IconLock size={15} /> : <IconUnlock size={15} />}
+                  <span>{node.locked ? 'Unlock' : 'Lock'}</span>
+                </button>
+                <button
+                  className="node-inspector__menu-btn danger"
+                  onClick={(e) => { e.stopPropagation(); removeNode(node.id); setIsFrameMoreOpen(false); }}
+                >
+                  <IconTrash size={15} />
+                  <span>Delete</span>
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -512,71 +619,72 @@ export function NodeInspector({ node }: NodeInspectorProps) {
         </>
       )}
 
-      {/* Action Buttons */}
-      <div className="node-inspector__actions">
-        <button
-          className="node-inspector__btn node-inspector__btn--connect"
-          onClick={(e) => {
-            e.stopPropagation();
-            useCanvasStore.getState().setRelationSourceId(node.id);
-            useCanvasStore.getState().setActiveTool('relation');
-          }}
-          title="Connect Relation (↗) — Click any target node to create link"
-        >
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-primary)' }}>↗</span>
-        </button>
+      {!isFrame && (
+        <div className="node-inspector__actions">
+          <button
+            className="node-inspector__btn node-inspector__btn--connect"
+            onClick={(e) => {
+              e.stopPropagation();
+              useCanvasStore.getState().setRelationSourceId(node.id);
+              useCanvasStore.getState().setActiveTool('relation');
+            }}
+            title="Connect Relation (↗) — Click any target node to create link"
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-primary)' }}>↗</span>
+          </button>
 
-        <button
-          className={`node-inspector__btn node-inspector__btn--ai ${isExpanding ? 'spinning' : ''}`}
-          onClick={handleAIExpand}
-          disabled={isExpanding}
-          title="✨ AI Expand: Generate related sub-topics & connect with relations"
-        >
-          <span className="material-symbols-outlined text-sm" style={{ color: '#a855f7', fontSize: 16 }}>
-            {isExpanding ? 'sync' : 'auto_awesome'}
-          </span>
-        </button>
+          <button
+            className={`node-inspector__btn node-inspector__btn--ai ${isExpanding ? 'spinning' : ''}`}
+            onClick={handleAIExpand}
+            disabled={isExpanding}
+            title="✨ AI Expand: Generate related sub-topics & connect with relations"
+          >
+            <span className="material-symbols-outlined text-sm" style={{ color: '#a855f7', fontSize: 16 }}>
+              {isExpanding ? 'sync' : 'auto_awesome'}
+            </span>
+          </button>
 
-        <button
-          className="node-inspector__btn"
-          onClick={(e) => { e.stopPropagation(); duplicateNode(node.id); }}
-          title="Duplicate (Ctrl+D)"
-        >
-          <IconCopy size={15} />
-        </button>
+          <button
+            className="node-inspector__btn"
+            onClick={(e) => { e.stopPropagation(); duplicateNode(node.id); }}
+            title="Duplicate (Ctrl+D)"
+          >
+            <IconCopy size={15} />
+          </button>
 
-        <button
-          className="node-inspector__btn"
-          onClick={(e) => { e.stopPropagation(); bringToFront(node.id); }}
-          title="Bring to Front"
-        >
-          <IconArrowUp size={15} />
-        </button>
+          <button
+            className="node-inspector__btn"
+            onClick={(e) => { e.stopPropagation(); bringToFront(node.id); }}
+            title="Bring to Front"
+          >
+            <IconArrowUp size={15} />
+          </button>
 
-        <button
-          className="node-inspector__btn"
-          onClick={(e) => { e.stopPropagation(); sendToBack(node.id); }}
-          title="Send to Back"
-        >
-          <IconArrowDown size={15} />
-        </button>
+          <button
+            className="node-inspector__btn"
+            onClick={(e) => { e.stopPropagation(); sendToBack(node.id); }}
+            title="Send to Back"
+          >
+            <IconArrowDown size={15} />
+          </button>
 
-        <button
-          className={`node-inspector__btn ${node.locked ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); toggleLockNode(node.id); }}
-          title={node.locked ? 'Unlock Node' : 'Lock Node'}
-        >
-          {node.locked ? <IconLock size={15} /> : <IconUnlock size={15} />}
-        </button>
+          <button
+            className={`node-inspector__btn ${node.locked ? 'active' : ''}`}
+            onClick={(e) => { e.stopPropagation(); toggleLockNode(node.id); }}
+            title={node.locked ? 'Unlock Node' : 'Lock Node'}
+          >
+            {node.locked ? <IconLock size={15} /> : <IconUnlock size={15} />}
+          </button>
 
-        <button
-          className="node-inspector__btn danger"
-          onClick={(e) => { e.stopPropagation(); removeNode(node.id); }}
-          title="Delete Node (Del)"
-        >
-          <IconTrash size={15} />
-        </button>
-      </div>
+          <button
+            className="node-inspector__btn danger"
+            onClick={(e) => { e.stopPropagation(); removeNode(node.id); }}
+            title="Delete Node (Del)"
+          >
+            <IconTrash size={15} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -112,11 +112,43 @@
   animation: pulse-relation-source 1.5s infinite ease-in-out;
 }
 
+.node-renderer.relation-source::before,
+.node-renderer.relation-target::before {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  transform: translateX(-50%);
+  z-index: 40;
+  min-height: 22px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  border: 1px solid var(--toolbar-border);
+  background: color-mix(in srgb, var(--toolbar-bg) 94%, transparent);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  pointer-events: none;
+  white-space: nowrap;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.node-renderer.relation-source::before {
+  content: "Start";
+}
+
 .node-renderer.relation-target {
   border: 1.5px solid var(--accent-success) !important;
   box-shadow:
     0 0 0 4px color-mix(in srgb, var(--accent-success) 18%, transparent),
     0 10px 30px rgba(15, 23, 42, 0.14);
+}
+
+.node-renderer.relation-target::before {
+  content: "Connect";
+  border-color: color-mix(in srgb, var(--accent-success) 44%, var(--toolbar-border));
 }
 
 /* Shape nodes have custom transparent outer borders to fit custom SVG geometry */
@@ -232,6 +264,13 @@
     border-width: 3px;
   }
 
+  .resize-handle::before {
+    content: "";
+    position: absolute;
+    inset: -13px;
+    border-radius: 50%;
+  }
+
   .resize-handle.tl { top: -10px; left: -10px; }
   .resize-handle.tr { top: -10px; right: -10px; }
   .resize-handle.bl { bottom: -10px; left: -10px; }
@@ -255,6 +294,14 @@
   .node-port.right { right: -13px; }
   .node-port.bottom { bottom: -13px; }
   .node-port.left { left: -13px; }
+
+  .node-renderer.relation-source::before,
+  .node-renderer.relation-target::before {
+    top: -42px;
+    min-height: 30px;
+    padding: 7px 12px;
+    font-size: 12px;
+  }
 }
 
 [data-theme="light"] .node-renderer.selected {

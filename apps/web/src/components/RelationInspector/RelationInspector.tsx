@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { useCanvasStore, RelationshipType } from '../../store/canvasStore';
 import {
+  IconMoreHorizontal,
   IconTrash,
   IconX
 } from '@canvio/ui';
@@ -28,6 +29,8 @@ const LINE_COLORS = [
 ];
 
 export function RelationInspector() {
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const ignoreNextAdvancedClickRef = useRef(false);
   const selectedRelationId = useCanvasStore((s) => s.selectedRelationId);
   const relations = useCanvasStore((s) => s.relations);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -68,16 +71,40 @@ export function RelationInspector() {
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="relation-inspector__header">
         <span className="relation-inspector__title">Relation Options</span>
-        <button
-          className="relation-inspector__close"
-          onClick={() => selectRelation(null)}
-          title="Close inspector"
-        >
-          <IconX size={14} />
-        </button>
+        <div className="relation-inspector__header-actions">
+          <button
+            className={`relation-inspector__close ${isAdvancedOpen ? 'active' : ''}`}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              ignoreNextAdvancedClickRef.current = true;
+              setIsAdvancedOpen((prev) => !prev);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (ignoreNextAdvancedClickRef.current) {
+                ignoreNextAdvancedClickRef.current = false;
+                return;
+              }
+              setIsAdvancedOpen((prev) => !prev);
+            }}
+            title="More relation controls"
+            aria-label="More relation controls"
+          >
+            <IconMoreHorizontal size={14} />
+          </button>
+          <button
+            className="relation-inspector__close"
+            onClick={() => selectRelation(null)}
+            title="Close inspector"
+          >
+            <IconX size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Relationship Type Selection */}
@@ -108,73 +135,77 @@ export function RelationInspector() {
         />
       </div>
 
-      {/* Line Path Type */}
-      <div className="relation-inspector__section">
-        <label className="relation-inspector__label">Routing Style</label>
-        <div className="relation-inspector__button-group">
-          <button
-            className={`relation-inspector__btn ${style.type === 'straight' ? 'active' : ''}`}
-            onClick={() => updateRelation(relation.id, { style: { ...style, type: 'straight' } })}
-          >
-            Straight
-          </button>
-          <button
-            className={`relation-inspector__btn ${style.type === 'curved' ? 'active' : ''}`}
-            onClick={() => updateRelation(relation.id, { style: { ...style, type: 'curved' } })}
-          >
-            Curved
-          </button>
-          <button
-            className={`relation-inspector__btn ${style.type === 'orthogonal' ? 'active' : ''}`}
-            onClick={() => updateRelation(relation.id, { style: { ...style, type: 'orthogonal' } })}
-          >
-            Step
-          </button>
-        </div>
-      </div>
+      {isAdvancedOpen && (
+        <div className="relation-inspector__advanced">
+          {/* Line Path Type */}
+          <div className="relation-inspector__section">
+            <label className="relation-inspector__label">Routing Style</label>
+            <div className="relation-inspector__button-group">
+              <button
+                className={`relation-inspector__btn ${style.type === 'straight' ? 'active' : ''}`}
+                onClick={() => updateRelation(relation.id, { style: { ...style, type: 'straight' } })}
+              >
+                Straight
+              </button>
+              <button
+                className={`relation-inspector__btn ${style.type === 'curved' ? 'active' : ''}`}
+                onClick={() => updateRelation(relation.id, { style: { ...style, type: 'curved' } })}
+              >
+                Curved
+              </button>
+              <button
+                className={`relation-inspector__btn ${style.type === 'orthogonal' ? 'active' : ''}`}
+                onClick={() => updateRelation(relation.id, { style: { ...style, type: 'orthogonal' } })}
+              >
+                Step
+              </button>
+            </div>
+          </div>
 
-      {/* Arrow Heads Control (Start & End) */}
-      <div className="relation-inspector__section">
-        <label className="relation-inspector__label">Arrow Heads</label>
-        <div className="relation-inspector__button-group">
-          <button
-            className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'none' ? 'active' : ''}`}
-            onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'none', endArrow: 'none' } })}
-          >
-            None
-          </button>
-          <button
-            className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'arrow' ? 'active' : ''}`}
-            onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'none', endArrow: 'arrow' } })}
-          >
-            End ➔
-          </button>
-          <button
-            className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'none' ? 'active' : ''}`}
-            onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'arrow', endArrow: 'none' } })}
-          >
-            Start
-          </button>
-          <button
-            className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'arrow' ? 'active' : ''}`}
-            onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'arrow', endArrow: 'arrow' } })}
-          >
-            Both
-          </button>
-        </div>
-      </div>
+          {/* Arrow Heads Control (Start & End) */}
+          <div className="relation-inspector__section">
+            <label className="relation-inspector__label">Arrow Heads</label>
+            <div className="relation-inspector__button-group">
+              <button
+                className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'none' ? 'active' : ''}`}
+                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'none', endArrow: 'none' } })}
+              >
+                None
+              </button>
+              <button
+                className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'arrow' ? 'active' : ''}`}
+                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'none', endArrow: 'arrow' } })}
+              >
+                End
+              </button>
+              <button
+                className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'none' ? 'active' : ''}`}
+                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'arrow', endArrow: 'none' } })}
+              >
+                Start
+              </button>
+              <button
+                className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'arrow' ? 'active' : ''}`}
+                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'arrow', endArrow: 'arrow' } })}
+              >
+                Both
+              </button>
+            </div>
+          </div>
 
-      {/* Animation Flow Toggle */}
-      <div className="relation-inspector__section relation-inspector__row">
-        <button
-          className={`relation-inspector__toggle ${style.animated ? 'active' : ''}`}
-          onClick={() => updateRelation(relation.id, {
-            style: { ...style, animated: !style.animated }
-          })}
-        >
-          Animated Flow
-        </button>
-      </div>
+          {/* Animation Flow Toggle */}
+          <div className="relation-inspector__section relation-inspector__row">
+            <button
+              className={`relation-inspector__toggle ${style.animated ? 'active' : ''}`}
+              onClick={() => updateRelation(relation.id, {
+                style: { ...style, animated: !style.animated }
+              })}
+            >
+              Animated Flow
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Color Palette */}
       <div className="relation-inspector__section">

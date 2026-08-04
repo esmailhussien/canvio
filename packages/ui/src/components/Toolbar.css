@@ -143,6 +143,10 @@
   white-space: nowrap;
 }
 
+.canvio-toolbar-button--mobile-menu {
+  display: none;
+}
+
 .canvio-toolbar-button--menu:hover,
 .canvio-toolbar-button--menu.active {
   transform: none;
@@ -164,6 +168,26 @@
     width: 42px;
     height: 42px;
     flex: 0 0 42px;
+  }
+
+  .canvio-toolbar-button--mobile-secondary,
+  .canvio-toolbar-divider {
+    display: none;
+  }
+
+  .canvio-toolbar-button--mobile-menu {
+    display: flex;
+  }
+
+  .canvio-toolbar-more__menu .canvio-toolbar-button--menu:not(.canvio-toolbar-button--mobile-menu) {
+    display: none;
+  }
+
+  .canvio-toolbar-more__menu {
+    width: min(280px, calc(100vw - 24px));
+    max-height: min(420px, calc(100vh - 140px));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

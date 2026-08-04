@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Relation, LivingNode, useCanvasStore } from '../../store/canvasStore';
 import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from './relationUtils';
 import './RelationRenderer.css';
@@ -61,6 +61,21 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
   const removeRelation = useCanvasStore((s) => s.removeRelation);
   const updateRelation = useCanvasStore((s) => s.updateRelation);
   const [hoveredRelationId, setHoveredRelationId] = useState<string | null>(null);
+  const [recentRelationId, setRecentRelationId] = useState<string | null>(null);
+  const previousRelationIdsRef = useRef<Set<string>>(new Set(Object.keys(relations)));
+
+  useEffect(() => {
+    const currentIds = new Set(Object.keys(relations));
+    const addedId = [...currentIds].find((id) => !previousRelationIdsRef.current.has(id));
+    previousRelationIdsRef.current = currentIds;
+    if (!addedId) return;
+
+    setRecentRelationId(addedId);
+    const timer = window.setTimeout(() => {
+      setRecentRelationId((id) => (id === addedId ? null : id));
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [relations]);
 
   return (
     <svg
@@ -171,7 +186,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
               pointerEvents: (isEraser || isSelectTool || presentationMode) ? 'auto' : 'none',
               cursor: isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
             }}
-            className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''}`}
+            className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${recentRelationId === rel.id ? 'relation-group--new' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''}`}
             onMouseEnter={() => setHoveredRelationId(rel.id)}
             onMouseLeave={() => setHoveredRelationId((id) => id === rel.id ? null : id)}
             onClick={(e) => {
@@ -202,7 +217,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
             />
 
             {/* Selection glow highlight line */}
-            {(isSelected || isHovered) && (
+            {(isSelected || isHovered || recentRelationId === rel.id) && (
               <path
                 className="relation-line-glow"
                 d={pathResult.pathD}

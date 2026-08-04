@@ -53,8 +53,6 @@ type AIProvider = 'gemini' | 'openai' | 'anthropic';
 interface ProviderConfig {
   name: string;
   icon: React.ReactNode;
-  link: string;
-  placeholder: string;
   models: string[];
 }
 
@@ -62,22 +60,16 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
   gemini: {
     name: 'Google Gemini',
     icon: <GeminiLogo size={15} />,
-    link: 'https://aistudio.google.com/app/apikey',
-    placeholder: 'AIzaSy...',
     models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash'],
   },
   openai: {
     name: 'OpenAI',
     icon: <OpenAILogo size={15} />,
-    link: 'https://platform.openai.com/api-keys',
-    placeholder: 'sk-proj-...',
     models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'],
   },
   anthropic: {
     name: 'Anthropic Claude',
     icon: <AnthropicLogo size={15} />,
-    link: 'https://console.anthropic.com/settings/keys',
-    placeholder: 'sk-ant-...',
     models: ['claude-3-5-sonnet', 'claude-3-5-haiku'],
   },
 };
@@ -85,17 +77,11 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
 export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onClose }) => {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showKey, setShowKey] = useState(false);
+  const [aiStatus, setAIStatus] = useState<{ kind: 'info' | 'error' | 'success'; text: string } | null>(null);
 
   const [provider, setProvider] = useState<AIProvider>(() => {
     return (localStorage.getItem('CANVIO_AI_PROVIDER') as AIProvider) || 'gemini';
   });
-
-  const [keys, setKeys] = useState<Record<AIProvider, string>>(() => ({
-    gemini: localStorage.getItem('CANVIO_GEMINI_KEY') || '',
-    openai: localStorage.getItem('CANVIO_OPENAI_KEY') || localStorage.getItem('CANVIO_AI_API_KEY') || '',
-    anthropic: localStorage.getItem('CANVIO_ANTHROPIC_KEY') || '',
-  }));
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     return localStorage.getItem('CANVIO_AI_MODEL') || 'gemini-2.5-flash';
@@ -128,29 +114,31 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     localStorage.setItem('CANVIO_AI_MODEL', defaultModel);
   };
 
-  const handleKeyChange = (val: string) => {
-    const updated = { ...keys, [provider]: val };
-    setKeys(updated);
-    const storageKey = provider === 'gemini' ? 'CANVIO_GEMINI_KEY' : provider === 'openai' ? 'CANVIO_OPENAI_KEY' : 'CANVIO_ANTHROPIC_KEY';
-    localStorage.setItem(storageKey, val);
-  };
-
   const handleModelChange = (model: string) => {
     setSelectedModel(model);
     localStorage.setItem('CANVIO_AI_MODEL', model);
   };
 
   const currentConfig = PROVIDER_CONFIGS[provider];
-  const currentKey = keys[provider];
+
+  const closeWithAIStatus = (result: { message?: string; source?: string }) => {
+    if (result.source === 'local' && result.message) {
+      setAIStatus({ kind: 'info', text: result.message });
+      window.setTimeout(onClose, 1100);
+      return;
+    }
+    onClose();
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isGenerating) return;
 
     setIsGenerating(true);
+    setAIStatus({ kind: 'info', text: 'Building a structured board...' });
 
     try {
-      const result = await generateSpatialBoardAsync(prompt, provider, currentKey, selectedModel);
+      const result = await generateSpatialBoardAsync(prompt, provider, undefined, selectedModel);
       const createdAt = Date.now();
       const taggedNodes = result.nodes.map((node) => ({
         ...node,
@@ -170,9 +158,10 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       fitViewportToNodes(placedNodes, { minZoom: 0.58 });
 
       setPrompt('');
-      onClose();
+      closeWithAIStatus(result);
     } catch (err) {
       console.error('Failed to generate spatial board:', err);
+      setAIStatus({ kind: 'error', text: 'AI generation failed. Please try again or switch to a local template.' });
     } finally {
       setIsGenerating(false);
     }
@@ -180,6 +169,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const handleSummarizeBoard = async () => {
     setIsGenerating(true);
+    setAIStatus({ kind: 'info', text: 'Reading the board graph and relations...' });
     try {
       const allNodes = Object.values(useCanvasStore.getState().nodes);
       const allRelations = Object.values(useCanvasStore.getState().relations);
@@ -187,9 +177,10 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       res.nodes.forEach((n) => addNode(n));
       res.relations.forEach((r) => addRelation(r));
       fitViewportToNodes(res.nodes, { minZoom: 0.5 });
-      onClose();
+      closeWithAIStatus(res);
     } catch (err) {
       console.error('Summarize board failed:', err);
+      setAIStatus({ kind: 'error', text: 'Summary failed. Check the server AI configuration or try again.' });
     } finally {
       setIsGenerating(false);
     }
@@ -197,14 +188,20 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const handleOrganizeCluster = async () => {
     setIsGenerating(true);
+    setAIStatus({ kind: 'info', text: 'Grouping related elements into clearer clusters...' });
     try {
       const allNodes = Object.values(useCanvasStore.getState().nodes);
       const updateNode = useCanvasStore.getState().updateNode;
-      await organizeAndClusterWithAIAsync(allNodes, updateNode, addNode);
+      const result = await organizeAndClusterWithAIAsync(allNodes, updateNode, addNode);
       fitViewportToNodes(Object.values(useCanvasStore.getState().nodes), { minZoom: 0.5 });
-      onClose();
+      setAIStatus({
+        kind: result.source === 'local' ? 'info' : 'success',
+        text: result.message || 'Board organized into readable clusters.',
+      });
+      window.setTimeout(onClose, result.source === 'local' ? 1100 : 700);
     } catch (err) {
       console.error('Organize cluster failed:', err);
+      setAIStatus({ kind: 'error', text: 'Organize failed. Please try again after selecting fewer elements.' });
     } finally {
       setIsGenerating(false);
     }
@@ -274,7 +271,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
               type="button"
               className={`ai-modal__settings-toggle ${isSettingsOpen ? 'active' : ''}`}
               onClick={() => setIsSettingsOpen((prev) => !prev)}
-              title="Toggle API Key & Model Settings"
+              title="Toggle AI provider and model settings"
             >
               <span className="material-symbols-outlined text-sm">settings</span>
               <span>{isSettingsOpen ? 'Hide' : 'Settings'}</span>
@@ -320,7 +317,6 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
           <div className="ai-modal__settings-top">
             <div className="ai-modal__provider-tabs">
               {(Object.keys(PROVIDER_CONFIGS) as AIProvider[]).map((p) => {
-                const hasKey = Boolean(keys[p]?.trim());
                 return (
                   <button
                     key={p}
@@ -330,7 +326,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
                   >
                     <span className="ai-provider-icon">{PROVIDER_CONFIGS[p].icon}</span>
                     <span className="ai-provider-name">{PROVIDER_CONFIGS[p].name}</span>
-                    <span className={`ai-provider-dot ${hasKey ? 'active' : ''}`} title={hasKey ? 'Key configured' : 'No key added'} />
+                    <span className="ai-provider-dot active" title="Server-managed provider" />
                   </button>
                 );
               })}
@@ -341,31 +337,12 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
             <div className="ai-modal__field-group flex-1">
               <div className="ai-modal__settings-header">
                 <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#f59e0b' }}>key</span>
-                  <span>API Key ({currentConfig.name})</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#10b981' }}>admin_panel_settings</span>
+                  <span>Private Server AI</span>
                 </span>
-                <a href={currentConfig.link} target="_blank" rel="noreferrer" className="ai-modal__key-link">
-                  Get Key ↗
-                </a>
               </div>
-              <div className="ai-modal__key-input-wrapper">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  className="ai-modal__api-key-input"
-                  placeholder={currentConfig.placeholder}
-                  value={currentKey}
-                  onChange={(e) => handleKeyChange(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="ai-modal__toggle-key-btn"
-                  onClick={() => setShowKey((prev) => !prev)}
-                  title={showKey ? 'Hide key' : 'Show key'}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                    {showKey ? 'visibility_off' : 'visibility'}
-                  </span>
-                </button>
+              <div className="ai-modal__server-note">
+                Provider keys now live on the API server. If no server key is configured, Canvio uses the local smart generator automatically.
               </div>
             </div>
 
@@ -393,10 +370,16 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
           <div className="ai-modal__settings-footer">
             <span className="ai-modal__settings-hint flex items-center gap-1">
               <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#10b981' }}>lock</span>
-              <span>Local & Private: Your key stays in your browser's local storage and is sent directly to {currentConfig.name}.</span>
+              <span>Safer by default: browser sessions do not store or transmit provider API keys.</span>
             </span>
           </div>
         </div>
+        )}
+
+        {aiStatus && (
+          <div className={`ai-modal__status ai-modal__status--${aiStatus.kind}`} role="status">
+            {aiStatus.text}
+          </div>
         )}
       </div>
     </div>

@@ -1,218 +1,233 @@
 import { nanoid } from 'nanoid';
 import { LivingNode, Relation, useCanvasStore } from '../store/canvasStore';
+import {
+  ApiRequestError,
+  AIProvider,
+  generateAIBoard,
+  organizeAIClusters,
+  RawAIBoardNode,
+  RawAIBoardRelation,
+  summarizeAIBoard,
+} from './api';
 
 export interface SpatialAIResult {
   title: string;
   nodes: LivingNode[];
   relations: Relation[];
+  source?: 'server' | 'local';
+  message?: string;
 }
 
 export async function generateSpatialBoardAsync(
   prompt: string,
   provider?: string,
-  apiKey?: string,
+  _apiKey?: string,
   model?: string
 ): Promise<SpatialAIResult> {
-  if (!apiKey || !apiKey.trim()) {
-    return generateSpatialBoard(prompt);
-  }
-
   try {
-    const existingNodes = Object.values(useCanvasStore.getState().nodes);
-    let boardContext = '';
-    if (existingNodes.length > 0) {
-      boardContext = `\n\nExisting Canvas Board Context:\n` + existingNodes.map((n) => {
-        const d = n.data as Record<string, any> | undefined;
-        const text = String(d?.text || d?.content || d?.title || d?.label || '');
-        return `- [${n.type.toUpperCase()}] "${text.slice(0, 150)}"`;
-      }).join('\n');
-    }
-
-    const fullUserPrompt = `User Request: ${prompt}${boardContext}`;
-
-    const systemPrompt = `You are Spatial AI for Canvio, an infinite canvas knowledge workspace.
-Generate a structured spatial knowledge graph for the given user request.
-Return ONLY raw JSON with this exact schema (no markdown block wrapper):
-{
-  "title": "Short title",
-  "nodes": [
-    {
-      "id": "node1",
-      "type": "sticky",
-      "position": { "x": 0, "y": 0 },
-      "size": { "width": 260, "height": 140 },
-      "data": {
-        "title": "Title (if frame)",
-        "color": "blue",
-        "text": "Card text content...",
-        "label": "Shape label...",
-        "shape": "rectangle"
-      }
-    }
-  ],
-  "relations": [
-    {
-      "sourceId": "node1",
-      "targetId": "node2",
-      "label": "relationship label",
-      "relationship": "depends_on"
-    }
-  ]
+    const result = await generateAIBoard({
+      prompt,
+      provider: normalizeProvider(provider),
+      model,
+      context: buildAIContext(),
+    });
+    return normalizeServerBoardResult(result.title, result.nodes, result.relations, prompt, 'server');
+  } catch (err) {
+    console.warn('Server AI generation unavailable. Falling back to local spatial template.', err);
+    return {
+      ...generateSpatialBoard(prompt),
+      source: 'local',
+      message: getAIFallbackMessage(err),
+    };
+  }
 }
-Types allowed: "sticky", "shape", "text", "frame".
-Sticky colors: "blue", "yellow", "green", "pink", "orange", "purple".
-Relationships: "depends_on", "leads_to", "enables", "based_on", "contradicts", "part_of", "related_to".
-Arrange nodes spatially with sensible X/Y offsets (e.g. 280px apart horizontally, 180px vertically).`;
 
-    let jsonText = '';
+function normalizeServerBoardResult(
+  title: string,
+  rawNodes: RawAIBoardNode[],
+  rawRelations: RawAIBoardRelation[],
+  fallbackTitle: string,
+  source: SpatialAIResult['source']
+): SpatialAIResult {
+  const createdAt = Date.now();
+  const idMap = new Map<string, string>();
+  const nodes: LivingNode[] = rawNodes.slice(0, 28).map((node, index) => {
+    const originalId = cleanText(node.id, 80) || `node_${index + 1}`;
+    const id = nanoid(10);
+    idMap.set(originalId, id);
+    const type = normalizeNodeType(node.type);
+    const data = node.data || {};
+    const color = normalizeStickyColor(data.color);
+    const text = cleanText(data.text, 600) || cleanText(data.label, 180) || cleanText(data.title, 120);
+    const label = cleanText(data.label, 180) || text.slice(0, 80);
+    const titleText = cleanText(data.title, 120) || label || text.slice(0, 80);
 
-    if (provider === 'gemini') {
-      const targetModel = model || 'gemini-2.5-flash';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: systemPrompt },
-                { text: fullUserPrompt }
-              ]
-            }
-          ]
-        })
-      });
-
-      if (!resp.ok) throw new Error(`Gemini API HTTP ${resp.status}`);
-      const data = await resp.json();
-      jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } else if (provider === 'openai') {
-      const targetModel = model || 'gpt-4o-mini';
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey.trim()}`
-        },
-        body: JSON.stringify({
-          model: targetModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: fullUserPrompt }
-          ],
-          response_format: { type: 'json_object' }
-        })
-      });
-
-      if (!resp.ok) throw new Error(`OpenAI API HTTP ${resp.status}`);
-      const data = await resp.json();
-      jsonText = data.choices?.[0]?.message?.content || '';
-    } else if (provider === 'anthropic') {
-      const targetModel = model || 'claude-3-5-sonnet';
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey.trim(),
-          'anthropic-version': '2023-06-01',
-          'dangerously-allow-browser': 'true'
-        },
-        body: JSON.stringify({
-          model: targetModel,
-          max_tokens: 2500,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: fullUserPrompt }]
-        })
-      });
-
-      if (!resp.ok) throw new Error(`Anthropic API HTTP ${resp.status}`);
-      const data = await resp.json();
-      jsonText = data.content?.[0]?.text || '';
-    }
-
-    const cleanJson = jsonText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
-
-    const createdAt = Date.now();
-    const formattedNodes: LivingNode[] = (parsed.nodes || []).map((n: any, idx: number) => ({
-      id: n.id || nanoid(10),
-      type: n.type || 'sticky',
-      position: n.position || { x: (idx % 3) * 280, y: Math.floor(idx / 3) * 180 },
-      size: n.size || { width: 260, height: 140 },
+    return {
+      id,
+      type,
+      position: {
+        x: clampNumber(node.position?.x, -10000, 10000, (index % 4) * 300),
+        y: clampNumber(node.position?.y, -10000, 10000, Math.floor(index / 4) * 190),
+      },
+      size: {
+        width: clampNumber(node.size?.width, 110, 1400, type === 'frame' ? 760 : 260),
+        height: clampNumber(node.size?.height, 70, 1000, type === 'frame' ? 460 : 140),
+      },
       rotation: 0,
-      zIndex: idx + 1,
+      zIndex: type === 'frame' ? 0 : index + 1,
       locked: false,
       data: {
-        color: n.data?.color || 'blue',
-        text: n.data?.text || n.data?.label || '',
-        title: n.data?.title || '',
-        label: n.data?.label || '',
-        shape: n.data?.shape || 'rectangle',
-        fill: n.data?.fill || 'rgba(128, 131, 255, 0.12)',
-        stroke: n.data?.stroke || '#8083ff',
+        ...data,
+        color,
+        text,
+        content: type === 'text' ? text : cleanText(data.content, 600),
+        title: type === 'frame' ? titleText : cleanText(data.title, 120),
+        label: type === 'shape' ? label : cleanText(data.label, 180),
+        shape: normalizeShape(data.shape),
+        fill: cleanText(data.fill, 80) || 'rgba(128, 131, 255, 0.12)',
+        stroke: normalizeColor(data.stroke, '#8083ff'),
       },
       createdAt,
       updatedAt: createdAt,
-    }));
-
-    const formattedRelations: Relation[] = (parsed.relations || []).map((r: any) => ({
-      id: nanoid(10),
-      sourceId: r.sourceId,
-      targetId: r.targetId,
-      label: r.label || 'relates to',
-      color: '#8083ff',
-      relationship: r.relationship || 'related_to',
-    }));
-
-    return {
-      title: parsed.title || `AI World: ${prompt.slice(0, 24)}`,
-      nodes: formattedNodes,
-      relations: formattedRelations,
     };
-  } catch (err) {
-    console.warn('Real AI generation failed or key was invalid. Falling back to spatial heuristic template.', err);
-    return generateSpatialBoard(prompt);
+  });
+
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const relations: Relation[] = rawRelations.slice(0, 60).flatMap((relation) => {
+    const sourceId = idMap.get(cleanText(relation.sourceId, 80));
+    const targetId = idMap.get(cleanText(relation.targetId, 80));
+    if (!sourceId || !targetId || sourceId === targetId || !nodeIds.has(sourceId) || !nodeIds.has(targetId)) return [];
+
+    return [{
+      id: nanoid(10),
+      sourceId,
+      sourcePort: normalizePort(relation.sourcePort),
+      targetId,
+      targetPort: normalizePort(relation.targetPort),
+      relationship: normalizeRelationship(relation.relationship),
+      label: cleanText(relation.label, 90) || 'relates to',
+      style: {
+        type: 'orthogonal',
+        color: normalizeColor(relation.color, '#6366f1'),
+        width: 2.5,
+        endArrow: 'arrow',
+      },
+    }];
+  });
+
+  return {
+    title: cleanText(title, 120) || `AI Board: ${fallbackTitle.slice(0, 32)}`,
+    nodes,
+    relations,
+    source,
+  };
+}
+
+function buildAIContext(nodes = Object.values(useCanvasStore.getState().nodes), relations = Object.values(useCanvasStore.getState().relations)) {
+  return {
+    nodes: nodes.slice(0, 80).map((node) => ({
+      id: node.id,
+      type: node.type,
+      text: getNodeText(node).slice(0, 280),
+    })),
+    relations: relations.slice(0, 140).map((relation) => ({
+      sourceId: relation.sourceId,
+      targetId: relation.targetId,
+      label: relation.label,
+      relationship: relation.relationship,
+    })),
+  };
+}
+
+function getNodeText(node: LivingNode) {
+  const data = node.data as Record<string, unknown> | undefined;
+  return String(data?.text || data?.content || data?.title || data?.label || '');
+}
+
+function normalizeProvider(provider?: string): AIProvider | undefined {
+  return provider === 'openai' || provider === 'anthropic' || provider === 'gemini' ? provider : undefined;
+}
+
+function getAIFallbackMessage(error: unknown) {
+  if (error instanceof ApiRequestError && error.code === 'AI_NOT_CONFIGURED') {
+    return 'Server AI is not configured yet, so Canvio used the local smart board generator.';
   }
+  return 'Server AI was unavailable, so Canvio used the local smart board generator.';
+}
+
+function normalizeNodeType(type: unknown) {
+  return type === 'shape' || type === 'text' || type === 'frame' || type === 'sticky' ? type : 'sticky';
+}
+
+function normalizeRelationship(value: unknown): Relation['relationship'] {
+  const relationship = cleanText(value, 40) as Relation['relationship'];
+  return ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'same_as', 'enables', 'inspired_by', 'custom'].includes(relationship)
+    ? relationship
+    : 'related_to';
+}
+
+function normalizePort(value: unknown) {
+  const port = cleanText(value, 40);
+  if (port === 'top' || port === 'right' || port === 'bottom' || port === 'left' || port === 'center' || port.startsWith('marker:')) return port;
+  return undefined;
+}
+
+function normalizeStickyColor(value: unknown) {
+  const color = cleanText(value, 24);
+  return ['blue', 'yellow', 'green', 'pink', 'orange', 'purple'].includes(color) ? color : 'blue';
+}
+
+function normalizeShape(value: unknown) {
+  const shape = cleanText(value, 24);
+  return ['rectangle', 'circle', 'diamond', 'triangle', 'hexagon'].includes(shape) ? shape : 'rectangle';
+}
+
+function normalizeColor(value: unknown, fallback: string) {
+  const color = cleanText(value, 32);
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
+}
+
+function cleanText(value: unknown, maxLength: number) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : '';
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback;
 }
 
 export async function expandNodeWithAIAsync(
   targetNode: LivingNode,
 ): Promise<SpatialAIResult> {
-  const provider = (localStorage.getItem('CANVIO_AI_PROVIDER') as string) || 'gemini';
-  const keyStorageKey = provider === 'gemini' ? 'CANVIO_GEMINI_KEY' : provider === 'openai' ? 'CANVIO_OPENAI_KEY' : 'CANVIO_ANTHROPIC_KEY';
-  const apiKey = localStorage.getItem(keyStorageKey) || localStorage.getItem('CANVIO_AI_API_KEY') || '';
+  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
   const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
 
   const targetData = targetNode.data as Record<string, any> | undefined;
   const nodeContent = String(targetData?.text || targetData?.content || targetData?.title || targetData?.label || 'Concept');
   const prompt = `Given this central node idea: "${nodeContent}", generate 3 distinct sub-topics or logical next steps. Connect each new sub-topic node to this central node (sourceId: "${targetNode.id}").`;
 
-  if (apiKey && apiKey.trim()) {
-    try {
-      const res = await generateSpatialBoardAsync(prompt, provider, apiKey, model);
-      if (res.nodes.length > 0) {
-        // Adjust positions relative to target node
-        const cx = targetNode.position.x;
-        const cy = targetNode.position.y;
-        res.nodes.forEach((n, idx) => {
-          n.position = {
-            x: cx + 320,
-            y: cy + (idx - 1) * 160,
-          };
-        });
+  try {
+    const res = await generateSpatialBoardAsync(prompt, provider, undefined, model);
+    if (res.source === 'server' && res.nodes.length > 0) {
+      const cx = targetNode.position.x;
+      const cy = targetNode.position.y;
+      res.nodes.forEach((n, idx) => {
+        n.position = {
+          x: cx + 320,
+          y: cy + (idx - 1) * 160,
+        };
+      });
 
-        // Ensure relations link back to targetNode.id
-        res.nodes.forEach((n) => {
-          if (!res.relations.some((r) => r.sourceId === targetNode.id && r.targetId === n.id)) {
-            res.relations.push(relation(targetNode.id, n.id, 'expands into', '#8083ff', 'leads_to'));
-          }
-        });
-      }
+      res.nodes.forEach((n) => {
+        if (!res.relations.some((r) => r.sourceId === targetNode.id && r.targetId === n.id)) {
+          res.relations.push(relation(targetNode.id, n.id, 'expands into', '#8083ff', 'leads_to'));
+        }
+      });
       return res;
-    } catch {
-      // Fallback below
     }
+  } catch {
+    // Fallback below
   }
 
   // Fallback heuristic expand
@@ -241,9 +256,7 @@ export async function summarizeBoardWithAIAsync(
   nodes: LivingNode[],
   relations: Relation[]
 ): Promise<SpatialAIResult> {
-  const provider = (localStorage.getItem('CANVIO_AI_PROVIDER') as string) || 'gemini';
-  const keyStorageKey = provider === 'gemini' ? 'CANVIO_GEMINI_KEY' : provider === 'openai' ? 'CANVIO_OPENAI_KEY' : 'CANVIO_ANTHROPIC_KEY';
-  const apiKey = localStorage.getItem(keyStorageKey) || localStorage.getItem('CANVIO_AI_API_KEY') || '';
+  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
   const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
 
   const viewport = useCanvasStore.getState().viewport;
@@ -251,30 +264,24 @@ export async function summarizeBoardWithAIAsync(
   const cx = -viewport.x / zoom + (window.innerWidth / (2 * zoom));
   const cy = -viewport.y / zoom + (window.innerHeight / (2 * zoom));
 
-  const graphSummary = nodes.map((n) => {
-    const d = n.data as Record<string, any> | undefined;
-    const text = String(d?.text || d?.content || d?.title || d?.label || '');
-    return `- [${n.type.toUpperCase()}] "${text.slice(0, 80)}"`;
-  }).join('\n');
-
-  const prompt = `Analyze this entire canvas whiteboard graph:\n${graphSummary}\n\nGenerate an executive AI Summary Board with 4 summary cards covering: 1. Core Summary, 2. Key Decisions, 3. Critical Risks, 4. Action Plan.`;
-
-  if (apiKey && apiKey.trim()) {
-    try {
-      const res = await generateSpatialBoardAsync(prompt, provider, apiKey, model);
-      if (res.nodes.length > 0) {
-        // Offset generated summary nodes to current viewport center
-        res.nodes.forEach((n, idx) => {
-          n.position = {
-            x: cx - 400 + (idx % 2) * 420,
-            y: cy - 200 + Math.floor(idx / 2) * 200,
-          };
-        });
-      }
-      return res;
-    } catch {
-      // Fallback below
+  try {
+    const result = await summarizeAIBoard({
+      provider,
+      model,
+      context: buildAIContext(nodes, relations),
+    });
+    const normalized = normalizeServerBoardResult(result.title, result.nodes, result.relations, 'Executive board summary', 'server');
+    if (normalized.nodes.length > 0) {
+      normalized.nodes.forEach((n, idx) => {
+        n.position = {
+          x: cx - 400 + (idx % 2) * 420,
+          y: cy - 200 + Math.floor(idx / 2) * 200,
+        };
+      });
     }
+    return normalized;
+  } catch (err) {
+    console.warn('Server AI summary unavailable. Falling back to local summary board.', err);
   }
 
   // Fallback heuristic summary
@@ -301,6 +308,8 @@ export async function summarizeBoardWithAIAsync(
       relation(s3, s2, 'constrains', '#ef4444', 'contradicts'),
       relation(s2, s4, 'enables', '#22c55e', 'enables'),
     ],
+    source: 'local',
+    message: 'Server AI is not configured yet, so Canvio used the local summary generator.',
   };
 }
 
@@ -308,51 +317,86 @@ export async function organizeAndClusterWithAIAsync(
   nodes: LivingNode[],
   updateNode: (id: string, patch: Partial<LivingNode>) => void,
   addNode: (node: LivingNode) => void
-): Promise<{ clustersCount: number }> {
+): Promise<{ clustersCount: number; source?: 'server' | 'local'; message?: string }> {
   if (nodes.length === 0) return { clustersCount: 0 };
 
-  const provider = (localStorage.getItem('CANVIO_AI_PROVIDER') as string) || 'gemini';
-  const keyStorageKey = provider === 'gemini' ? 'CANVIO_GEMINI_KEY' : provider === 'openai' ? 'CANVIO_OPENAI_KEY' : 'CANVIO_ANTHROPIC_KEY';
-  const apiKey = localStorage.getItem(keyStorageKey) || localStorage.getItem('CANVIO_AI_API_KEY') || '';
-
-  // Group nodes into 3 columns (clusters)
   const CLUSTER_PRESETS = [
     { title: '💡 Strategy & Ideas', color: '#8b5cf6', stickyColor: 'purple' },
     { title: '⚡ Execution & Tasks', color: '#22c55e', stickyColor: 'green' },
     { title: '🚨 Risks & Review', color: '#f59e0b', stickyColor: 'orange' },
   ];
+  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
+  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
 
-  const total = nodes.length;
-  const nodesPerCluster = Math.ceil(total / 3);
-
-  nodes.forEach((n, idx) => {
-    const clusterIdx = Math.min(2, Math.floor(idx / nodesPerCluster));
-    const inClusterPos = idx % nodesPerCluster;
-    const colX = (clusterIdx - 1) * 380;
-    const rowY = inClusterPos * 180;
-
-    updateNode(n.id, {
-      position: { x: colX, y: rowY },
-      ...(n.type === 'sticky' ? { data: { ...n.data, color: CLUSTER_PRESETS[clusterIdx].stickyColor } } : {}),
+  try {
+    const result = await organizeAIClusters({
+      provider,
+      model,
+      context: buildAIContext(nodes, Object.values(useCanvasStore.getState().relations)),
     });
-  });
+    if (result.clusters.length > 0) {
+      applyClusterLayout(
+        nodes,
+        result.clusters.map((cluster, idx) => ({
+          title: cluster.title,
+          color: cluster.color,
+          stickyColor: CLUSTER_PRESETS[idx % CLUSTER_PRESETS.length].stickyColor,
+          nodeIds: cluster.nodeIds,
+        })),
+        updateNode,
+        addNode
+      );
+      return { clustersCount: result.clusters.length, source: 'server' };
+    }
+  } catch (err) {
+    console.warn('Server AI clustering unavailable. Falling back to local clustering.', err);
+  }
 
-  // Create 3 Frame clusters around them
-  CLUSTER_PRESETS.forEach((cp, idx) => {
-    const colX = (idx - 1) * 380 - 20;
-    const frameNode = frame(
+  const nodesPerCluster = Math.ceil(nodes.length / CLUSTER_PRESETS.length);
+  const localClusters = CLUSTER_PRESETS.map((preset, clusterIdx) => ({
+    ...preset,
+    nodeIds: nodes.slice(clusterIdx * nodesPerCluster, clusterIdx * nodesPerCluster + nodesPerCluster).map((node) => node.id),
+  })).filter((cluster) => cluster.nodeIds.length > 0);
+
+  applyClusterLayout(nodes, localClusters, updateNode, addNode);
+  return {
+    clustersCount: localClusters.length,
+    source: 'local',
+    message: 'Server AI is not configured yet, so Canvio used the local organizer.',
+  };
+}
+
+function applyClusterLayout(
+  nodes: LivingNode[],
+  clusters: Array<{ title: string; color: string; stickyColor: string; nodeIds: string[] }>,
+  updateNode: (id: string, patch: Partial<LivingNode>) => void,
+  addNode: (node: LivingNode) => void
+) {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const clusterGap = 410;
+
+  clusters.forEach((cluster, clusterIdx) => {
+    const clusterNodes = cluster.nodeIds.map((id) => nodeById.get(id)).filter(Boolean) as LivingNode[];
+    if (clusterNodes.length === 0) return;
+
+    const colX = (clusterIdx - (clusters.length - 1) / 2) * clusterGap;
+    clusterNodes.forEach((node, nodeIdx) => {
+      updateNode(node.id, {
+        position: { x: colX, y: nodeIdx * 180 },
+        ...(node.type === 'sticky' ? { data: { ...node.data, color: cluster.stickyColor } } : {}),
+      });
+    });
+
+    addNode(frame(
       nanoid(10),
-      colX,
-      -60,
-      340,
-      Math.max(300, nodesPerCluster * 180 + 80),
-      cp.title,
-      cp.color
-    );
-    addNode(frameNode);
+      colX - 22,
+      -62,
+      346,
+      Math.max(300, clusterNodes.length * 180 + 84),
+      cluster.title,
+      normalizeColor(cluster.color, '#6366f1')
+    ));
   });
-
-  return { clustersCount: 3 };
 }
 
 const markerPort = (id: string) => `marker:${id}`;

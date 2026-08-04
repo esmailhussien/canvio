@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, type CSSProperties } from 'react';
 import { LivingNode } from '../../store/canvasStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { DrawingNode, StickyNote, MapNode, TextNode, ImageNode, ShapeNode, FrameNode, CodeNode } from '@canvio/objects';
@@ -19,6 +19,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   const isSelected = useCanvasStore(useCallback(s => s.selectedNodeIds.includes(node.id), [node.id]));
   const isOnlySelected = useCanvasStore(useCallback(s => s.selectedNodeIds.length === 1 && s.selectedNodeIds.includes(node.id), [node.id]));
   const selectNode = useCanvasStore(s => s.selectNode);
+  const viewportZoom = useCanvasStore(s => s.viewport.zoom);
   
   const activeTool = useCanvasStore(s => s.activeTool);
   const relationSourceId = useCanvasStore(s => s.relationSourceId);
@@ -39,6 +40,20 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     (relationSourceId !== node.id || relationTargetPort !== relationSourcePort);
   const isFocusDimmed = Boolean(focusNodeId && focusNodeId !== node.id);
   const isFocusActive = focusNodeId === node.id;
+  const getNearestEdgePort = useCallback((clientX: number, clientY: number) => {
+    const element = document.querySelector(`[data-node-id="${node.id}"]`) as HTMLElement | null;
+    const rect = element?.getBoundingClientRect();
+    if (!rect) return undefined;
+
+    const distances = [
+      { port: 'top' as const, value: Math.abs(clientY - rect.top) },
+      { port: 'right' as const, value: Math.abs(rect.right - clientX) },
+      { port: 'bottom' as const, value: Math.abs(rect.bottom - clientY) },
+      { port: 'left' as const, value: Math.abs(clientX - rect.left) },
+    ];
+    distances.sort((a, b) => a.value - b.value);
+    return distances[0].port;
+  }, [node.id]);
 
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number, y: number } | null>(null);
@@ -54,7 +69,12 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   // grab and move a note by touching its text, instead of every tap opening the
   // keyboard and blocking the drag.
   const pendingTapEditTargetRef = useRef<HTMLElement | null>(null);
-  const DRAG_THRESHOLD_PX = 6;
+  const pendingTapShouldEditRef = useRef(false);
+  const getDragThreshold = (pointerType: string) => {
+    if (pointerType === 'touch') return 12;
+    if (pointerType === 'pen') return 9;
+    return 6;
+  };
 
   const [resizeDir, setResizeDir] = useState<'tl' | 'tr' | 'bl' | 'br' | null>(null);
   const resizeStartRef = useRef<{ x: number, y: number, width: number, height: number, posX: number, posY: number } | null>(null);
@@ -128,12 +148,13 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     // Relation Tool
     if (activeTool === 'relation') {
       e.stopPropagation();
+      const nearestPort = getNearestEdgePort(e.clientX, e.clientY);
       if (!relationSourceId) {
-        setRelationSource(node.id);
-      } else if (relationSourceId === node.id && !relationSourcePort) {
+        setRelationSource(node.id, nearestPort);
+      } else if (relationSourceId === node.id) {
         setRelationSourceId(null);
       } else {
-        completeRelationTo(relationTargetId === node.id ? relationTargetPort || undefined : undefined);
+        completeRelationTo(relationTargetId === node.id ? relationTargetPort || nearestPort : nearestPort);
       }
       return;
     }
@@ -153,7 +174,10 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     const targetTag = target.tagName.toLowerCase();
     const isEditingField = targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file') || Boolean(target.closest('.shape-node__textarea, .sticky-note__textarea, .text-node__editor, .code-node__textarea'));
     const isStickyTextarea = Boolean(target.closest('.sticky-note__textarea'));
+    const isEditableSurface = Boolean(target.closest('.sticky-note__textarea, .text-node__content, .text-node__placeholder, .shape-node__label'));
     const isClickableTarget = Boolean(target.closest('.image-node__placeholder, .image-node__replace-btn, .image-node--empty'));
+    const isTouchLike = e.pointerType === 'touch' || e.pointerType === 'pen';
+    const wasSelectedBeforeTap = useCanvasStore.getState().selectedNodeIds.includes(node.id);
 
     if (isEditingField && (!isStickyTextarea || document.activeElement === target)) {
       e.stopPropagation();
@@ -161,11 +185,13 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       return;
     }
 
-    if (isClickableTarget || isStickyTextarea) {
+    if (isClickableTarget || isEditableSurface) {
       e.preventDefault();
       pendingTapEditTargetRef.current = target;
+      pendingTapShouldEditRef.current = !isTouchLike || wasSelectedBeforeTap;
     } else {
       pendingTapEditTargetRef.current = null;
+      pendingTapShouldEditRef.current = false;
       e.preventDefault();
     }
 
@@ -184,7 +210,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       dragStartRef.current = { x: e.clientX, y: e.clientY };
       originalNodePosRef.current = { x: node.position.x, y: node.position.y };
     }
-  }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationSourcePort, relationTargetId, relationTargetPort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode, snapshot, node.position, presentationMode]);
+  }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationTargetId, relationTargetPort, getNearestEdgePort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode, snapshot, node.position, presentationMode]);
 
   const rafIdRef = useRef<number | null>(null);
 
@@ -193,7 +219,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       if (!hasExceededDragThresholdRef.current && dragOriginRef.current) {
         const totalDx = e.clientX - dragOriginRef.current.x;
         const totalDy = e.clientY - dragOriginRef.current.y;
-        if (Math.hypot(totalDx, totalDy) <= DRAG_THRESHOLD_PX) {
+        if (Math.hypot(totalDx, totalDy) <= getDragThreshold(e.pointerType)) {
           // Still within tap tolerance — don't move the node yet, and don't let
           // tiny jitter nudge it before we know this is really a drag.
           return;
@@ -303,16 +329,22 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     dragStartRef.current = null;
     dragOriginRef.current = null;
     if (!hasExceededDragThresholdRef.current && pendingTapEditTargetRef.current) {
-      // A genuine stationary tap (no drag) — focus text field or click action control now.
+      // A genuine stationary tap (no drag) — focus text on the second touch/pen
+      // tap, while mouse users keep the immediate editing behavior.
       const target = pendingTapEditTargetRef.current;
       const targetTag = target.tagName.toLowerCase();
-      if (targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file')) {
-        target.focus();
-      } else {
+      if (pendingTapShouldEditRef.current) {
+        if (targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file')) {
+          target.focus();
+        } else {
+          window.dispatchEvent(new CustomEvent('canvio:edit-node', { detail: { nodeId: node.id } }));
+        }
+      } else if (!(targetTag === 'textarea' || (targetTag === 'input' && target.getAttribute('type') !== 'file'))) {
         target.click();
       }
     }
     pendingTapEditTargetRef.current = null;
+    pendingTapShouldEditRef.current = false;
     hasExceededDragThresholdRef.current = false;
     useCanvasStore.getState().setSnapLines(null);
   }, []);
@@ -446,14 +478,14 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     }
   };
 
-  const handleNodeEnter = () => {
+  const handleNodeEnter = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsHovered(true);
-    updateRelationTargetForNode();
+    updateRelationTargetForNode(e);
   };
 
-  const updateRelationTargetForNode = () => {
+  const updateRelationTargetForNode = (e?: React.MouseEvent<HTMLDivElement>) => {
     if (activeTool === 'relation' && relationSourceId && relationSourceId !== node.id) {
-      setRelationTarget(node.id);
+      setRelationTarget(node.id, e ? getNearestEdgePort(e.clientX, e.clientY) : undefined);
     }
   };
 
@@ -470,15 +502,20 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     }
   };
 
+  const nodeTouchScale = Math.max(1, Math.min(2.75, 1 / Math.max(0.32, viewportZoom)));
+  const nodeStyle = {
+    transform: `translate(${node.position.x}px, ${node.position.y}px)`,
+    width: node.size.width,
+    height: node.size.height,
+    zIndex: node.zIndex,
+    '--node-touch-scale': nodeTouchScale,
+  } as CSSProperties;
+
   return (
     <div
       className={`node-renderer node-type-${node.type} ${isSelected ? 'selected' : ''} ${isRelationSource ? 'relation-source' : ''} ${isRelationTarget ? 'relation-target' : ''} ${!presentationMode && activeTool === 'relation' ? 'relation-mode' : ''} ${isInteractionBusy ? 'is-interacting' : ''} ${presentationMode ? 'presentation-mode' : ''} ${isFocusDimmed ? 'focus-dimmed' : ''} ${isFocusActive ? 'focus-active' : ''}`}
-      style={{
-        transform: `translate(${node.position.x}px, ${node.position.y}px)`,
-        width: node.size.width,
-        height: node.size.height,
-        zIndex: node.zIndex,
-      }}
+      data-node-id={node.id}
+      style={nodeStyle}
       onPointerDown={handlePointerDown}
       onMouseEnter={handleNodeEnter}
       onMouseMove={updateRelationTargetForNode}
@@ -509,10 +546,10 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       {/* Interactive Connection Ports (rendered on hover, selection, or relation mode) */}
       {!presentationMode && (isHovered || isSelected || activeTool === 'relation') && (
         <>
-          <div className={`node-port top ${relationSourcePort === 'top' || (isRelationTarget && relationTargetPort === 'top') ? 'active' : ''}`} title="Top connection" onMouseEnter={handlePortEnter('top')} onPointerEnter={handlePortEnter('top')} onPointerDown={handlePortStart('top')} />
-          <div className={`node-port right ${relationSourcePort === 'right' || (isRelationTarget && relationTargetPort === 'right') ? 'active' : ''}`} title="Right connection" onMouseEnter={handlePortEnter('right')} onPointerEnter={handlePortEnter('right')} onPointerDown={handlePortStart('right')} />
-          <div className={`node-port bottom ${relationSourcePort === 'bottom' || (isRelationTarget && relationTargetPort === 'bottom') ? 'active' : ''}`} title="Bottom connection" onMouseEnter={handlePortEnter('bottom')} onPointerEnter={handlePortEnter('bottom')} onPointerDown={handlePortStart('bottom')} />
-          <div className={`node-port left ${relationSourcePort === 'left' || (isRelationTarget && relationTargetPort === 'left') ? 'active' : ''}`} title="Left connection" onMouseEnter={handlePortEnter('left')} onPointerEnter={handlePortEnter('left')} onPointerDown={handlePortStart('left')} />
+          <div className={`node-port top ${(isRelationSource && relationSourcePort === 'top') || (isRelationTarget && relationTargetPort === 'top') ? 'active' : ''}`} title="Top connection" onMouseEnter={handlePortEnter('top')} onPointerEnter={handlePortEnter('top')} onPointerDown={handlePortStart('top')} />
+          <div className={`node-port right ${(isRelationSource && relationSourcePort === 'right') || (isRelationTarget && relationTargetPort === 'right') ? 'active' : ''}`} title="Right connection" onMouseEnter={handlePortEnter('right')} onPointerEnter={handlePortEnter('right')} onPointerDown={handlePortStart('right')} />
+          <div className={`node-port bottom ${(isRelationSource && relationSourcePort === 'bottom') || (isRelationTarget && relationTargetPort === 'bottom') ? 'active' : ''}`} title="Bottom connection" onMouseEnter={handlePortEnter('bottom')} onPointerEnter={handlePortEnter('bottom')} onPointerDown={handlePortStart('bottom')} />
+          <div className={`node-port left ${(isRelationSource && relationSourcePort === 'left') || (isRelationTarget && relationTargetPort === 'left') ? 'active' : ''}`} title="Left connection" onMouseEnter={handlePortEnter('left')} onPointerEnter={handlePortEnter('left')} onPointerDown={handlePortStart('left')} />
         </>
       )}
 

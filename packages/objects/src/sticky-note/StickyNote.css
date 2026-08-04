@@ -33,9 +33,9 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 28px;
-  height: 22px;
-  border-radius: 11px;
+  width: 32px;
+  height: 26px;
+  border-radius: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,7 +93,7 @@
   background: transparent;
   border: none;
   resize: none;
-  padding: 0 42px 0 0;
+  padding: 0 46px 0 0;
   margin: 0;
   box-sizing: border-box;
 }
@@ -159,5 +159,25 @@
   .sticky-note__text,
   .sticky-note__textarea {
     padding-right: 48px;
+  }
+}
+
+@media (max-width: 520px) {
+  .sticky-note {
+    padding: 18px;
+  }
+
+  .sticky-note__drag-handle {
+    top: 7px;
+    right: 7px;
+    width: calc(44px * var(--node-touch-scale, 1));
+    height: calc(44px * var(--node-touch-scale, 1));
+    border-radius: calc(14px * var(--node-touch-scale, 1));
+    opacity: 0.95;
+  }
+
+  .sticky-note__text,
+  .sticky-note__textarea {
+    padding-right: calc(54px * var(--node-touch-scale, 1));
   }
 }

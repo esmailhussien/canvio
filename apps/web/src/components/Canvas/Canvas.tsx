@@ -214,7 +214,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
         if (touchPanStartRef.current) {
           const totalDx = e.clientX - touchPanStartRef.current.x;
           const totalDy = e.clientY - touchPanStartRef.current.y;
-          if (Math.hypot(totalDx, totalDy) > 8) {
+          if (Math.hypot(totalDx, totalDy) > 12) {
             touchPanStartRef.current.moved = true;
           }
         }
@@ -377,6 +377,14 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           : 'canvas--relation-aiming'
         : 'canvas--relation-ready'
       : '';
+  const relationGuideText =
+    activeTool !== 'relation'
+      ? ''
+      : relationSourceId
+        ? relationTargetId
+          ? 'Tap to connect'
+          : 'Choose the target side'
+        : 'Choose a start side';
 
   return (
     <div
@@ -402,6 +410,13 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           backgroundPosition: `calc(50% + ${viewport.x * viewport.zoom}px) calc(50% + ${viewport.y * viewport.zoom}px)`
         }} 
       />
+
+      {!presentationMode && activeTool === 'relation' && (
+        <div className={`canvas__relation-guide ${relationSourceId ? 'is-aiming' : 'is-ready'} ${relationTargetId ? 'is-snapped' : ''}`}>
+          <span className="canvas__relation-guide-dot" />
+          <span>{relationGuideText}</span>
+        </div>
+      )}
 
       <div className="canvas__world" style={{ transform }}>
         {/* Relation preview line */}

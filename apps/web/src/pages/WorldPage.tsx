@@ -46,6 +46,7 @@ export function WorldPage() {
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const selectNode = useCanvasStore((s) => s.selectNode);
+  const clearSelection = useCanvasStore((s) => s.clearSelection);
   const nextZIndex = useCanvasStore((s) => s.nextZIndex);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const theme = useCanvasStore((s) => s.theme);
@@ -104,6 +105,7 @@ export function WorldPage() {
   };
 
   const selectedFocusNodeId = selectedNodeIds[0] || null;
+  const isSelectedNodeFocused = Boolean(selectedFocusNodeId && focusNodeId === selectedFocusNodeId);
 
   const handleFitPresentationView = () => {
     if (focusNodeId && nodes[focusNodeId]) {
@@ -155,13 +157,24 @@ export function WorldPage() {
     navigate(`/w/${newId}`);
   };
 
+  const handleExperimentSelection = () => {
+    if (selectedNodeIds.length === 0) return;
+    branchSelectionAsExperiment();
+    setActiveTool('select');
+  };
+
+  const handleClearSelectionContext = () => {
+    clearSelection();
+    setFocusNodeId(null);
+  };
+
   const handleStartFromScratch = (reset = false) => {
-    setIsStarterDismissed(true);
     if (reset && Object.keys(nodes).length > 0) {
       const confirmed = window.confirm('Start with a blank canvas? Current canvas content will be cleared.');
       if (!confirmed) return;
     }
 
+    setIsStarterDismissed(true);
     replaceWorld({
       nodes: {},
       relations: {},
@@ -203,6 +216,7 @@ export function WorldPage() {
   const handleStartTemplate = (templateId: string) => {
     setIsStarterDismissed(true);
     applyTemplate(templateId);
+    clearSelection();
     setActiveTool('select');
   };
 
@@ -380,6 +394,38 @@ export function WorldPage() {
         </div>
       )}
 
+      {!isPresenting && selectedNodeIds.length > 0 && (
+        <div className="selection-quick-actions" role="toolbar" aria-label="Selection quick actions">
+          <span className="selection-quick-actions__count">
+            {selectedNodeIds.length === 1 ? '1 selected' : `${selectedNodeIds.length} selected`}
+          </span>
+          <button
+            className="selection-quick-actions__btn"
+            onClick={handleExperimentSelection}
+            title="Create an editable copy to try another version"
+          >
+            <span className="material-symbols-outlined">difference</span>
+            <span>Experiment</span>
+          </button>
+          <button
+            className="selection-quick-actions__btn"
+            onClick={isSelectedNodeFocused ? handleClearFocus : handleFocusSelectedNode}
+            title={isSelectedNodeFocused ? 'Show all elements' : 'Spotlight selected element'}
+          >
+            <span className="material-symbols-outlined">{isSelectedNodeFocused ? 'visibility' : 'filter_center_focus'}</span>
+            <span>{isSelectedNodeFocused ? 'All' : 'Focus'}</span>
+          </button>
+          <button
+            className="selection-quick-actions__btn selection-quick-actions__btn--quiet"
+            onClick={handleClearSelectionContext}
+            title="Clear selection"
+            aria-label="Clear selection"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      )}
+
       {/* Modern Compact Top Navigation Header Bar */}
       {!isPresenting && <header className="world-header">
         {/* Left: Canvio Brand Menu & Export */}
@@ -409,6 +455,19 @@ export function WorldPage() {
                 <span className="material-symbols-outlined text-sm">add_circle</span>
                 <span>New Blank Board</span>
               </button>
+
+              {Object.keys(nodes).length > 0 && (
+                <button
+                  className="canvio-menu-item canvio-menu-item--danger"
+                  onClick={() => {
+                    handleStartFromScratch(true);
+                    setIsCanvioMenuOpen(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-sm">restart_alt</span>
+                  <span>Start Over This Board</span>
+                </button>
+              )}
 
               <button
                 className="canvio-menu-item"
@@ -444,11 +503,11 @@ export function WorldPage() {
                 <button
                   className="canvio-menu-item"
                   onClick={() => {
-                    branchSelectionAsExperiment();
+                    handleExperimentSelection();
                     setIsCanvioMenuOpen(false);
                   }}
                 >
-                  <span className="material-symbols-outlined text-sm">content_copy</span>
+                  <span className="material-symbols-outlined text-sm">difference</span>
                   <span>Experiment With Selection</span>
                 </button>
               )}

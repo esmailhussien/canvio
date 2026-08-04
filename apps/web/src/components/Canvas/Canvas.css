@@ -20,6 +20,43 @@
   cursor: alias;
 }
 
+.canvas__relation-guide {
+  position: fixed;
+  left: 50%;
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: calc(var(--z-toolbar) + 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--toolbar-bg) 94%, transparent);
+  box-shadow: var(--toolbar-shadow);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 750;
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.canvas__relation-guide-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--relation-active);
+  box-shadow: 0 0 0 5px var(--relation-active-soft);
+}
+
+.canvas__relation-guide.is-snapped .canvas__relation-guide-dot {
+  background: var(--accent-success);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-success) 22%, transparent);
+}
+
 .canvas--presenting {
   cursor: grab;
 }
@@ -180,6 +217,12 @@
 }
 
 @media (pointer: coarse) {
+  .canvas__relation-guide {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    min-height: 42px;
+    font-size: 0.84rem;
+  }
+
   .canvas__radial-ring {
     width: 196px;
     height: 196px;

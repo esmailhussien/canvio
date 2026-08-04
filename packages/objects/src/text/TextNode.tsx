@@ -50,6 +50,17 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    const handleEditRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ nodeId?: string }>).detail;
+      if (detail?.nodeId === node.id) {
+        setIsEditing(true);
+      }
+    };
+    window.addEventListener('canvio:edit-node', handleEditRequest);
+    return () => window.removeEventListener('canvio:edit-node', handleEditRequest);
+  }, [node.id]);
+
   const handleDoubleClick = () => {
     setIsEditing(true);
   };
