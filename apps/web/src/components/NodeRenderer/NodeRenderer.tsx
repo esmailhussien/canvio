@@ -503,11 +503,14 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   };
 
   const nodeTouchScale = Math.max(1, Math.min(2.75, 1 / Math.max(0.32, viewportZoom)));
+  const baseZIndex = Number.isFinite(node.zIndex) ? node.zIndex : 0;
+  const shouldElevateForEditing =
+    node.type !== 'frame' && (isSelected || isInteractionBusy || isRelationSource || isRelationTarget);
   const nodeStyle = {
     transform: `translate(${node.position.x}px, ${node.position.y}px)`,
     width: node.size.width,
     height: node.size.height,
-    zIndex: node.zIndex,
+    zIndex: shouldElevateForEditing ? baseZIndex + 10000 : baseZIndex,
     '--node-touch-scale': nodeTouchScale,
   } as CSSProperties;
 

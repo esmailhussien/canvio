@@ -90,6 +90,26 @@
   pointer-events: auto;
 }
 
+.canvas__relations-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: var(--z-relations, 5);
+  pointer-events: none;
+}
+
+.canvas__relations-layer > svg {
+  z-index: 0 !important;
+}
+
+.canvas__nodes-layer {
+  position: relative;
+  z-index: 30;
+}
+
 .canvas__radial-ring {
   position: fixed;
   z-index: 1000;

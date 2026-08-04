@@ -1,9 +1,19 @@
-import { getApiBaseUrl } from './runtimeConfig';
+import { getApiBaseUrl, getCanvioApiToken, getCanvioClientId } from './runtimeConfig';
 
 const API_BASE = getApiBaseUrl();
 
 function apiUrl(path: string) {
   return `${API_BASE}${path}`;
+}
+
+function requestHeaders(json = false) {
+  const headers: Record<string, string> = {
+    'x-canvio-client-id': getCanvioClientId(),
+  };
+  const token = getCanvioApiToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (json) headers['Content-Type'] = 'application/json';
+  return headers;
 }
 
 export interface BoardRecord {
@@ -84,13 +94,18 @@ export class ApiRequestError extends Error {
 }
 
 export async function createBoard() {
-  const response = await fetch(apiUrl('/api/boards'), { method: 'POST' });
+  const response = await fetch(apiUrl('/api/boards'), {
+    method: 'POST',
+    headers: requestHeaders(),
+  });
   if (!response.ok) throw new Error(`Failed to create board: ${response.status}`);
   return response.json() as Promise<BoardRecord>;
 }
 
 export async function touchBoard(id: string) {
-  const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}`));
+  const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}`), {
+    headers: requestHeaders(),
+  });
   if (!response.ok) throw new Error(`Failed to load board: ${response.status}`);
   return response.json() as Promise<BoardRecord>;
 }
@@ -101,7 +116,7 @@ export async function updateBoardAppearance(
 ) {
   const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}`), {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(true),
     body: JSON.stringify({ appearance }),
   });
   if (!response.ok) throw new Error(`Failed to update board appearance: ${response.status}`);
@@ -136,7 +151,7 @@ export async function organizeAIClusters(request: {
 async function postAI<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: requestHeaders(true),
     body: JSON.stringify(body),
   });
 

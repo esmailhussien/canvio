@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import dotenv from 'dotenv';
 import { boardRoutes } from './routes/boards.js';
 import { aiRoutes } from './routes/ai.js';
+import { createCorsOriginGuard } from './security.js';
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ const app = Fastify({
 });
 
 app.register(cors, {
-  origin: true,
+  origin: createCorsOriginGuard(),
 });
 
 app.get('/', async () => {

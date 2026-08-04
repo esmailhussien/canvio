@@ -512,8 +512,16 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           );
         })()}
 
+        {/* Relations are board content, so keep them below nodes and editing controls. */}
+        <div className="canvas__relations-layer">
+          <RelationRenderer relations={relations} nodes={nodes} presentationMode={presentationMode} focusNodeId={focusNodeId} />
+        </div>
+
         {/* Nodes layer (Virtualization / Viewport Culled for high performance) */}
-        <div style={{ pointerEvents: presentationMode || activeTool === 'select' || activeTool === 'relation' || activeTool === 'eraser' ? 'auto' : 'none' }}>
+        <div
+          className="canvas__nodes-layer"
+          style={{ pointerEvents: presentationMode || activeTool === 'select' || activeTool === 'relation' || activeTool === 'eraser' ? 'auto' : 'none' }}
+        >
           {visibleNodes.map((node) => (
             <NodeRenderer key={node.id} node={node} presentationMode={presentationMode} focusNodeId={focusNodeId} />
           ))}
@@ -549,9 +557,6 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
 
         {/* Multi-selection layout tools */}
         {!presentationMode && <MultiSelectionInspector />}
-
-        {/* Relations layer */}
-        <RelationRenderer relations={relations} nodes={nodes} presentationMode={presentationMode} focusNodeId={focusNodeId} />
 
         {/* Marquee Selection Box */}
         {isMarqueeActive && marqueeStart && marqueeEnd && (

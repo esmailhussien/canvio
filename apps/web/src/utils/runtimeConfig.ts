@@ -1,6 +1,7 @@
 export interface CanvioRuntimeConfig {
   apiUrl?: string;
   wsUrl?: string;
+  apiToken?: string;
 }
 
 declare global {
@@ -19,6 +20,27 @@ export function getApiBaseUrl() {
     import.meta.env.VITE_API_URL ||
     ''
   ).replace(/\/$/, '');
+}
+
+export function getCanvioClientId() {
+  const storageKey = 'canvio-client-id';
+  try {
+    const existing = window.localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const generated = window.crypto?.randomUUID?.() || `client-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(storageKey, generated);
+    return generated;
+  } catch {
+    return 'browser-session';
+  }
+}
+
+export function getCanvioApiToken() {
+  return (
+    getRuntimeConfig().apiToken ||
+    import.meta.env.VITE_CANVIO_API_TOKEN ||
+    ''
+  ).trim();
 }
 
 export function getWebSocketUrl() {

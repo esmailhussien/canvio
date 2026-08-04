@@ -430,18 +430,29 @@ export function WorldPage() {
       {!isPresenting && <header className="world-header">
         {/* Left: Canvio Brand Menu & Export */}
         <div className="world-header__left" ref={menuRef}>
-          <button
-            className="canvio-brand-btn"
-            onClick={() => {
-              setIsCanvioMenuOpen((prev) => !prev);
-              setIsExportMenuOpen(false);
-            }}
-            aria-label="Canvio Workspace Menu"
-          >
-            <CanvioLogoIcon size={24} />
-            <span className="canvio-brand-text">Canvio</span>
-            <span className="canvio-arrow">▾</span>
-          </button>
+          <div className="canvio-brand-group" aria-label="Canvio navigation">
+            <button
+              className="canvio-brand-btn"
+              onClick={() => navigate('/')}
+              aria-label="Go to Canvio home"
+              title="Go to home"
+            >
+              <CanvioLogoIcon size={24} />
+              <span className="canvio-brand-text">Canvio</span>
+            </button>
+            <button
+              className="canvio-brand-menu-toggle"
+              onClick={() => {
+                setIsCanvioMenuOpen((prev) => !prev);
+                setIsExportMenuOpen(false);
+              }}
+              aria-label="Open Canvio workspace menu"
+              aria-expanded={isCanvioMenuOpen}
+              title="Workspace menu"
+            >
+              <span className="canvio-arrow">▾</span>
+            </button>
+          </div>
 
           {/* Canvio Dropdown Popover Menu */}
           {isCanvioMenuOpen && (

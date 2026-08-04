@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { createAuthHook, createRateLimitHook } from '../security.js';
 
 type AIProvider = 'gemini' | 'openai' | 'anthropic';
 type RelationshipType = 'related_to' | 'leads_to' | 'based_on' | 'part_of' | 'depends_on' | 'contradicts' | 'enables';
@@ -49,6 +50,13 @@ const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on',
 const NODE_TYPES = ['sticky', 'shape', 'text', 'frame'];
 
 export async function aiRoutes(fastify: FastifyInstance) {
+  fastify.addHook('onRequest', createRateLimitHook({
+    namespace: 'ai',
+    windowMs: parseInt(process.env.CANVIO_AI_RATE_WINDOW_MS || '60000', 10),
+    max: parseInt(process.env.CANVIO_AI_RATE_LIMIT || '20', 10),
+  }));
+  fastify.addHook('onRequest', createAuthHook({ requiredEnv: 'CANVIO_REQUIRE_AI_AUTH' }));
+
   fastify.post('/generate', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
     const prompt = cleanText(request.body?.prompt, 4000);
     if (!prompt) return reply.code(400).send({ error: 'Prompt is required' });

@@ -9,7 +9,8 @@ import { WebSocketServer } from 'ws';
 import ywsUtils from 'y-websocket/bin/utils';
 import dotenv from 'dotenv';
 import { createFilePersistence } from './storage/yPersistence.js';
-import { upsertBoard } from './storage/boards.js';
+import { isOriginAllowed } from './security.js';
+import { authorizeWebSocketBoard, getBoardIdFromWsRequest } from './wsAccess.js';
 
 dotenv.config();
 
@@ -20,10 +21,12 @@ const PORT = parseInt(process.env.PORT || '4001', 10);
 
 // ─── HTTP handler (health check + CORS preflight) ─────────────────────
 const server = http.createServer((req, res) => {
-  // CORS headers for all responses
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-canvio-api-key, x-canvio-client-id');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -44,16 +47,22 @@ const server = http.createServer((req, res) => {
 // ─── WebSocket handler ────────────────────────────────────────────────
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (conn, req) => {
-  const url = req.url || '/';
-  const boardId = url.slice(1).split('?')[0] || 'default-board';
+wss.on('connection', async (conn, req) => {
+  const boardId = getBoardIdFromWsRequest(req);
 
-  console.log(`[WS] Client connected → board: ${boardId}`);
-  upsertBoard(boardId).catch((err) => {
-    console.error(`[WS] Failed to touch board metadata for ${boardId}`, err);
-  });
+  try {
+    const access = await authorizeWebSocketBoard(req, boardId);
+    if (!access.ok) {
+      conn.close(access.code, access.reason);
+      return;
+    }
 
-  setupWSConnection(conn, req, { docName: boardId });
+    console.log(`[WS] Client connected → board: ${boardId}`);
+    setupWSConnection(conn, req, { docName: boardId });
+  } catch (err) {
+    console.error(`[WS] Failed to authorize board ${boardId}`, err);
+    conn.close(1011, 'WebSocket authorization failed');
+  }
 });
 
 // ─── Start ────────────────────────────────────────────────────────────

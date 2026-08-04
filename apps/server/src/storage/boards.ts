@@ -5,6 +5,7 @@ import { ensureDataDir, safeId } from './paths.js';
 export interface BoardRecord {
   id: string;
   title: string;
+  ownerId?: string;
   appearance?: {
     theme?: 'dark' | 'light';
     canvasBackground?: string | null;
@@ -40,7 +41,7 @@ export async function getBoard(id: string) {
   }
 }
 
-export async function upsertBoard(id: string, title = `Board ${id}`) {
+export async function upsertBoard(id: string, title = `Board ${id}`, ownerId?: string) {
   const existing = await getBoard(id);
   const now = new Date().toISOString();
 
@@ -51,6 +52,7 @@ export async function upsertBoard(id: string, title = `Board ${id}`) {
   return saveBoard({
     id,
     title,
+    ownerId,
     createdAt: now,
     updatedAt: now,
   });

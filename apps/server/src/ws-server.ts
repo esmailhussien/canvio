@@ -4,7 +4,7 @@ import ywsUtils from 'y-websocket/bin/utils';
 import dotenv from 'dotenv';
 import http from 'http';
 import { createFilePersistence } from './storage/yPersistence.js';
-import { upsertBoard } from './storage/boards.js';
+import { authorizeWebSocketBoard, getBoardIdFromWsRequest } from './wsAccess.js';
 
 const { setupWSConnection, setPersistence } = ywsUtils;
 
@@ -20,18 +20,22 @@ const server = http.createServer((request, response) => {
 
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (conn, req) => {
-  // Extract board ID from URL, e.g. /boardId
-  const url = req.url || '/';
-  const boardId = url.slice(1).split('?')[0] || 'default-board';
-  
-  console.log(`Client connected to board: ${boardId}`);
-  upsertBoard(boardId).catch((error) => {
-    console.error(`Failed to touch board metadata for ${boardId}`, error);
-  });
-  
-  // Use y-websocket utility to handle the connection
-  setupWSConnection(conn, req, { docName: boardId });
+wss.on('connection', async (conn, req) => {
+  const boardId = getBoardIdFromWsRequest(req);
+
+  try {
+    const access = await authorizeWebSocketBoard(req, boardId);
+    if (!access.ok) {
+      conn.close(access.code, access.reason);
+      return;
+    }
+
+    console.log(`Client connected to board: ${boardId}`);
+    setupWSConnection(conn, req, { docName: boardId });
+  } catch (error) {
+    console.error(`Failed to authorize WebSocket board ${boardId}`, error);
+    conn.close(1011, 'WebSocket authorization failed');
+  }
 });
 
 server.listen(PORT, '0.0.0.0', () => {
