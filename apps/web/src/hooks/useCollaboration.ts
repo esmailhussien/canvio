@@ -26,6 +26,7 @@ function isStoredViewport(value: unknown): value is Viewport {
 
 export function useCollaboration(worldId: string) {
   const [connected, setConnected] = useState(false);
+  const [connectionIssue, setConnectionIssue] = useState<string | null>(null);
   const [users, setUsers] = useState<UserPresence[]>([]);
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
 
@@ -195,7 +196,9 @@ export function useCollaboration(worldId: string) {
     });
 
     const handleProviderStatus = (event: { status: string }) => {
-      setConnected(event.status === 'connected');
+      const isConnected = event.status === 'connected';
+      setConnected(isConnected);
+      if (isConnected) setConnectionIssue(null);
     };
 
     let hasHandledError = false;
@@ -206,8 +209,23 @@ export function useCollaboration(worldId: string) {
         wsProvider.off('connection-error', handleConnectionFailure);
         wsProvider.disconnect();
         console.info('🔌 Canvio is running in Offline-First IndexedDB mode.');
+        setConnectionIssue('Offline mode');
         // In offline mode, enable local push immediately so the user can work
         localPushEnabled = true;
+      } else {
+        setConnectionIssue('Collaboration unavailable');
+      }
+    };
+
+    const handleConnectionClose = (event: CloseEvent | null) => {
+      setConnected(false);
+      const reason = event?.reason || '';
+      if (event?.code === 1008 && reason.toLowerCase().includes('auth')) {
+        setConnectionIssue('Collaboration requires access');
+      } else if (event?.code === 1008) {
+        setConnectionIssue('Access denied');
+      } else if (reason) {
+        setConnectionIssue(reason);
       }
     };
 
@@ -284,6 +302,7 @@ export function useCollaboration(worldId: string) {
     wsProvider.on('status', handleProviderStatus);
     wsProvider.on('sync', handleProviderSync);
     wsProvider.on('connection-error', handleConnectionFailure);
+    wsProvider.on('connection-close', handleConnectionClose);
     awareness.on('change', handleAwarenessChange);
 
     // ─── Local → Remote Sync ──────────────────────────────────────────
@@ -399,6 +418,7 @@ export function useCollaboration(worldId: string) {
       wsProvider.off('status', handleProviderStatus);
       wsProvider.off('sync', handleProviderSync);
       wsProvider.off('connection-error', handleConnectionFailure);
+      wsProvider.off('connection-close', handleConnectionClose);
       awareness.off('change', handleAwarenessChange);
       yNodes.unobserve(handleNodesObserve);
       yRelations.unobserve(handleRelationsObserve);
@@ -407,5 +427,5 @@ export function useCollaboration(worldId: string) {
     };
   }, [worldId]);
 
-  return { connected, users, provider };
+  return { connected, connectionIssue, users, provider };
 }

@@ -285,7 +285,7 @@ export function WorldPage() {
   }, [isPresenting]);
 
   // Connect to collaboration
-  const { connected, users } = useCollaboration(worldId || '');
+  const { connected, connectionIssue, users } = useCollaboration(worldId || '');
 
   return (
     <div className={`world-page ${isPresenting ? 'is-presenting' : ''}`} data-tool={activeTool} style={worldStyle}>
@@ -636,6 +636,13 @@ export function WorldPage() {
           </button>
 
           <ShareButton worldId={worldId || ''} />
+
+          <span
+            className={`connection-status ${connected ? 'connected' : ''} ${connectionIssue ? 'warning' : ''}`}
+            title={connected ? 'Live collaboration connected' : connectionIssue || 'Collaboration is reconnecting'}
+          >
+            {connected ? 'Live' : connectionIssue || 'Offline'}
+          </span>
 
           {/* Overlapping Multiplayer Avatar Stack */}
           <div className="presence-avatar-stack" title={`${users.length + 1} online collaborator${users.length > 0 ? 's' : ''}`}>

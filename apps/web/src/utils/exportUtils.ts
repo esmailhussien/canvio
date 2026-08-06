@@ -1,6 +1,7 @@
 import { getStroke } from 'perfect-freehand';
 import { LivingNode, Relation, useCanvasStore } from '../store/canvasStore';
 import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from '../components/RelationRenderer/relationUtils';
+import { createCanvioBackupDocument } from './backupSchema';
 
 type CanvasContext = CanvasRenderingContext2D;
 const MAP_CONTENT_PADDING = 16;
@@ -614,22 +615,16 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
  */
 export function exportAsJSON(nodes: Record<string, LivingNode>, relations: Record<string, Relation>, worldId: string) {
   const store = useCanvasStore.getState();
-  const exportData = {
-    version: '1.0',
+  const exportData = createCanvioBackupDocument({
     worldId,
-    exportedAt: new Date().toISOString(),
     appearance: {
       theme: store.theme,
       canvasBackground: store.canvasBackground,
     },
     viewport: store.viewport,
-    counts: {
-      nodes: Object.keys(nodes).length,
-      relations: Object.keys(relations).length,
-    },
     nodes,
     relations,
-  };
+  });
 
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8' });
   downloadBlob(blob, `canvio-workspace-${safeName(worldId)}.json`);

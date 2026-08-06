@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { LivingNode, Relation, Viewport, useCanvasStore } from '../../store/canvasStore';
+import { useCanvasStore } from '../../store/canvasStore';
+import { CanvioBackupError, parseCanvioBackup } from '../../utils/backupSchema';
 import { exportAsJSON, exportAsPDF, exportAsPNG } from '../../utils/exportUtils';
 import { PRESET_TEMPLATES } from '../../utils/presetTemplates';
 import './ExportMenu.css';
@@ -106,13 +107,14 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       setExportError(null);
       setExportStatus(null);
       const text = await file.text();
-      const backup = parseCanvioBackup(text);
-      replaceWorld(backup);
-      setExportStatus(`Restored ${Object.keys(backup.nodes).length} nodes`);
+      const result = parseCanvioBackup(text);
+      replaceWorld(result.world);
+      const warningText = result.meta.warnings.length > 0 ? ` (${result.meta.warnings[0]})` : '';
+      setExportStatus(`Restored ${Object.keys(result.world.nodes).length} nodes${warningText}`);
       setShowPresets(false);
       onClose();
-    } catch {
-      setExportError('Import failed: choose a Canvio JSON backup');
+    } catch (error) {
+      setExportError(error instanceof CanvioBackupError ? error.message : 'Import failed: choose a Canvio JSON backup');
     } finally {
       setExporting(null);
       if (importInputRef.current) importInputRef.current.value = '';
@@ -215,91 +217,5 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
         </div>
       )}
     </div>
-  );
-}
-
-function parseCanvioBackup(text: string): {
-  nodes: Record<string, LivingNode>;
-  relations: Record<string, Relation>;
-  viewport?: Viewport;
-  appearance?: { theme?: 'dark' | 'light'; canvasBackground?: string | null };
-} {
-  const parsed = JSON.parse(text) as {
-    nodes?: unknown;
-    relations?: unknown;
-    viewport?: unknown;
-    appearance?: unknown;
-  };
-  const nodes = isNodeRecord(parsed.nodes) ? parsed.nodes : null;
-  const relations = isRelationRecord(parsed.relations) ? parsed.relations : null;
-  if (!nodes || !relations) {
-    throw new Error('Invalid Canvio backup');
-  }
-
-  return {
-    nodes,
-    relations: sanitizeRelations(relations, nodes),
-    viewport: isViewport(parsed.viewport) ? {
-      x: parsed.viewport.x,
-      y: parsed.viewport.y,
-      zoom: Math.min(5, Math.max(0.1, parsed.viewport.zoom)),
-    } : undefined,
-    appearance: isAppearance(parsed.appearance) ? parsed.appearance : undefined,
-  };
-}
-
-function isNodeRecord(value: unknown): value is Record<string, LivingNode> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return Object.entries(value).every(([id, node]) => (
-    Boolean(id) &&
-    Boolean(node) &&
-    typeof node === 'object' &&
-    (node as LivingNode).id === id &&
-    typeof (node as LivingNode).type === 'string' &&
-    isPoint((node as LivingNode).position) &&
-    isSize((node as LivingNode).size)
-  ));
-}
-
-function isRelationRecord(value: unknown): value is Record<string, Relation> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return Object.entries(value).every(([id, relation]) => (
-    Boolean(id) &&
-    Boolean(relation) &&
-    typeof relation === 'object' &&
-    (relation as Relation).id === id &&
-    typeof (relation as Relation).sourceId === 'string' &&
-    typeof (relation as Relation).targetId === 'string'
-  ));
-}
-
-function sanitizeRelations(relations: Record<string, Relation>, nodes: Record<string, LivingNode>) {
-  return Object.fromEntries(Object.entries(relations).filter(([, relation]) => (
-    Boolean(nodes[relation.sourceId]) && Boolean(nodes[relation.targetId])
-  )));
-}
-
-function isPoint(value: unknown): value is { x: number; y: number } {
-  return Boolean(value) && typeof value === 'object' &&
-    Number.isFinite((value as { x?: unknown }).x) &&
-    Number.isFinite((value as { y?: unknown }).y);
-}
-
-function isSize(value: unknown): value is { width: number; height: number } {
-  return Boolean(value) && typeof value === 'object' &&
-    Number.isFinite((value as { width?: unknown }).width) &&
-    Number.isFinite((value as { height?: unknown }).height);
-}
-
-function isViewport(value: unknown): value is Viewport {
-  return isPoint(value) && Number.isFinite((value as { zoom?: unknown }).zoom);
-}
-
-function isAppearance(value: unknown): value is { theme?: 'dark' | 'light'; canvasBackground?: string | null } {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const appearance = value as { theme?: unknown; canvasBackground?: unknown };
-  return (
-    (appearance.theme === undefined || appearance.theme === 'dark' || appearance.theme === 'light') &&
-    (appearance.canvasBackground === undefined || appearance.canvasBackground === null || typeof appearance.canvasBackground === 'string')
   );
 }
