@@ -78,7 +78,8 @@ export function HomePage() {
           <button className="home-nav__link" onClick={() => navigate('/support')}>Support</button>
           <button className="home-btn-primary home-nav__launch" onClick={handleCreateWorld} disabled={isCreating}>
             <HomeGlyph value="+" />
-            <span>{isCreating ? 'Opening...' : 'Launch Canvas'}</span>
+            <span className="home-nav__label-full">{isCreating ? 'Opening...' : 'Launch Canvas'}</span>
+            <span className="home-nav__label-mobile">{isCreating ? 'Opening...' : 'Start'}</span>
           </button>
           <button
             className="home-theme-btn"

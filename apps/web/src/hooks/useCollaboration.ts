@@ -203,19 +203,30 @@ export function useCollaboration(worldId: string) {
       if (isConnected) setConnectionIssue(null);
     };
 
-    let hasHandledError = false;
+    let failedConnectionCount = 0;
+    let hasEnteredOfflineMode = false;
+    const enterOfflineMode = (label: string) => {
+      if (hasEnteredOfflineMode) return;
+      hasEnteredOfflineMode = true;
+      wsProvider.off('connection-error', handleConnectionFailure);
+      wsProvider.off('connection-close', handleConnectionClose);
+      wsProvider.disconnect();
+      setConnectionIssue(label);
+      localPushEnabled = true;
+    };
+
     const handleConnectionFailure = () => {
-      if (hasHandledError) return;
-      hasHandledError = true;
+      failedConnectionCount += 1;
       if (wsUrl.includes('localhost') || wsUrl.includes('127.0.0.1')) {
         wsProvider.off('connection-error', handleConnectionFailure);
         wsProvider.disconnect();
         console.info('🔌 Canvio is running in Offline-First IndexedDB mode.');
-        setConnectionIssue('Offline mode');
-        // In offline mode, enable local push immediately so the user can work
-        localPushEnabled = true;
+        enterOfflineMode('Offline mode');
       } else {
-        setConnectionIssue('Collaboration unavailable');
+        setConnectionIssue('Reconnecting collaboration');
+        if (failedConnectionCount >= 2) {
+          enterOfflineMode('Collaboration unavailable');
+        }
       }
     };
 
@@ -223,9 +234,9 @@ export function useCollaboration(worldId: string) {
       setConnected(false);
       const reason = event?.reason || '';
       if (event?.code === 1008 && reason.toLowerCase().includes('auth')) {
-        setConnectionIssue('Collaboration requires access');
+        enterOfflineMode('Collaboration requires access');
       } else if (event?.code === 1008) {
-        setConnectionIssue('Access denied');
+        enterOfflineMode('Access denied');
       } else if (reason) {
         setConnectionIssue(reason);
       }
