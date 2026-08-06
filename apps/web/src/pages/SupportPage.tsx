@@ -13,12 +13,35 @@ const BUG_REPORT_URL = `${GITHUB_REPO_URL}/issues/new?title=Bug%20report%3A%20`;
 const FEATURE_REQUEST_URL = `${GITHUB_REPO_URL}/issues/new?title=Feature%20request%3A%20`;
 const UX_FEEDBACK_URL = `${GITHUB_REPO_URL}/issues/new?title=UX%20feedback%3A%20`;
 
-function SupportGlyph({ value, color }: { value: string; color?: string }) {
-  return (
-    <span className="support-glyph" style={color ? { color } : undefined} aria-hidden="true">
-      {value}
-    </span>
-  );
+function SupportIcon({ value, color, size = 20 }: { value: string; color?: string; size?: number }) {
+  const style = { color: color || 'currentColor', flexShrink: 0 };
+  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, style };
+
+  switch (value) {
+    case 'HELP':
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+    case 'BUG':
+      return <svg {...props}><path d="M8 2l1.88 1.88M16 2l-1.88 1.88M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a6 6 0 0 1 12 0v3c0 3.3-2.7 6-6 6Z"/><path d="M12 20v-9M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2M6 17l-4 1M17.47 9c1.93-.2 3.53-1.9 3.53-4"/><path d="M18 13h4M18 17l4 1"/></svg>;
+    case 'UX':
+      return <svg {...props}><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>;
+    case 'IDEA':
+      return <svg {...props}><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>;
+    case 'KO':
+      return <svg {...props}><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>;
+    case 'GH':
+      return <svg {...props} fill="currentColor" stroke="none"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2Z"/></svg>;
+    case 'GO':
+    case '+':
+      return <svg {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+    case '01':
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/><polyline points="16 12 12 8 8 12"/></svg>;
+    case '02':
+      return <svg {...props}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/></svg>;
+    case '03':
+      return <svg {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+    default:
+      return <span className="support-glyph" style={style} aria-hidden="true">{value}</span>;
+  }
 }
 
 const SUPPORT_PATHS = [
@@ -86,7 +109,7 @@ export function SupportPage() {
           <button className="support-nav__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
           <button className="support-nav__link active" onClick={() => navigate('/support')}>Support</button>
           <button className="support-btn-primary support-nav__launch" onClick={handleCreateWorld} disabled={isCreating}>
-            <SupportGlyph value="+" />
+            <SupportIcon value="+" />
             <span className="support-nav__label-full">{isCreating ? 'Opening...' : 'Launch Canvas'}</span>
             <span className="support-nav__label-mobile">{isCreating ? 'Opening...' : 'Start'}</span>
           </button>
@@ -116,11 +139,11 @@ export function SupportPage() {
             </p>
             <div className="support-hero__actions">
               <a className="support-btn-primary" href={BUG_REPORT_URL} target="_blank" rel="noopener noreferrer">
-                <SupportGlyph value="BUG" />
+                <SupportIcon value="BUG" />
                 <span>Report a bug</span>
               </a>
               <a className="support-btn-secondary" href={KOFI_URL} target="_blank" rel="noopener noreferrer">
-                <SupportGlyph value="KO" color="#f59e0b" />
+                <SupportIcon value="KO" color="#f59e0b" />
                 <span>Support on Ko-fi</span>
               </a>
             </div>
@@ -128,7 +151,7 @@ export function SupportPage() {
 
           <aside className="support-hero__panel" aria-label="Support response guide">
             <div className="support-panel__header">
-              <SupportGlyph value="HELP" color="#38bdf8" />
+              <SupportIcon value="HELP" color="#38bdf8" />
               <div>
                 <strong>What should I choose?</strong>
                 <span>Pick the path that matches the moment.</span>
@@ -156,7 +179,7 @@ export function SupportPage() {
 
         <section className="support-section">
           <div className="support-section__heading">
-            <SupportGlyph value="01" />
+            <SupportIcon value="01" />
             <div>
               <h2>Get to the right place quickly</h2>
               <p>Support should reduce friction, not add a new maze.</p>
@@ -172,7 +195,7 @@ export function SupportPage() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <SupportGlyph value={path.glyph} color={path.color} />
+                <SupportIcon value={path.glyph} color={path.color} />
                 <h3>{path.title}</h3>
                 <p>{path.text}</p>
                 <span>{path.cta}</span>
@@ -184,7 +207,7 @@ export function SupportPage() {
         <section className="support-two-column">
           <div className="support-kofi-card">
             <div className="support-kofi-card__label">
-              <SupportGlyph value="KO" color="#f59e0b" />
+              <SupportIcon value="KO" color="#f59e0b" />
               <span>Open-source funding</span>
             </div>
             <h2>Support Canvio on Ko-fi</h2>
@@ -199,7 +222,7 @@ export function SupportPage() {
 
           <div className="support-priority-card">
             <div className="support-section__heading compact">
-              <SupportGlyph value="02" color="#22c55e" />
+              <SupportIcon value="02" color="#22c55e" />
               <div>
                 <h2>What support helps improve</h2>
                 <p>These are the product areas that matter most right now.</p>
@@ -218,7 +241,7 @@ export function SupportPage() {
 
         <section className="support-feedback-guide">
           <div className="support-section__heading">
-            <SupportGlyph value="03" color="#a855f7" />
+            <SupportIcon value="03" color="#a855f7" />
             <div>
               <h2>Write feedback that turns into a fix</h2>
               <p>A clear report saves time and makes improvements easier to ship.</p>
@@ -248,11 +271,11 @@ export function SupportPage() {
           </div>
           <div className="support-cta-band__actions">
             <button className="support-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
-              <SupportGlyph value="GO" />
+              <SupportIcon value="GO" />
               <span>{isCreating ? 'Opening board...' : 'Start a blank board'}</span>
             </button>
             <a className="support-btn-secondary" href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
-              <SupportGlyph value="GH" />
+              <SupportIcon value="GH" />
               <span>View GitHub</span>
             </a>
           </div>

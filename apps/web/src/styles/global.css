@@ -28,7 +28,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-body:has(.home-page) {
+body:has(.home-page),
+body:has(.support-page),
+body:has(.guide-page) {
   overflow-y: auto !important;
   height: auto !important;
 }
