@@ -119,6 +119,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     if (target.classList.contains('resize-handle') || target.classList.contains('node-port')) return;
 
     if (activeTool === 'relation' && node.type === 'map' && target.closest('.leaflet-marker-icon')) {
+      e.stopPropagation();
       return;
     }
 
@@ -167,6 +168,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       !target.closest('.map-node__marker-panel')
     ) {
       selectNode(node.id, e.shiftKey);
+      e.stopPropagation();
       return;
     }
 

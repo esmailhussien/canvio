@@ -327,6 +327,10 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
     }
   };
 
+  const stopMapGesture = React.useCallback((event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  }, []);
+
   return (
     <div className={`map-node ${selected ? 'map-node--selected' : ''}`}>
       <div className="map-node__header" title="Drag here to reposition Map Node">
@@ -359,56 +363,69 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
         </button>
       </div>
 
-      <MapContainer 
-        key={mapKey}
-        center={data.center || WORLD_MAP_CENTER} 
-        zoom={data.zoom || 4} 
-        style={{ width: '100%', height: '100%' }}
-        zoomControl={true}
-        attributionControl={false}
+      <div
+        className="map-node__map-surface"
+        onPointerMove={stopMapGesture}
+        onPointerUp={stopMapGesture}
+        onPointerCancel={stopMapGesture}
+        onMouseMove={stopMapGesture}
+        onMouseUp={stopMapGesture}
+        onTouchMove={stopMapGesture}
+        onTouchEnd={stopMapGesture}
+        onWheel={stopMapGesture}
+        onDoubleClick={stopMapGesture}
       >
-        <TileLayer
-          url={TILE_LAYERS[layer].url}
-          attribution={TILE_LAYERS[layer].attribution}
-        />
-        <MapResizer width={node.size.width} height={node.size.height} />
-        <MapController center={data.center} zoom={data.zoom} markers={data.markers} onChangeCenterZoom={handleCenterZoomChange} />
-        <MarkerAnchorTracker markers={data.markers} onAnchorsChange={updateMarkerAnchors} />
-        <MapClickEvents enabled={true} onAddMarker={addMarker} />
-        
-        {data.markers?.map(marker => (
-          <Marker
-            key={marker.id}
-            position={marker.position}
-            draggable={!relationMode}
-            title={relationMode ? `Connect relation to ${marker.label || 'marker'}` : marker.label}
-            eventHandlers={{
-              mousedown: (event) => {
-                if (!relationMode) return;
-                event.originalEvent.stopPropagation();
-                event.originalEvent.preventDefault();
-                onMarkerRelation?.(marker.id);
-              },
-              mouseover: () => {
-                if (!relationMode) return;
-                onMarkerRelationHover?.(marker.id);
-              },
-              mouseout: () => {
-                if (!relationMode) return;
-                onMarkerRelationHover?.(null);
-              },
-              dragend: (event) => {
-                const nextPosition = event.target.getLatLng();
-                moveMarker(marker.id, [nextPosition.lat, nextPosition.lng]);
-              },
-            }}
-          >
-            {marker.label && (
-              <Popup>{marker.label}</Popup>
-            )}
-          </Marker>
-        ))}
-      </MapContainer>
+        <MapContainer
+          key={mapKey}
+          center={data.center || WORLD_MAP_CENTER}
+          zoom={data.zoom || 4}
+          style={{ width: '100%', height: '100%' }}
+          zoomControl={true}
+          attributionControl={false}
+        >
+          <TileLayer
+            url={TILE_LAYERS[layer].url}
+            attribution={TILE_LAYERS[layer].attribution}
+          />
+          <MapResizer width={node.size.width} height={node.size.height} />
+          <MapController center={data.center} zoom={data.zoom} markers={data.markers} onChangeCenterZoom={handleCenterZoomChange} />
+          <MarkerAnchorTracker markers={data.markers} onAnchorsChange={updateMarkerAnchors} />
+          <MapClickEvents enabled={true} onAddMarker={addMarker} />
+
+          {data.markers?.map(marker => (
+            <Marker
+              key={marker.id}
+              position={marker.position}
+              draggable={!relationMode}
+              title={relationMode ? `Connect relation to ${marker.label || 'marker'}` : marker.label}
+              eventHandlers={{
+                mousedown: (event) => {
+                  if (!relationMode) return;
+                  event.originalEvent.stopPropagation();
+                  event.originalEvent.preventDefault();
+                  onMarkerRelation?.(marker.id);
+                },
+                mouseover: () => {
+                  if (!relationMode) return;
+                  onMarkerRelationHover?.(marker.id);
+                },
+                mouseout: () => {
+                  if (!relationMode) return;
+                  onMarkerRelationHover?.(null);
+                },
+                dragend: (event) => {
+                  const nextPosition = event.target.getLatLng();
+                  moveMarker(marker.id, [nextPosition.lat, nextPosition.lng]);
+                },
+              }}
+            >
+              {marker.label && (
+                <Popup>{marker.label}</Popup>
+              )}
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
 
       {data.markers.length > 0 && (
         <div className="map-node__marker-panel" onMouseDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>

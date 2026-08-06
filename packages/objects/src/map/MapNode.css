@@ -59,8 +59,16 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.map-node .leaflet-container {
+.map-node__map-surface {
   flex: 1;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100px;
+  position: relative;
+  touch-action: none;
+}
+
+.map-node .leaflet-container {
   width: 100% !important;
   height: 100% !important;
   min-height: 100px;

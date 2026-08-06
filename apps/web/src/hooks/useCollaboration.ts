@@ -378,6 +378,15 @@ export function useCollaboration(worldId: string) {
 
     // ─── Cursor Tracking ──────────────────────────────────────────────
     const handlePointerMove = (e: PointerEvent) => {
+      const target = e.target;
+      if (
+        target instanceof Element &&
+        target.closest('.leaflet-container, .map-node__map-surface, .map-node__marker-panel')
+      ) {
+        return;
+      }
+      if (hasEnteredOfflineMode) return;
+
       const store = useCanvasStore.getState();
       const viewport = store.viewport;
       const rect = document.querySelector('.canvas')?.getBoundingClientRect();
