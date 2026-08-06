@@ -128,7 +128,8 @@ export async function updateBoardAppearance(
 export async function createBoardShareLink(id: string) {
   const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}/share`), {
     method: 'POST',
-    headers: requestHeaders(),
+    headers: requestHeaders(true),
+    body: '{}',
   });
   if (!response.ok) throw new Error(`Failed to create share link: ${response.status}`);
   return response.json() as Promise<{ url: string; shareToken: string }>;
