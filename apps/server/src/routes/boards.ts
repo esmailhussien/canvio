@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { nanoid } from 'nanoid';
 import { getBoard, listBoards, saveBoard, upsertBoard } from '../storage/boards.js';
-import { canAccessBoard, createAuthHook, createRateLimitHook, getRequestOwnerId } from '../security.js';
+import { canAccessBoard, createRateLimitHook, getRequestOwnerId, isRequestAuthorized } from '../security.js';
 
 export async function boardRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', createRateLimitHook({
@@ -9,15 +9,20 @@ export async function boardRoutes(fastify: FastifyInstance) {
     windowMs: parseInt(process.env.CANVIO_BOARD_RATE_WINDOW_MS || '60000', 10),
     max: parseInt(process.env.CANVIO_BOARD_RATE_LIMIT || '120', 10),
   }));
-  fastify.addHook('onRequest', createAuthHook({ requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' }));
 
   fastify.get('/', async (request) => {
+    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
+      return { boards: [] };
+    }
     const ownerId = getRequestOwnerId(request);
     const boards = await listBoards();
     return { boards: boards.filter((board) => !board.ownerId || board.ownerId === ownerId) };
   });
 
   fastify.post('/', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
+      return reply.code(401).send({ error: 'AUTH_REQUIRED' });
+    }
     const id = nanoid(10);
     const now = new Date().toISOString();
     const board = {
@@ -31,11 +36,41 @@ export async function boardRoutes(fastify: FastifyInstance) {
     return { url: '/w/' + id, ...board };
   });
 
+  fastify.post('/:id/share', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
+      return reply.code(401).send({ error: 'AUTH_REQUIRED' });
+    }
+
+    const { id } = request.params;
+    const existing = await getBoard(id);
+    const board = existing || await upsertBoard(id, `Board ${id}`, getRequestOwnerId(request));
+    if (board.ownerId && board.ownerId !== getRequestOwnerId(request)) {
+      return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
+    }
+
+    const shareToken = board.shareToken || nanoid(32);
+    await saveBoard({
+      ...board,
+      shareToken,
+      shareCreatedAt: board.shareCreatedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    return {
+      url: `/w/${encodeURIComponent(id)}?share=${encodeURIComponent(shareToken)}`,
+      shareToken,
+    };
+  });
+
   fastify.get('/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH', allowShareToken: true })) {
+      return reply.code(401).send({ error: 'AUTH_REQUIRED' });
+    }
+
     const { id } = request.params;
     const existing = await getBoard(id);
     if (existing) {
-      if (!canAccessBoard(existing.ownerId, request)) return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
+      if (!canAccessBoard(existing.ownerId, request, existing.shareToken)) return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
       return saveBoard({ ...existing, updatedAt: new Date().toISOString() });
     }
 
@@ -46,9 +81,13 @@ export async function boardRoutes(fastify: FastifyInstance) {
     Params: { id: string };
     Body: { title?: string; appearance?: { theme?: 'dark' | 'light'; canvasBackground?: string | null } };
   }>, reply: FastifyReply) => {
+    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH', allowShareToken: true })) {
+      return reply.code(401).send({ error: 'AUTH_REQUIRED' });
+    }
+
     const { id } = request.params;
     const existing = await getBoard(id);
-    if (existing && !canAccessBoard(existing.ownerId, request)) {
+    if (existing && !canAccessBoard(existing.ownerId, request, existing.shareToken)) {
       return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
     }
     const board = existing || await upsertBoard(id, `Board ${id}`, getRequestOwnerId(request));

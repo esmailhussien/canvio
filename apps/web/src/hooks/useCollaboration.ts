@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { useCanvasStore } from '../store/canvasStore';
-import { getCanvioApiToken, getCanvioClientId, getWebSocketUrl } from '../utils/runtimeConfig';
+import { getCanvioApiToken, getCanvioClientId, getCanvioShareToken, getWebSocketUrl } from '../utils/runtimeConfig';
 import { getStorageItem, setStorageItem } from '../utils/storageDB';
 import {
   nodeToYMap,
@@ -55,7 +55,9 @@ export function useCollaboration(worldId: string) {
       clientId: getCanvioClientId(),
     };
     const apiToken = getCanvioApiToken();
+    const shareToken = getCanvioShareToken();
     if (apiToken) wsParams.token = apiToken;
+    if (shareToken) wsParams.share = shareToken;
     const wsProvider = new WebsocketProvider(wsUrl, worldId, doc, {
       connect: false,
       maxBackoffTime: 30000,

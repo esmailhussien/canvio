@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'node:http';
-import { canOwnerAccessBoard, getOwnerIdFromHeaders, isOriginAllowed, isValidSocketAuth } from './security.js';
+import { canOwnerAccessBoard, getOwnerIdFromHeaders, getShareTokenFromRequestHeaders, isOriginAllowed, isValidSocketAuth } from './security.js';
 import { getBoard, saveBoard, upsertBoard } from './storage/boards.js';
 
 export function getBoardIdFromWsRequest(req: IncomingMessage) {
@@ -23,10 +23,11 @@ export async function authorizeWebSocketBoard(req: IncomingMessage, boardId: str
   }
 
   const ownerId = getOwnerIdFromHeaders(req.headers, req.socket.remoteAddress || 'unknown', req.url);
+  const shareToken = getShareTokenFromRequestHeaders(req.headers, req.url);
   const existing = await getBoard(boardId);
 
   if (existing) {
-    if (!canOwnerAccessBoard(existing.ownerId, ownerId)) {
+    if (!canOwnerAccessBoard(existing.ownerId, ownerId, existing.shareToken, shareToken)) {
       return { ok: false as const, code: 1008, reason: 'Board access denied' };
     }
     await saveBoard({ ...existing, updatedAt: new Date().toISOString() });

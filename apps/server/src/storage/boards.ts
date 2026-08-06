@@ -6,6 +6,8 @@ export interface BoardRecord {
   id: string;
   title: string;
   ownerId?: string;
+  shareToken?: string;
+  shareCreatedAt?: string;
   appearance?: {
     theme?: 'dark' | 'light';
     canvasBackground?: string | null;

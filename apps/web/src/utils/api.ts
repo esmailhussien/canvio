@@ -1,4 +1,4 @@
-import { getApiBaseUrl, getCanvioApiToken, getCanvioClientId } from './runtimeConfig';
+import { getApiBaseUrl, getCanvioApiToken, getCanvioClientId, getCanvioShareToken } from './runtimeConfig';
 
 const API_BASE = getApiBaseUrl();
 
@@ -11,7 +11,9 @@ function requestHeaders(json = false) {
     'x-canvio-client-id': getCanvioClientId(),
   };
   const token = getCanvioApiToken();
+  const shareToken = getCanvioShareToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+  if (shareToken) headers['x-canvio-share-token'] = shareToken;
   if (json) headers['Content-Type'] = 'application/json';
   return headers;
 }
@@ -121,6 +123,15 @@ export async function updateBoardAppearance(
   });
   if (!response.ok) throw new Error(`Failed to update board appearance: ${response.status}`);
   return response.json() as Promise<BoardRecord>;
+}
+
+export async function createBoardShareLink(id: string) {
+  const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}/share`), {
+    method: 'POST',
+    headers: requestHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to create share link: ${response.status}`);
+  return response.json() as Promise<{ url: string; shareToken: string }>;
 }
 
 export async function generateAIBoard(request: {

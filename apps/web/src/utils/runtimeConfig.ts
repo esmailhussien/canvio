@@ -43,6 +43,15 @@ export function getCanvioApiToken() {
   ).trim();
 }
 
+export function getCanvioShareToken() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return new URLSearchParams(window.location.search).get('share')?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
 export function getWebSocketUrl() {
   if (getRuntimeConfig().wsUrl) return getRuntimeConfig().wsUrl!.replace(/\/$/, '');
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL.replace(/\/$/, '');

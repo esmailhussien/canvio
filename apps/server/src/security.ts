@@ -39,6 +39,12 @@ function getBearerTokenFromHeaders(headers: IncomingHttpHeaders, url?: string) {
   return getQueryValue(url, 'token') || getQueryValue(url, 'apiToken') || '';
 }
 
+function getShareTokenFromHeaders(headers: IncomingHttpHeaders, url?: string) {
+  const headerValue = headers['x-canvio-share-token'];
+  if (typeof headerValue === 'string' && headerValue.trim()) return headerValue.trim();
+  return getQueryValue(url, 'share') || '';
+}
+
 function getConfiguredTokens() {
   return [
     ...envList('CANVIO_API_TOKENS'),
@@ -101,11 +107,19 @@ export function createRateLimitHook(options: {
 
 export function createAuthHook(options: { requiredEnv?: string } = {}) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!isAuthRequired(options.requiredEnv)) return;
-    if (isValidApiToken(request.headers, request.url)) return;
+    if (isRequestAuthorized(request, { requiredEnv: options.requiredEnv })) return;
 
     reply.code(401).send({ error: 'AUTH_REQUIRED' });
   };
+}
+
+export function isRequestAuthorized(
+  request: FastifyRequest,
+  options: { requiredEnv?: string; allowShareToken?: boolean } = {}
+) {
+  if (!isAuthRequired(options.requiredEnv)) return true;
+  if (isValidApiToken(request.headers, request.url)) return true;
+  return Boolean(options.allowShareToken && getRequestShareToken(request));
 }
 
 export function getRequestOwnerId(request: FastifyRequest) {
@@ -122,13 +136,27 @@ export function getOwnerIdFromHeaders(headers: IncomingHttpHeaders, ipFallback =
   return `anon:${hashValue(`${getClientIpFromHeaders(headers, ipFallback)}:${headers['user-agent'] || ''}`)}`;
 }
 
-export function canAccessBoard(boardOwnerId: string | undefined, request: FastifyRequest) {
-  return canOwnerAccessBoard(boardOwnerId, getRequestOwnerId(request));
+export function getRequestShareToken(request: FastifyRequest) {
+  return getShareTokenFromHeaders(request.headers, request.url);
 }
 
-export function canOwnerAccessBoard(boardOwnerId: string | undefined, ownerId: string) {
+export function getShareTokenFromRequestHeaders(headers: IncomingHttpHeaders, url?: string) {
+  return getShareTokenFromHeaders(headers, url);
+}
+
+export function canAccessBoard(boardOwnerId: string | undefined, request: FastifyRequest, boardShareToken?: string) {
+  return canOwnerAccessBoard(boardOwnerId, getRequestOwnerId(request), boardShareToken, getRequestShareToken(request));
+}
+
+export function canOwnerAccessBoard(
+  boardOwnerId: string | undefined,
+  ownerId: string,
+  boardShareToken?: string,
+  requestShareToken?: string
+) {
   if (!boardOwnerId) return true;
-  return boardOwnerId === ownerId;
+  if (boardOwnerId === ownerId) return true;
+  return Boolean(boardShareToken && requestShareToken && boardShareToken === requestShareToken);
 }
 
 export function isAuthRequired(requiredEnv?: string) {
@@ -139,6 +167,7 @@ export function isAuthRequired(requiredEnv?: string) {
 
 export function isValidSocketAuth(headers: IncomingHttpHeaders, url?: string) {
   if (!isAuthRequired('CANVIO_REQUIRE_WS_AUTH')) return true;
+  if (getShareTokenFromHeaders(headers, url)) return true;
   return isValidApiToken(headers, url);
 }
 

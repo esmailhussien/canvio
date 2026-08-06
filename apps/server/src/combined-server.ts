@@ -26,7 +26,7 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-canvio-api-key, x-canvio-client-id');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-canvio-api-key, x-canvio-client-id, x-canvio-share-token');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
