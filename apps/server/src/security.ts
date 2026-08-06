@@ -72,7 +72,11 @@ export function createCorsOriginGuard() {
 }
 
 export function isOriginAllowed(origin: string | undefined) {
-  const allowedOrigins = new Set(envList('CANVIO_ALLOWED_ORIGINS'));
+  const allowedOrigins = new Set([
+    'https://canvio.space',
+    'https://www.canvio.space',
+    ...envList('CANVIO_ALLOWED_ORIGINS'),
+  ]);
   const allowLocalDev = envBool('CANVIO_ALLOW_LOCAL_ORIGINS', process.env.NODE_ENV !== 'production');
   if (!origin) return true;
   return allowedOrigins.has(origin) || (allowLocalDev && isLocalOrigin(origin));
