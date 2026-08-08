@@ -322,6 +322,15 @@ export function WorldPage() {
         : connected
           ? 'cloud_done'
           : 'cloud_off';
+  const saveShortLabel = persistenceState === 'loading'
+    ? 'Restoring'
+    : persistenceState === 'saving'
+      ? 'Saving'
+      : persistenceState === 'error'
+        ? 'Attention'
+        : connected
+          ? 'Live'
+          : 'Local';
 
   return (
     <div className={`world-page ${isPresenting ? 'is-presenting' : ''}`} data-tool={activeTool} style={worldStyle}>
@@ -721,7 +730,7 @@ export function WorldPage() {
               aria-label={saveLabel}
             >
               <span className="material-symbols-outlined">{saveIcon}</span>
-              <span>{saveLabel}</span>
+              <span>{saveShortLabel}</span>
             </span>
           )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { createBoard } from '../utils/api';
 import { useCanvasStore } from '../store/canvasStore';
@@ -75,6 +75,7 @@ export function HomePage() {
         <div className="home-nav__links">
           <button className="home-nav__link" onClick={handleCreateWorld} disabled={isCreating}>Workspace</button>
           <button className="home-nav__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
+          <Link className="home-nav__link" to="/updates">Updates</Link>
           <button className="home-nav__link" onClick={() => navigate('/support')}>Support</button>
           <button className="home-btn-primary home-nav__launch" onClick={handleCreateWorld} disabled={isCreating}>
             <HomeGlyph value="+" />
@@ -221,6 +222,7 @@ export function HomePage() {
           <span>Canvio - Connect ideas. Create knowledge.</span>
         </div>
         <div className="home-footer__links">
+          <Link className="home-footer__link" to="/updates">Updates</Link>
           <button className="home-footer__link" onClick={() => navigate('/support')}>Support Canvio</button>
           <button className="home-footer__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
         </div>

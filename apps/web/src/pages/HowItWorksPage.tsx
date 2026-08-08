@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { createBoard } from '../utils/api';
 import { useCanvasStore } from '../store/canvasStore';
@@ -121,6 +121,7 @@ export function HowItWorksPage() {
         <div className="guide-nav__links">
           <button className="guide-nav__link" onClick={() => navigate('/')}>Workspace</button>
           <button className="guide-nav__link active" onClick={() => navigate('/how-it-works')}>How It Works</button>
+          <Link className="guide-nav__link" to="/updates">Updates</Link>
           <button className="guide-nav__link" onClick={() => navigate('/support')}>Support</button>
           <button className="guide-btn-primary" onClick={handleCreateWorld}>
             <GuideGlyph value="+" />
@@ -303,6 +304,7 @@ export function HowItWorksPage() {
         </div>
         <div className="guide-footer__links">
           <button className="guide-footer__link" onClick={() => navigate('/')}>Home</button>
+          <Link className="guide-footer__link" to="/updates">Updates</Link>
           <button className="guide-footer__link" onClick={() => navigate('/support')}>Support</button>
         </div>
       </footer>

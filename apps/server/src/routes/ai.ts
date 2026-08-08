@@ -188,7 +188,8 @@ Return ONLY raw JSON with this schema:
 Allowed node types: sticky, shape, text, frame.
 Sticky colors: blue, yellow, green, pink, orange, purple.
 Relationships: depends_on, leads_to, enables, based_on, contradicts, part_of, related_to.
-Keep the board practical, readable, and not more than 18 nodes unless the request clearly needs more.`;
+Keep the board practical, readable, and not more than 18 nodes unless the request clearly needs more.
+Use visual variety for diagrams: do not make every node a sticky note. For a board with four or more nodes, include a frame when useful, use a shape for the central concept or decision, use text for a clear title, and reserve sticky notes for supporting ideas. Keep frames behind their contents and place nodes with enough spacing for labeled relations.`;
 }
 
 function buildGraphContext(context?: AIRequestBody['context']) {

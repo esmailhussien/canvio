@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { createBoard } from '../utils/api';
 import { useCanvasStore } from '../store/canvasStore';
@@ -107,6 +107,7 @@ export function SupportPage() {
         <div className="support-nav__links">
           <button className="support-nav__link" onClick={() => navigate('/')}>Workspace</button>
           <button className="support-nav__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
+          <Link className="support-nav__link" to="/updates">Updates</Link>
           <button className="support-nav__link active" onClick={() => navigate('/support')}>Support</button>
           <button className="support-btn-primary support-nav__launch" onClick={handleCreateWorld} disabled={isCreating}>
             <SupportIcon value="+" />
@@ -289,6 +290,7 @@ export function SupportPage() {
         </div>
         <div className="support-footer__links">
           <button className="support-footer__link" onClick={() => navigate('/')}>Home</button>
+          <Link className="support-footer__link" to="/updates">Updates</Link>
           <button className="support-footer__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
           <a className="support-footer__link" href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
           <a className="support-footer__link" href={KOFI_URL} target="_blank" rel="noopener noreferrer">Ko-fi</a>

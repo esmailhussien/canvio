@@ -74,23 +74,39 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
   },
 };
 
+function getStoredProvider(): AIProvider {
+  const stored = localStorage.getItem('CANVIO_AI_PROVIDER');
+  return stored && Object.prototype.hasOwnProperty.call(PROVIDER_CONFIGS, stored)
+    ? stored as AIProvider
+    : 'gemini';
+}
+
+function getStoredModel(provider: AIProvider) {
+  const stored = localStorage.getItem('CANVIO_AI_MODEL');
+  return stored && PROVIDER_CONFIGS[provider].models.includes(stored)
+    ? stored
+    : PROVIDER_CONFIGS[provider].models[0];
+}
+
 export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onClose }) => {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiStatus, setAIStatus] = useState<{ kind: 'info' | 'error' | 'success'; text: string } | null>(null);
 
   const [provider, setProvider] = useState<AIProvider>(() => {
-    return (localStorage.getItem('CANVIO_AI_PROVIDER') as AIProvider) || 'gemini';
+    return getStoredProvider();
   });
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem('CANVIO_AI_MODEL') || 'gemini-2.5-flash';
+    return getStoredModel(getStoredProvider());
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const addNode = useCanvasStore((s) => s.addNode);
   const addRelation = useCanvasStore((s) => s.addRelation);
+  const nodeCount = useCanvasStore((s) => Object.keys(s.nodes).length);
+  const hasBoardContent = nodeCount > 0;
 
   // Close on Escape key press
   React.useEffect(() => {
@@ -122,12 +138,13 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   const currentConfig = PROVIDER_CONFIGS[provider];
 
   const closeWithAIStatus = (result: { message?: string; source?: string }) => {
-    if (result.source === 'local' && result.message) {
-      setAIStatus({ kind: 'info', text: result.message });
-      window.setTimeout(onClose, 1100);
-      return;
-    }
-    onClose();
+    setAIStatus({
+      kind: result.source === 'local' ? 'info' : 'success',
+      text: result.source === 'local'
+        ? result.message || 'Done with Canvio smart mode. Everything is editable.'
+        : 'Done. Your board is ready to edit.',
+    });
+    window.setTimeout(onClose, result.source === 'local' ? 1500 : 900);
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -155,7 +172,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       // Add generated nodes and relations to the store
       placedNodes.forEach((node) => addNode(node));
       result.relations.forEach((rel) => addRelation(rel));
-      fitViewportToNodes(placedNodes, { minZoom: 0.58 });
+      fitViewportToNodes(placedNodes, { maxZoom: 0.95, minZoom: 0.42, paddingX: 220, paddingY: 240 });
 
       setPrompt('');
       closeWithAIStatus(result);
@@ -168,6 +185,10 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   };
 
   const handleSummarizeBoard = async () => {
+    if (!hasBoardContent) {
+      setAIStatus({ kind: 'info', text: 'Add a note, shape, or drawing first. Then Canvio can explain the board.' });
+      return;
+    }
     setIsGenerating(true);
     setAIStatus({ kind: 'info', text: 'Reading the board graph and relations...' });
     try {
@@ -187,6 +208,10 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   };
 
   const handleOrganizeCluster = async () => {
+    if (!hasBoardContent) {
+      setAIStatus({ kind: 'info', text: 'Add a few elements first. Then Canvio can group them into clear areas.' });
+      return;
+    }
     setIsGenerating(true);
     setAIStatus({ kind: 'info', text: 'Grouping related elements into clearer clusters...' });
     try {
@@ -249,61 +274,89 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   return (
     <div className="ai-modal__overlay" onClick={onClose}>
       <div className="ai-modal__content" onClick={(e) => e.stopPropagation()}>
-        <div className="ai-modal__header-row">
-          <span className="ai-modal__sparkle" title="Canvio Spatial AI">✨</span>
-          <form onSubmit={handleGenerate} className="ai-modal__form flex-1" style={{ flex: 1, margin: 0 }}>
-            <div className="ai-modal__input-wrapper">
-              <input
-                autoFocus
-                className="ai-modal__input"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ask AI to generate a World, summarize, or organize... (Ctrl+K)"
-                disabled={isGenerating}
-              />
-              <button type="submit" className="ai-modal__generate-btn" disabled={!prompt.trim() || isGenerating}>
-                {isGenerating ? 'Running...' : 'Generate'}
-              </button>
+        <div className="ai-modal__topbar">
+          <div className="ai-modal__title-wrap">
+            <span className="ai-modal__sparkle" title="Canvio Spatial AI">✨</span>
+            <div>
+              <div className="ai-modal__eyebrow">Canvio AI</div>
+              <h2 className="ai-modal__title">What are you working on?</h2>
+              <p className="ai-modal__subtitle">Describe it naturally. Canvio creates editable ideas and connections.</p>
             </div>
-          </form>
+          </div>
           <div className="ai-modal__header-actions">
             <button
               type="button"
               className={`ai-modal__settings-toggle ${isSettingsOpen ? 'active' : ''}`}
               onClick={() => setIsSettingsOpen((prev) => !prev)}
-              title="Toggle AI provider and model settings"
+              title="Open advanced AI settings"
             >
               <span className="material-symbols-outlined text-sm">settings</span>
-              <span>{isSettingsOpen ? 'Hide' : 'Settings'}</span>
+              <span>{isSettingsOpen ? 'Close advanced' : 'Advanced'}</span>
             </button>
-            <button className="ai-modal__close" onClick={onClose} title="Close (Esc)">✕</button>
+            <button type="button" className="ai-modal__close" onClick={onClose} title="Close (Esc)" aria-label="Close AI assistant">✕</button>
           </div>
         </div>
 
         {!isSettingsOpen && (
           <>
+            <form onSubmit={handleGenerate} className="ai-modal__form">
+              <label className="ai-modal__input-label" htmlFor="canvio-ai-prompt">Tell Canvio what to make</label>
+              <div className="ai-modal__input-wrapper">
+                <textarea
+                  id="canvio-ai-prompt"
+                  autoFocus
+                  rows={2}
+                  className="ai-modal__input"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Example: Make a study board about photosynthesis..."
+                  disabled={isGenerating}
+                />
+                <button type="submit" className="ai-modal__generate-btn" disabled={!prompt.trim() || isGenerating}>
+                  <span className="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+                  <span>{isGenerating ? 'Working...' : 'Create board'}</span>
+                </button>
+              </div>
+            </form>
+
+            <div className="ai-modal__section-heading">
+              <span>Work with this board</span>
+              <span className="ai-modal__count">{hasBoardContent ? `${nodeCount} ${nodeCount === 1 ? 'element' : 'elements'}` : 'Nothing here yet'}</span>
+            </div>
             <div className="ai-modal__quick-actions">
-              <button type="button" className="ai-action-btn" onClick={handleSummarizeBoard} disabled={isGenerating}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#8083ff' }}>summarize</span>
-                <span>✨ Summarize Board</span>
+              <button type="button" className="ai-action-btn" onClick={handleSummarizeBoard} disabled={isGenerating || !hasBoardContent} title={hasBoardContent ? 'Create an overview of this board' : 'Add something to the board first'}>
+                <span className="ai-action-btn__icon ai-action-btn__icon--purple"><span className="material-symbols-outlined" aria-hidden="true">summarize</span></span>
+                <span className="ai-action-btn__copy"><strong>Understand</strong><small>Make an overview and key points</small></span>
               </button>
-              <button type="button" className="ai-action-btn" onClick={handleOrganizeCluster} disabled={isGenerating}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#22c55e' }}>grid_view</span>
-                <span>✨ Organize & Cluster</span>
+              <button type="button" className="ai-action-btn" onClick={handleOrganizeCluster} disabled={isGenerating || !hasBoardContent} title={hasBoardContent ? 'Group related elements into clear areas' : 'Add something to the board first'}>
+                <span className="ai-action-btn__icon ai-action-btn__icon--green"><span className="material-symbols-outlined" aria-hidden="true">grid_view</span></span>
+                <span className="ai-action-btn__copy"><strong>Tidy</strong><small>Group related ideas together</small></span>
               </button>
             </div>
 
+            {!hasBoardContent && (
+              <div className="ai-modal__board-note">
+                <span className="material-symbols-outlined" aria-hidden="true">lightbulb</span>
+                <span>Start with a prompt above, or add a note to the canvas first.</span>
+              </div>
+            )}
+
             {!prompt.trim() && (
               <div className="ai-modal__quick-prompts">
-                <span className="ai-modal__prompts-label">Suggested Starters</span>
+                <div className="ai-modal__section-heading">
+                  <span>Try an example</span>
+                  <span className="ai-modal__count">Tap to edit it</span>
+                </div>
                 <div className="ai-modal__prompt-pills">
                   {QUICK_PROMPTS.slice(0, 3).map((qp) => (
                     <button
                       key={qp.title}
+                      type="button"
                       className="ai-prompt-pill"
                       onClick={() => setPrompt(qp.prompt)}
                     >
-                      <strong>{qp.title}:</strong> <span>{qp.prompt}</span>
+                      <strong>{qp.title}</strong>
+                      <span>{qp.prompt}</span>
                     </button>
                   ))}
                 </div>

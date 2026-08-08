@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /w/
+Disallow: /api/
+
+Sitemap: https://canvio.space/sitemap.xml

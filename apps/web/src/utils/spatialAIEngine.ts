@@ -115,12 +115,101 @@ function normalizeServerBoardResult(
     }];
   });
 
+  const finalTitle = cleanText(title, 120) || `AI Board: ${fallbackTitle.slice(0, 32)}`;
+
   return {
-    title: cleanText(title, 120) || `AI Board: ${fallbackTitle.slice(0, 32)}`,
-    nodes,
+    title: finalTitle,
+    nodes: improveAIVisualStructure(finalTitle, nodes, createdAt),
     relations,
     source,
   };
+}
+
+function improveAIVisualStructure(title: string, nodes: LivingNode[], timestamp: number) {
+  if (nodes.length < 4) return nodes;
+
+  const allSticky = nodes.every((node) => node.type === 'sticky');
+  const hasFrame = nodes.some((node) => node.type === 'frame');
+  let enhancedNodes = nodes;
+
+  // A frame gives an AI-created diagram a clear boundary and keeps fitting
+  // predictable when the model returns only content cards.
+  if (!hasFrame) {
+    const bounds = getNodeBounds(nodes);
+    enhancedNodes = [
+      {
+        id: nanoid(10),
+        type: 'frame',
+        position: { x: bounds.minX - 56, y: bounds.minY - 78 },
+        size: { width: bounds.maxX - bounds.minX + 112, height: bounds.maxY - bounds.minY + 134 },
+        rotation: 0,
+        zIndex: -1,
+        locked: false,
+        data: {
+          title: title.slice(0, 72) || 'AI Board',
+          color: '#6366f1',
+          fill: 'rgba(99, 102, 241, 0.045)',
+        },
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      ...nodes,
+    ];
+  }
+
+  if (!allSticky) return enhancedNodes;
+
+  // Promote the node nearest the group centre to a readable visual anchor.
+  const centre = nodes.reduce((point, node) => ({
+    x: point.x + node.position.x + node.size.width / 2,
+    y: point.y + node.position.y + node.size.height / 2,
+  }), { x: 0, y: 0 });
+  centre.x /= nodes.length;
+  centre.y /= nodes.length;
+  let anchorId = nodes[0].id;
+  let anchorDistance = Number.POSITIVE_INFINITY;
+  nodes.forEach((node) => {
+    const nodeCentre = {
+      x: node.position.x + node.size.width / 2,
+      y: node.position.y + node.size.height / 2,
+    };
+    const distance = Math.hypot(nodeCentre.x - centre.x, nodeCentre.y - centre.y);
+    if (distance < anchorDistance) {
+      anchorDistance = distance;
+      anchorId = node.id;
+    }
+  });
+
+  return enhancedNodes.map((node) => {
+    if (node.id !== anchorId) return node;
+    const label = getNodeText(node).slice(0, 100) || 'Core idea';
+    return {
+      ...node,
+      type: 'shape',
+      data: {
+        ...(node.data || {}),
+        shape: 'hexagon',
+        label,
+        fill: 'rgba(99, 102, 241, 0.18)',
+        stroke: '#6366f1',
+        strokeWidth: 2,
+      },
+    };
+  });
+}
+
+function getNodeBounds(nodes: LivingNode[]) {
+  return nodes.reduce((bounds, node) => ({
+    minX: Math.min(bounds.minX, node.position.x),
+    minY: Math.min(bounds.minY, node.position.y),
+    maxX: Math.max(bounds.maxX, node.position.x + node.size.width),
+    maxY: Math.max(bounds.maxY, node.position.y + node.size.height),
+  }), {
+    minX: Number.POSITIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+  });
 }
 
 function buildAIContext(nodes = Object.values(useCanvasStore.getState().nodes), relations = Object.values(useCanvasStore.getState().relations)) {
