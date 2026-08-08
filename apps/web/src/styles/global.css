@@ -30,7 +30,8 @@ body {
 
 body:has(.home-page),
 body:has(.support-page),
-body:has(.guide-page) {
+body:has(.guide-page),
+body:has(.updates-page) {
   overflow-y: auto !important;
   height: auto !important;
 }

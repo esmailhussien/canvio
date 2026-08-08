@@ -9,6 +9,7 @@ export interface UpdateArticle {
   readTime: string;
   icon: string;
   accent: string;
+  takeaways: string[];
   sections: Array<{ heading: string; paragraphs: string[] }>;
 }
 
@@ -22,6 +23,11 @@ export const UPDATE_ARTICLES: UpdateArticle[] = [
     readTime: '4 min read',
     icon: 'auto_awesome',
     accent: '#a855f7',
+    takeaways: [
+      'AI drafts become normal, editable Canvio objects.',
+      'Generated boards use frames, shapes, notes, and relations together.',
+      'The first draft is fitted into view so people can start editing immediately.',
+    ],
     sections: [
       {
         heading: 'The problem with AI answers',
@@ -54,6 +60,11 @@ export const UPDATE_ARTICLES: UpdateArticle[] = [
     readTime: '5 min read',
     icon: 'account_tree',
     accent: '#38bdf8',
+    takeaways: [
+      'Relations explain meaning such as cause, proof, sequence, and dependency.',
+      'Labels and routing keep important connections readable as boards change.',
+      'The same relation model works across notes, maps, shapes, and frames.',
+    ],
     sections: [
       {
         heading: 'Lines are not enough',
@@ -85,6 +96,11 @@ export const UPDATE_ARTICLES: UpdateArticle[] = [
     readTime: '4 min read',
     icon: 'map',
     accent: '#22c55e',
+    takeaways: [
+      'Maps appear when location matters, without defining the whole product.',
+      'Pins can sit beside evidence, decisions, and notes on the same board.',
+      'People can move between a world view and a focused site view.',
+    ],
     sections: [
       {
         heading: 'Start with the task',
@@ -115,6 +131,11 @@ export const UPDATE_ARTICLES: UpdateArticle[] = [
     readTime: '6 min read',
     icon: 'devices',
     accent: '#f59e0b',
+    takeaways: [
+      'Mouse, touch, and pen need different interaction protections.',
+      'Dedicated handles and clear active tools reduce accidental movement.',
+      'Undo, redo, fit view, and recovery are part of good touch design.',
+    ],
     sections: [
       {
         heading: 'The canvas has more than one input',
@@ -145,6 +166,11 @@ export const UPDATE_ARTICLES: UpdateArticle[] = [
     readTime: '3 min read',
     icon: 'lock',
     accent: '#ef4444',
+    takeaways: [
+      'A shared board link does not mean a board should be searchable.',
+      'Workspace routes stay out of the public sitemap and search index.',
+      'The public website and private thinking space serve different jobs.',
+    ],
     sections: [
       {
         heading: 'A board can contain unfinished thinking',

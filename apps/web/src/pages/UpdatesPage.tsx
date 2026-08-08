@@ -94,6 +94,15 @@ export function UpdatesPage() {
               <h1>{article.title}</h1>
               <p>{article.excerpt}</p>
             </header>
+            <aside className="updates-article__takeaways" aria-label="Key takeaways">
+              <div className="updates-article__takeaways-heading">
+                <span className="material-symbols-outlined" aria-hidden="true">checklist</span>
+                <strong>At a glance</strong>
+              </div>
+              <ul>
+                {article.takeaways.map((takeaway) => <li key={takeaway}>{takeaway}</li>)}
+              </ul>
+            </aside>
             <div className="updates-article__body">
               {article.sections.map((section) => (
                 <section key={section.heading}>
@@ -112,6 +121,22 @@ export function UpdatesPage() {
                 <span>{isCreating ? 'Opening...' : 'Launch Canvas'}</span>
               </button>
             </footer>
+            <section className="updates-related" aria-label="Related updates">
+              <div>
+                <span className="updates-section-kicker">Keep exploring</span>
+                <h2>More from Canvio Updates</h2>
+              </div>
+              <div className="updates-related__grid">
+                {UPDATE_ARTICLES.filter((item) => item.slug !== article.slug).slice(0, 2).map((item) => (
+                  <Link className="updates-related__card" to={`/updates/${item.slug}`} key={item.slug}>
+                    <UpdateGlyph icon={item.icon} accent={item.accent} />
+                    <span className="updates-category" style={{ color: item.accent, backgroundColor: `${item.accent}18` }}>{item.category}</span>
+                    <h3>{item.title}</h3>
+                    <span className="updates-related__read">Read article <span aria-hidden="true">-&gt;</span></span>
+                  </Link>
+                ))}
+              </div>
+            </section>
           </article>
         </main>
       ) : (
