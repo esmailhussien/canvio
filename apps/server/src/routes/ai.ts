@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { createAuthHook, createRateLimitHook } from '../security.js';
+import { createAuthHook, createRateLimitHook, readPositiveIntEnv } from '../security.js';
 
 type AIProvider = 'gemini' | 'openai' | 'anthropic';
 type RelationshipType = 'related_to' | 'leads_to' | 'based_on' | 'part_of' | 'depends_on' | 'contradicts' | 'enables';
@@ -48,12 +48,13 @@ interface RawAIRelation {
 const PROVIDERS: AIProvider[] = ['gemini', 'openai', 'anthropic'];
 const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'enables'];
 const NODE_TYPES = ['sticky', 'shape', 'text', 'frame'];
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
 export async function aiRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', createRateLimitHook({
     namespace: 'ai',
-    windowMs: parseInt(process.env.CANVIO_AI_RATE_WINDOW_MS || '60000', 10),
-    max: parseInt(process.env.CANVIO_AI_RATE_LIMIT || '20', 10),
+    windowMs: readPositiveIntEnv('CANVIO_AI_RATE_WINDOW_MS', 60000, 1000, 3_600_000),
+    max: readPositiveIntEnv('CANVIO_AI_RATE_LIMIT', 20, 1, 1_000),
   }));
   fastify.addHook('onRequest', createAuthHook({ requiredEnv: 'CANVIO_REQUIRE_AI_AUTH' }));
 
@@ -138,10 +139,13 @@ function resolveProvider(provider?: string): AIProvider {
 
 function resolveModel(provider: AIProvider, model?: string) {
   const cleaned = cleanText(model, 80);
-  if (cleaned) return cleaned;
-  if (provider === 'openai') return process.env.CANVIO_OPENAI_MODEL || 'gpt-4o-mini';
-  if (provider === 'anthropic') return process.env.CANVIO_ANTHROPIC_MODEL || 'claude-3-5-sonnet';
-  return process.env.CANVIO_GEMINI_MODEL || 'gemini-2.5-flash';
+  if (provider === 'openai') return cleaned || process.env.CANVIO_OPENAI_MODEL || 'gpt-4o-mini';
+  if (provider === 'anthropic') return cleaned || process.env.CANVIO_ANTHROPIC_MODEL || 'claude-3-5-sonnet';
+
+  // Keep the browser on the configured Gemini model. This prevents an anonymous
+  // caller from switching a free-tier deployment to a more expensive model.
+  const configuredModel = cleanText(process.env.CANVIO_GEMINI_MODEL, 80) || DEFAULT_GEMINI_MODEL;
+  return cleaned === configuredModel ? cleaned : configuredModel;
 }
 
 function resolveApiKey(provider: AIProvider) {
@@ -229,6 +233,7 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
         ],
         response_format: { type: 'json_object' },
       }),
+      signal: AbortSignal.timeout(25_000),
     });
     if (!response.ok) throw new Error(`OpenAI API HTTP ${response.status}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -247,18 +252,26 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
+      signal: AbortSignal.timeout(25_000),
     });
     if (!response.ok) throw new Error(`Anthropic API HTTP ${response.status}`);
     const data = await response.json() as { content?: Array<{ text?: string }> };
     text = data.content?.[0]?.text || '';
   } else {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify({
         contents: [{ parts: [{ text: systemPrompt }, { text: userPrompt }] }],
-        generationConfig: { responseMimeType: 'application/json' },
+        generationConfig: {
+          responseMimeType: 'application/json',
+          maxOutputTokens: 3500,
+        },
       }),
+      signal: AbortSignal.timeout(25_000),
     });
     if (!response.ok) throw new Error(`Gemini API HTTP ${response.status}`);
     const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };

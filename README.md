@@ -42,6 +42,27 @@ The app runs at `http://localhost:5173`
 docker compose up
 ```
 
+### Server-side Gemini AI
+
+Canvio can use Gemini 2.5 Flash through the API server. Keep the provider key on
+the server only; never add it to the web app, a `VITE_*` variable, localStorage,
+the URL, or a committed file. Copy `apps/server/.env.example` as a reference
+and configure these as server environment variables:
+
+```text
+CANVIO_AI_PROVIDER=gemini
+CANVIO_GEMINI_MODEL=gemini-2.5-flash
+CANVIO_GEMINI_API_KEY=<rotated-secret>
+CANVIO_ALLOWED_ORIGINS=https://canvio.space,https://www.canvio.space
+CANVIO_ALLOW_LOCAL_ORIGINS=false
+CANVIO_AI_RATE_LIMIT=10
+CANVIO_AI_RATE_WINDOW_MS=60000
+```
+
+For a public deployment, add real user/session authentication before enabling
+`CANVIO_REQUIRE_AI_AUTH=true`. Origin checks and rate limits reduce abuse but do
+not replace authentication.
+
 ## 🏗️ Architecture
 
 ```

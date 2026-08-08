@@ -68,8 +68,17 @@
 }
 
 .node-renderer.node-type-drawing.selected {
-  border-color: transparent;
-  box-shadow: none;
+  border: 1px dashed color-mix(in srgb, var(--selection-ring) 72%, transparent);
+  box-shadow: 0 0 0 4px var(--selection-ring-soft);
+}
+
+.node-renderer.node-type-drawing.selected::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px dashed color-mix(in srgb, var(--selection-ring) 40%, transparent);
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 .node-renderer.node-type-drawing.selected .drawing-node__ink-path,

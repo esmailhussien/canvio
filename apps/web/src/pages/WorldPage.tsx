@@ -20,6 +20,23 @@ import { getPlugin } from '@canvio/objects';
 import { fitViewportToNodes } from '../utils/viewportFit';
 import './WorldPage.css';
 
+const TOOL_GUIDANCE: Record<string, { label: string; detail: string }> = {
+  select: { label: 'Select', detail: 'Click an element to move or edit it.' },
+  pan: { label: 'Pan', detail: 'Drag the canvas to move around. Release Space to return.' },
+  draw: { label: 'Pen', detail: 'Draw freely. Select the stroke afterward to move it.' },
+  highlighter: { label: 'Highlighter', detail: 'Mark an area, then switch to Select to move it.' },
+  arrow: { label: 'Arrow', detail: 'Draw a line and Canvio will keep its arrow head editable.' },
+  text: { label: 'Text', detail: 'Click anywhere to place a text block.' },
+  sticky: { label: 'Sticky note', detail: 'Click anywhere to place a note.' },
+  shape: { label: 'Shape', detail: 'Click anywhere to place a shape.' },
+  map: { label: 'Map', detail: 'Click anywhere to place a map. Map gestures stay inside the map.' },
+  relation: { label: 'Relation', detail: 'Choose a start port, then a target port. Press Esc to cancel.' },
+  eraser: { label: 'Eraser', detail: 'Click an ink stroke to remove it.' },
+  image: { label: 'Image', detail: 'Click the canvas to place an image.' },
+  frame: { label: 'Frame', detail: 'Drag an area to create a frame.' },
+  code: { label: 'Code', detail: 'Click anywhere to place a code block.' },
+};
+
 function AISparkleIcon({ size = 19 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block', flexShrink: 0 }}>
@@ -285,7 +302,26 @@ export function WorldPage() {
   }, [isPresenting]);
 
   // Connect to collaboration
-  const { connected, connectionIssue, users } = useCollaboration(worldId || '');
+  const { connected, connectionIssue, users, persistenceState, retryConnection } = useCollaboration(worldId || '');
+  const toolGuidance = TOOL_GUIDANCE[activeTool] || TOOL_GUIDANCE.select;
+  const saveLabel = persistenceState === 'loading'
+    ? 'Restoring board'
+    : persistenceState === 'saving'
+      ? 'Saving locally'
+      : persistenceState === 'error'
+        ? 'Save needs attention'
+        : connected
+          ? 'Saved and live'
+          : 'Saved locally';
+  const saveIcon = persistenceState === 'loading'
+    ? 'history'
+    : persistenceState === 'saving'
+      ? 'sync'
+      : persistenceState === 'error'
+        ? 'warning'
+        : connected
+          ? 'cloud_done'
+          : 'cloud_off';
 
   return (
     <div className={`world-page ${isPresenting ? 'is-presenting' : ''}`} data-tool={activeTool} style={worldStyle}>
@@ -302,51 +338,74 @@ export function WorldPage() {
           <div className="world-page__empty-bg-glow"></div>
           
           <div className="world-page__empty-hero">
+            <span className="world-page__empty-kicker">A simple place to think</span>
             <h1 className="world-page__empty-title">
-              Start a board in <span>seconds</span>.
+              What are you working on?
             </h1>
             <p className="world-page__empty-subtitle">
-              Teach, study, brainstorm, map, or build from a blank infinite canvas.
+              Choose a starting point. You can change direction at any time.
             </p>
           </div>
 
           <div className="world-page__starter-panel">
-            <button className="world-page__starter-card primary" onClick={() => handleStartFromScratch(false)}>
-              <IconSticky size={22} />
-              <span>Start from scratch</span>
-            </button>
-            <button className="world-page__starter-card lesson-card" onClick={() => handleStartTemplate('lesson-plan-board')}>
-              <span className="material-symbols-outlined text-xl">school</span>
-              <span>Teach a lesson</span>
-            </button>
-            <button className="world-page__starter-card study-card" onClick={() => handleStartTemplate('study-concept-map')}>
-              <span className="material-symbols-outlined text-xl">neurology</span>
-              <span>Study a topic</span>
-            </button>
-            <button className="world-page__starter-card map-card" onClick={handleDropMap}>
-              <IconMap size={22} />
-              <span>Map activity</span>
-            </button>
-            <button
-              className="world-page__starter-card"
-              onClick={() => {
-                setIsTemplateOpen(true);
-                setIsStarterDismissed(true);
-              }}
-            >
-              <span className="material-symbols-outlined text-xl">space_dashboard</span>
-              <span>Choose template</span>
-            </button>
-            <button
-              className="world-page__starter-card ai-card"
-              onClick={() => {
-                setIsAIOpen(true);
-                setIsStarterDismissed(true);
-              }}
-            >
-              <AISparkleIcon size={22} />
-              <span>Ask Spatial AI</span>
-            </button>
+            <div className="world-page__starter-section">
+              <span className="world-page__starter-label">Start blank</span>
+              <button className="world-page__starter-card primary" onClick={() => handleStartFromScratch(false)}>
+                <IconSticky size={22} />
+                <span>
+                  <strong>Start from scratch</strong>
+                  <small>Make your own board</small>
+                </span>
+              </button>
+            </div>
+            <div className="world-page__starter-section world-page__starter-section--wide">
+              <span className="world-page__starter-label">Start with a purpose</span>
+              <div className="world-page__starter-grid">
+                <button className="world-page__starter-card lesson-card" onClick={() => handleStartTemplate('lesson-plan-board')}>
+                  <span className="material-symbols-outlined text-xl">school</span>
+                  <span>
+                    <strong>Teach a lesson</strong>
+                    <small>Plan an explanation</small>
+                  </span>
+                </button>
+                <button className="world-page__starter-card study-card" onClick={() => handleStartTemplate('study-concept-map')}>
+                  <span className="material-symbols-outlined text-xl">neurology</span>
+                  <span>
+                    <strong>Study a topic</strong>
+                    <small>Connect what you know</small>
+                  </span>
+                </button>
+                <button className="world-page__starter-card map-card" onClick={handleDropMap}>
+                  <IconMap size={22} />
+                  <span>
+                    <strong>Explore a place</strong>
+                    <small>Start with a world map</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div className="world-page__starter-actions">
+              <button
+                className="world-page__starter-link"
+                onClick={() => {
+                  setIsTemplateOpen(true);
+                  setIsStarterDismissed(true);
+                }}
+              >
+                <span className="material-symbols-outlined text-xl">space_dashboard</span>
+                <span>Browse all templates</span>
+              </button>
+              <button
+                className="world-page__starter-link world-page__starter-link--ai"
+                onClick={() => {
+                  setIsAIOpen(true);
+                  setIsStarterDismissed(true);
+                }}
+              >
+                <AISparkleIcon size={22} />
+                <span>Ask Spatial AI</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -354,6 +413,14 @@ export function WorldPage() {
       <Cursors users={users} />
       {!isPresenting && (
         <>
+          <div className="world-page__tool-status" role="status" aria-live="polite">
+            <span className="world-page__tool-status-main">
+              <span className="material-symbols-outlined">{activeTool === 'select' ? 'near_me' : 'edit'}</span>
+              <strong>{toolGuidance.label}</strong>
+            </span>
+            <span className="world-page__tool-status-detail">{toolGuidance.detail}</span>
+            {activeTool !== 'select' && <kbd>Esc</kbd>}
+          </div>
           <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
           <PenInspector
             autoShapeEnabled={autoShapeEnabled}
@@ -637,12 +704,26 @@ export function WorldPage() {
 
           <ShareButton worldId={worldId || ''} />
 
-          <span
-            className={`connection-status ${connected ? 'connected' : ''} ${connectionIssue ? 'warning' : ''}`}
-            title={connected ? 'Live collaboration connected' : connectionIssue || 'Collaboration is reconnecting'}
-          >
-            {connected ? 'Live' : connectionIssue || 'Offline'}
-          </span>
+          {connectionIssue && !connected ? (
+            <button
+              className="connection-status connection-status--retry"
+              onClick={retryConnection}
+              title={`${connectionIssue}. Retry collaboration.`}
+              aria-label="Retry collaboration connection"
+            >
+              <span className="material-symbols-outlined">refresh</span>
+              <span>Retry</span>
+            </button>
+          ) : (
+            <span
+              className={`connection-status ${connected ? 'connected' : ''} connection-status--save-${persistenceState}`}
+              title={`${saveLabel}. ${connected ? 'Live collaboration connected.' : 'Collaboration continues locally.'}`}
+              aria-label={saveLabel}
+            >
+              <span className="material-symbols-outlined">{saveIcon}</span>
+              <span>{saveLabel}</span>
+            </span>
+          )}
 
           {/* Overlapping Multiplayer Avatar Stack */}
           <div className="presence-avatar-stack" title={`${users.length + 1} online collaborator${users.length > 0 ? 's' : ''}`}>

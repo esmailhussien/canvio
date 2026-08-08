@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { useCanvasStore } from '../store/canvasStore';
@@ -18,6 +18,8 @@ import type { LivingNode, Relation, Viewport } from '@canvio/core';
 // Re-export for backward compat
 export type { LivingNode, Relation, UserPresence };
 
+export type PersistenceState = 'loading' | 'saving' | 'saved' | 'error';
+
 function isStoredViewport(value: unknown): value is Viewport {
   if (!value || typeof value !== 'object') return false;
   const viewport = value as Viewport;
@@ -29,6 +31,15 @@ export function useCollaboration(worldId: string) {
   const [connectionIssue, setConnectionIssue] = useState<string | null>(null);
   const [users, setUsers] = useState<UserPresence[]>([]);
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
+  const [persistenceState, setPersistenceState] = useState<PersistenceState>('loading');
+  const [connectionEpoch, setConnectionEpoch] = useState(0);
+
+  const retryConnection = useCallback(() => {
+    setConnected(false);
+    setConnectionIssue(null);
+    setPersistenceState('loading');
+    setConnectionEpoch((value) => value + 1);
+  }, []);
 
   const upsertNodeRemote = useCanvasStore((s) => s.upsertNodeRemote);
   const removeNodeRemote = useCanvasStore((s) => s.removeNodeRemote);
@@ -37,6 +48,7 @@ export function useCollaboration(worldId: string) {
 
   useEffect(() => {
     if (!worldId) return;
+    setPersistenceState('loading');
     const currentStore = useCanvasStore.getState();
     currentStore.replaceWorld({
       nodes: {},
@@ -260,6 +272,7 @@ export function useCollaboration(worldId: string) {
         } finally {
           isReceivingRemote = false;
         }
+        setPersistenceState('saved');
 
         // Small delay before enabling local push to let the store settle
         window.setTimeout(() => {
@@ -414,6 +427,7 @@ export function useCollaboration(worldId: string) {
     let saveTimeout: number | null = null;
     const saveLocalState = () => {
       if (saveTimeout !== null) window.clearTimeout(saveTimeout);
+      setPersistenceState('saving');
       saveTimeout = window.setTimeout(() => {
         const store = useCanvasStore.getState();
         setStorageItem(storageKey, {
@@ -421,7 +435,10 @@ export function useCollaboration(worldId: string) {
           relations: store.relations,
           viewport: store.viewport,
           savedAt: Date.now(),
+        }).then(() => {
+          setPersistenceState('saved');
         }).catch((err) => {
+          setPersistenceState('error');
           console.warn('Failed to save state to IndexedDB', err);
         });
       }, 400);
@@ -447,7 +464,7 @@ export function useCollaboration(worldId: string) {
       wsProvider.destroy();
       doc.destroy();
     };
-  }, [worldId]);
+  }, [worldId, connectionEpoch]);
 
-  return { connected, connectionIssue, users, provider };
+  return { connected, connectionIssue, users, provider, persistenceState, retryConnection };
 }

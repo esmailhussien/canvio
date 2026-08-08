@@ -86,13 +86,31 @@ export interface AIClusterResponse {
 export class ApiRequestError extends Error {
   status: number;
   code?: string;
+  retryAfterSeconds?: number;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, retryAfterSeconds?: number) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
     this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+async function createApiRequestError(response: Response, fallback: string) {
+  let body: { error?: string; message?: string; retryAfterSeconds?: number } = {};
+  try {
+    body = await response.json() as typeof body;
+  } catch {
+    // Keep the fallback when the upstream returns an empty or non-JSON error.
+  }
+
+  return new ApiRequestError(
+    body.message || body.error || `${fallback}: ${response.status}`,
+    response.status,
+    body.error,
+    body.retryAfterSeconds,
+  );
 }
 
 export async function createBoard() {
@@ -100,7 +118,7 @@ export async function createBoard() {
     method: 'POST',
     headers: requestHeaders(),
   });
-  if (!response.ok) throw new Error(`Failed to create board: ${response.status}`);
+  if (!response.ok) throw await createApiRequestError(response, 'Failed to create board');
   return response.json() as Promise<BoardRecord>;
 }
 
@@ -108,7 +126,7 @@ export async function touchBoard(id: string) {
   const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}`), {
     headers: requestHeaders(),
   });
-  if (!response.ok) throw new Error(`Failed to load board: ${response.status}`);
+  if (!response.ok) throw await createApiRequestError(response, 'Failed to load board');
   return response.json() as Promise<BoardRecord>;
 }
 
@@ -121,7 +139,7 @@ export async function updateBoardAppearance(
     headers: requestHeaders(true),
     body: JSON.stringify({ appearance }),
   });
-  if (!response.ok) throw new Error(`Failed to update board appearance: ${response.status}`);
+  if (!response.ok) throw await createApiRequestError(response, 'Failed to update board appearance');
   return response.json() as Promise<BoardRecord>;
 }
 
@@ -131,7 +149,7 @@ export async function createBoardShareLink(id: string) {
     headers: requestHeaders(true),
     body: '{}',
   });
-  if (!response.ok) throw new Error(`Failed to create share link: ${response.status}`);
+  if (!response.ok) throw await createApiRequestError(response, 'Failed to create share link');
   return response.json() as Promise<{ url: string; shareToken: string }>;
 }
 
@@ -168,14 +186,7 @@ async function postAI<T>(path: string, body: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    let code: string | undefined;
-    try {
-      const errorBody = await response.json() as { error?: string };
-      code = errorBody.error;
-    } catch {
-      code = undefined;
-    }
-    throw new ApiRequestError(`AI request failed: ${response.status}`, response.status, code);
+    throw await createApiRequestError(response, 'AI request failed');
   }
 
   return response.json() as Promise<T>;

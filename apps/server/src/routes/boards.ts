@@ -1,13 +1,13 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { nanoid } from 'nanoid';
 import { getBoard, listBoards, saveBoard, upsertBoard } from '../storage/boards.js';
-import { canAccessBoard, createRateLimitHook, getRequestOwnerId, isRequestAuthorized } from '../security.js';
+import { canAccessBoard, createRateLimitHook, getRequestOwnerId, isRequestAuthorized, readPositiveIntEnv } from '../security.js';
 
 export async function boardRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', createRateLimitHook({
     namespace: 'boards',
-    windowMs: parseInt(process.env.CANVIO_BOARD_RATE_WINDOW_MS || '60000', 10),
-    max: parseInt(process.env.CANVIO_BOARD_RATE_LIMIT || '120', 10),
+    windowMs: readPositiveIntEnv('CANVIO_BOARD_RATE_WINDOW_MS', 60000, 1000, 3_600_000),
+    max: readPositiveIntEnv('CANVIO_BOARD_RATE_LIMIT', 120, 1, 10_000),
   }));
 
   fastify.get('/', async (request) => {

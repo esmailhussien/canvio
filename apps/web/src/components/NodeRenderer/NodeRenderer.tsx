@@ -118,6 +118,10 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     const target = e.target as HTMLElement;
     if (target.classList.contains('resize-handle') || target.classList.contains('node-port')) return;
 
+    // Sticky notes expose a dedicated drag handle so touch users can move a
+    // note without competing with the textarea's edit gesture.
+    const isDedicatedDragHandle = Boolean(target.closest('[data-node-drag-handle]'));
+
     if (activeTool === 'relation' && node.type === 'map' && target.closest('.leaflet-marker-icon')) {
       e.stopPropagation();
       return;
@@ -156,6 +160,22 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
         setRelationSourceId(null);
       } else {
         completeRelationTo(relationTargetId === node.id ? relationTargetPort || nearestPort : nearestPort);
+      }
+      return;
+    }
+
+    if (isDedicatedDragHandle) {
+      e.preventDefault();
+      e.stopPropagation();
+      selectNode(node.id, e.shiftKey);
+      hasExceededDragThresholdRef.current = true;
+      dragOriginRef.current = { x: e.clientX, y: e.clientY };
+      if (!node.locked) {
+        snapshot();
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        setIsDragging(true);
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        originalNodePosRef.current = { x: node.position.x, y: node.position.y };
       }
       return;
     }

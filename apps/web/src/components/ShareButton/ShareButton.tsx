@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { IconShare } from '@canvio/ui';
-import { createBoardShareLink } from '../../utils/api';
+import { ApiRequestError, createBoardShareLink } from '../../utils/api';
 import './ShareButton.css';
 
 export function ShareButton({ worldId }: { worldId: string }) {
   const [status, setStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
+  const [errorText, setErrorText] = useState('Copy failed');
 
   const handleShare = async () => {
     try {
@@ -27,17 +28,27 @@ export function ShareButton({ worldId }: { worldId: string }) {
         input.remove();
       }
       setStatus('copied');
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 429) {
+        setErrorText('Try again soon');
+      } else if (error instanceof ApiRequestError && error.status === 403) {
+        setErrorText('No access');
+      } else {
+        setErrorText('Copy failed');
+      }
       setStatus('error');
     }
 
-    setTimeout(() => setStatus('idle'), 2000);
+    setTimeout(() => {
+      setStatus('idle');
+      setErrorText('Copy failed');
+    }, 2000);
   };
 
   return (
     <button className="share-btn" onClick={handleShare} title="Copy link to clipboard">
       <IconShare size={16} />
-      <span>{status === 'copying' ? 'Sharing...' : status === 'copied' ? 'Copied!' : status === 'error' ? 'Copy failed' : 'Share'}</span>
+      <span>{status === 'copying' ? 'Sharing...' : status === 'copied' ? 'Copied!' : status === 'error' ? errorText : 'Share'}</span>
     </button>
   );
 }

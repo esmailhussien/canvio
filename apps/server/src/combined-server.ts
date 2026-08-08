@@ -14,6 +14,8 @@ import { aiRoutes } from './routes/ai.js';
 import { createFilePersistence } from './storage/yPersistence.js';
 import { createCorsOriginGuard } from './security.js';
 import { authorizeWebSocketBoard, getBoardIdFromWsRequest } from './wsAccess.js';
+import { FASTIFY_OPTIONS, registerErrorHandler } from './http.js';
+import { getReadiness } from './health.js';
 
 dotenv.config();
 
@@ -22,9 +24,8 @@ setPersistence(createFilePersistence());
 
 const PORT = parseInt(process.env.PORT || '4001', 10);
 
-const app = Fastify({
-  logger: true,
-});
+const app = Fastify(FASTIFY_OPTIONS);
+registerErrorHandler(app);
 
 app.register(cors, {
   origin: createCorsOriginGuard(),
@@ -43,6 +44,15 @@ app.get('/', async () => ({
 }));
 
 app.get('/health', async () => ({ status: 'healthy', timestamp: new Date().toISOString() }));
+
+app.get('/health/ready', async (_request, reply) => {
+  try {
+    return await getReadiness();
+  } catch (error) {
+    app.log.error({ err: error }, 'Readiness check failed');
+    return reply.code(503).send({ status: 'not_ready', storage: 'unavailable' });
+  }
+});
 
 app.register(boardRoutes, { prefix: '/api/boards' });
 app.register(aiRoutes, { prefix: '/api/ai' });

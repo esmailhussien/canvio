@@ -285,7 +285,9 @@ export function useCanvasDrawingSession({
           },
           updatedAt: now,
         });
-        // Don't select, don't switch tool — keep drawing!
+        selectNode(session.nodeId);
+        // Keep the drawing tool active, but leave the ink selected so it is
+        // immediately discoverable when the user switches back to Select.
 
         inkSessionRef.current = {
           nodeId: session.nodeId,
@@ -326,7 +328,9 @@ export function useCanvasDrawingSession({
           updatedAt: now,
         };
         addNode(node);
-        // Don't select, don't switch tool — keep drawing!
+        selectNode(node.id);
+        // Keep the drawing tool active, but leave the ink selected so it is
+        // immediately discoverable when the user switches back to Select.
 
         inkSessionRef.current = {
           nodeId: node.id,

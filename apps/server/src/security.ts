@@ -61,7 +61,9 @@ function getClientIpFromHeaders(headers: IncomingHttpHeaders, fallback = 'unknow
 }
 
 function getClientIp(request: FastifyRequest) {
-  return getClientIpFromHeaders(request.headers, request.ip || 'unknown');
+  // Fastify owns proxy handling through trustProxy. Avoid trusting a raw
+  // forwarded header here, otherwise a caller can rotate rate-limit buckets.
+  return request.ip || 'unknown';
 }
 
 export function createCorsOriginGuard() {
@@ -91,6 +93,19 @@ export function createRateLimitHook(options: {
     const ownerId = getRequestOwnerId(request);
     const key = `${options.namespace}:${ownerId || getClientIp(request)}`;
     const now = Date.now();
+
+    // Keep this process-local limiter bounded on long-lived Render instances.
+    if (rateBuckets.size > 10_000) {
+      for (const [bucketKey, bucketValue] of rateBuckets) {
+        if (bucketValue.resetAt <= now) rateBuckets.delete(bucketKey);
+      }
+    }
+
+    if (!rateBuckets.has(key) && rateBuckets.size >= 20_000) {
+      const oldestKey = rateBuckets.keys().next().value as string | undefined;
+      if (oldestKey) rateBuckets.delete(oldestKey);
+    }
+
     const bucket = rateBuckets.get(key);
 
     if (!bucket || bucket.resetAt <= now) {
@@ -102,11 +117,17 @@ export function createRateLimitHook(options: {
     if (bucket.count <= options.max) return;
 
     const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
-    reply
+    return reply
       .header('Retry-After', String(retryAfterSeconds))
       .code(429)
       .send({ error: 'RATE_LIMITED', retryAfterSeconds });
   };
+}
+
+export function readPositiveIntEnv(name: string, fallback: number, min = 1, max = 1_000_000) {
+  const parsed = Number.parseInt(process.env[name] || '', 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 export function createAuthHook(options: { requiredEnv?: string } = {}) {
