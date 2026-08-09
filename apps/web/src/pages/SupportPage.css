@@ -241,6 +241,7 @@
 
 .support-hero__panel,
 .support-section,
+.support-email-card,
 .support-kofi-card,
 .support-priority-card,
 .support-feedback-guide,
@@ -336,6 +337,7 @@
 }
 
 .support-section__heading h2,
+.support-email-card h2,
 .support-kofi-card h2,
 .support-cta-band h2 {
   font-family: var(--font-display);
@@ -348,6 +350,7 @@
 }
 
 .support-section__heading p,
+.support-email-card p,
 .support-kofi-card p,
 .support-cta-band p {
   color: var(--text-secondary);
@@ -405,13 +408,20 @@
 
 .support-two-column {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 
+.support-email-card,
 .support-kofi-card,
 .support-priority-card {
   padding: 24px;
+}
+
+.support-email-card {
+  background:
+    linear-gradient(135deg, rgba(56, 189, 248, 0.16), transparent 46%),
+    color-mix(in srgb, var(--bg-surface) 94%, transparent);
 }
 
 .support-kofi-card {
@@ -673,6 +683,7 @@
 
   .support-hero__panel,
   .support-section,
+  .support-email-card,
   .support-kofi-card,
   .support-priority-card,
   .support-feedback-guide,

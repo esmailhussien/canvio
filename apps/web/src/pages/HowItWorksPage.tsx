@@ -146,7 +146,7 @@ export function HowItWorksPage() {
           </div>
           <h1 className="guide-hero__title">How Canvio works</h1>
           <p className="guide-hero__subtitle">
-            Canvio is a visual knowledge workspace: start with a board, add living elements, connect the meaning, then present or export the result.
+            Canvio is an interactive online whiteboard for visual knowledge work: start with a board, add living elements, connect the meaning, then present or export the result.
           </p>
           <div className="guide-hero__actions">
             <button className="guide-btn-action" onClick={handleCreateWorld}>

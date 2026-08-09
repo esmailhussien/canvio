@@ -7,20 +7,20 @@ const DEFAULT_IMAGE = `${SITE_URL}/logo.png`;
 
 const PUBLIC_PAGES: Record<string, { title: string; description: string }> = {
   '/': {
-    title: 'Canvio | Visual Knowledge Workspace for Learning, Planning and Research',
-    description: 'Canvio is a collaborative visual workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
+    title: 'Canvio | Online Whiteboard for Learning, Planning and Research',
+    description: 'Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
   },
   '/how-it-works': {
-    title: 'How Canvio Works | Visual Knowledge Workspace',
-    description: 'Learn how Canvio turns notes, shapes, maps, relations, and AI drafts into one editable visual knowledge workspace.',
+    title: 'How Canvio Works | Interactive Online Whiteboard',
+    description: 'Learn how Canvio turns notes, shapes, maps, relations, and AI drafts into one editable online whiteboard for visual thinking.',
   },
   '/support': {
     title: 'Support Canvio | Help Improve the Visual Knowledge Workspace',
     description: 'Find Canvio support, report an issue, request a feature, contribute feedback, or help improve the open-source workspace.',
   },
   '/updates': {
-    title: 'Canvio Updates | Product Notes, Guides, and Releases',
-    description: 'Read Canvio product updates, design notes, guides, and archived releases about visual thinking, AI boards, relations, maps, and collaboration.',
+    title: 'Canvio Updates | Online Whiteboard Features and Guides',
+    description: 'Read Canvio product updates, design notes, guides, and releases about online whiteboard features, visual thinking, AI boards, relations, maps, and collaboration.',
   },
 };
 
@@ -79,30 +79,44 @@ export function Seo() {
 
     document.title = title;
     upsertMeta('name', 'description', description);
-    upsertMeta('name', 'robots', isPrivateBoard ? 'noindex, nofollow' : isPublicPage ? 'index, follow' : 'noindex, nofollow');
+    upsertMeta('name', 'robots', isPrivateBoard ? 'noindex, nofollow' : isPublicPage ? 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' : 'noindex, nofollow');
     upsertMeta('property', 'og:type', 'website');
     upsertMeta('property', 'og:site_name', 'Canvio');
     upsertMeta('property', 'og:title', title);
     upsertMeta('property', 'og:description', description);
     upsertMeta('property', 'og:url', canonicalUrl);
     upsertMeta('property', 'og:image', DEFAULT_IMAGE);
+    upsertMeta('property', 'og:image:alt', 'Canvio visual knowledge workspace logo');
     upsertMeta('name', 'twitter:card', 'summary');
     upsertMeta('name', 'twitter:title', title);
     upsertMeta('name', 'twitter:description', description);
     upsertMeta('name', 'twitter:image', DEFAULT_IMAGE);
+    upsertMeta('name', 'twitter:image:alt', 'Canvio visual knowledge workspace logo');
     upsertCanonical(canonicalUrl);
 
     if (article) {
       updateJsonLd({
         '@context': 'https://schema.org',
-        '@type': 'Article',
-        headline: article.title,
-        description: article.excerpt,
-        datePublished: article.datePublished,
-        dateModified: article.datePublished,
-        author: { '@type': 'Organization', name: 'Canvio', url: SITE_URL },
-        publisher: { '@type': 'Organization', name: 'Canvio', url: SITE_URL, logo: { '@type': 'ImageObject', url: DEFAULT_IMAGE } },
-        mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+        '@graph': [
+          {
+            '@type': 'Article',
+            headline: article.title,
+            description: article.excerpt,
+            datePublished: article.datePublished,
+            dateModified: article.datePublished,
+            author: { '@type': 'Organization', name: 'Canvio', url: SITE_URL },
+            publisher: { '@type': 'Organization', name: 'Canvio', url: SITE_URL, logo: { '@type': 'ImageObject', url: DEFAULT_IMAGE } },
+            mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+          },
+          {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Canvio', item: SITE_URL },
+              { '@type': 'ListItem', position: 2, name: 'Updates', item: `${SITE_URL}/updates` },
+              { '@type': 'ListItem', position: 3, name: article.title, item: canonicalUrl },
+            ],
+          },
+        ],
       });
     } else if (pathname === '/') {
       updateJsonLd({
@@ -122,6 +136,24 @@ export function Seo() {
             name: 'Canvio',
             url: SITE_URL,
             description,
+            publisher: { '@id': `${SITE_URL}/#organization` },
+          },
+          {
+            '@type': 'WebApplication',
+            '@id': `${SITE_URL}/#application`,
+            name: 'Canvio',
+            url: SITE_URL,
+            description,
+            applicationCategory: 'EducationalApplication',
+            operatingSystem: 'Web',
+            browserRequirements: 'Requires a modern web browser',
+            featureList: [
+              'Infinite online whiteboard',
+              'Concept mapping and connected notes',
+              'AI-assisted board creation',
+              'Real-time collaboration',
+              'Presentation and export tools',
+            ],
             publisher: { '@id': `${SITE_URL}/#organization` },
           },
         ],

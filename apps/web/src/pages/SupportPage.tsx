@@ -9,9 +9,25 @@ import './SupportPage.css';
 
 const KOFI_URL = 'https://ko-fi.com/canvio';
 const GITHUB_REPO_URL = 'https://github.com/esmailhussien/canvio';
-const BUG_REPORT_URL = `${GITHUB_REPO_URL}/issues/new?title=Bug%20report%3A%20`;
-const FEATURE_REQUEST_URL = `${GITHUB_REPO_URL}/issues/new?title=Feature%20request%3A%20`;
-const UX_FEEDBACK_URL = `${GITHUB_REPO_URL}/issues/new?title=UX%20feedback%3A%20`;
+const SUPPORT_EMAIL = 'support@canvio.space';
+
+function supportEmailUrl(type: 'Bug report' | 'UX feedback' | 'Feature request' | 'General inquiry') {
+  const subject = encodeURIComponent(`Canvio ${type}: `);
+  const body = encodeURIComponent(
+    type === 'Bug report'
+      ? 'What were you trying to do?\n\nWhat happened instead?\n\nDevice and browser:\n\nSteps to reproduce:\n'
+      : type === 'UX feedback'
+        ? 'What workflow or device were you using?\n\nWhat felt difficult?\n\nWhat would feel better?\n'
+        : type === 'Feature request'
+          ? 'What would you like Canvio to do?\n\nWho would this help?\n\nWhy would it matter?\n'
+          : 'How can we help?\n',
+  );
+  return `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+}
+
+const BUG_REPORT_URL = supportEmailUrl('Bug report');
+const FEATURE_REQUEST_URL = supportEmailUrl('Feature request');
+const UX_FEEDBACK_URL = supportEmailUrl('UX feedback');
 
 function SupportIcon({ value, color, size = 20 }: { value: string; color?: string; size?: number }) {
   const style = { color: color || 'currentColor', flexShrink: 0 };
@@ -136,12 +152,16 @@ export function SupportPage() {
               Help Canvio become easier, faster, and more useful.
             </h1>
             <p className="support-hero__subtitle">
-              Report friction, request improvements, follow the open-source work, or support development through Ko-fi.
+              Report a problem, ask a question, request an improvement, or support development through Ko-fi.
             </p>
             <div className="support-hero__actions">
-              <a className="support-btn-primary" href={BUG_REPORT_URL} target="_blank" rel="noopener noreferrer">
+              <a className="support-btn-primary" href={BUG_REPORT_URL}>
                 <SupportIcon value="BUG" />
                 <span>Report a bug</span>
+              </a>
+              <a className="support-btn-secondary" href={supportEmailUrl('General inquiry')}>
+                <SupportIcon value="HELP" color="#38bdf8" />
+                <span>Email support</span>
               </a>
               <a className="support-btn-secondary" href={KOFI_URL} target="_blank" rel="noopener noreferrer">
                 <SupportIcon value="KO" color="#f59e0b" />
@@ -193,8 +213,6 @@ export function SupportPage() {
                 key={path.title}
                 className="support-path-card"
                 href={path.href}
-                target="_blank"
-                rel="noopener noreferrer"
               >
                 <SupportIcon value={path.glyph} color={path.color} />
                 <h3>{path.title}</h3>
@@ -206,6 +224,21 @@ export function SupportPage() {
         </section>
 
         <section className="support-two-column">
+          <div className="support-email-card">
+            <div className="support-kofi-card__label">
+              <SupportIcon value="HELP" color="#38bdf8" />
+              <span>Direct support</span>
+            </div>
+            <h2>Have a question or problem?</h2>
+            <p>
+              Email the Canvio team directly for product questions, account help, bugs, and suggestions.
+            </p>
+            <a className="support-kofi-card__button" href={supportEmailUrl('General inquiry')}>
+              Email {SUPPORT_EMAIL}
+            </a>
+            <span className="support-kofi-card__note">Your mail app will open with a ready-to-edit message.</span>
+          </div>
+
           <div className="support-kofi-card">
             <div className="support-kofi-card__label">
               <SupportIcon value="KO" color="#f59e0b" />
@@ -279,6 +312,10 @@ export function SupportPage() {
               <SupportIcon value="GH" />
               <span>View GitHub</span>
             </a>
+            <a className="support-btn-secondary" href={supportEmailUrl('General inquiry')}>
+              <SupportIcon value="HELP" color="#38bdf8" />
+              <span>Email support</span>
+            </a>
           </div>
         </section>
       </main>
@@ -294,6 +331,7 @@ export function SupportPage() {
           <button className="support-footer__link" onClick={() => navigate('/how-it-works')}>How It Works</button>
           <a className="support-footer__link" href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
           <a className="support-footer__link" href={KOFI_URL} target="_blank" rel="noopener noreferrer">Ko-fi</a>
+          <a className="support-footer__link" href={supportEmailUrl('General inquiry')}>Email support</a>
         </div>
       </footer>
     </div>

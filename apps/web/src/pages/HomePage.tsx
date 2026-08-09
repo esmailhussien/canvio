@@ -104,7 +104,7 @@ export function HomePage() {
               A whiteboard that turns ideas into <span>connected work.</span>
             </h1>
             <p className="home-hero__subtitle">
-              Canvio combines an infinite canvas, smart ink, living objects, relation mapping, spatial AI, presentation mode, and export-ready frames in one familiar workspace.
+              Canvio combines an infinite online whiteboard, smart ink, living objects, concept mapping, spatial AI, presentation mode, and export-ready frames in one familiar workspace.
             </p>
             <div className="home-hero__cta">
               <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
