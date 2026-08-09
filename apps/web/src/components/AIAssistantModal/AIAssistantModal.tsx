@@ -106,6 +106,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   const addNode = useCanvasStore((s) => s.addNode);
   const addRelation = useCanvasStore((s) => s.addRelation);
   const nodeCount = useCanvasStore((s) => Object.keys(s.nodes).length);
+  const relationCount = useCanvasStore((s) => Object.keys(s.relations).length);
   const hasBoardContent = nodeCount > 0;
 
   // Close on Escape key press
@@ -321,7 +322,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
             <div className="ai-modal__section-heading">
               <span>Work with this board</span>
-              <span className="ai-modal__count">{hasBoardContent ? `${nodeCount} ${nodeCount === 1 ? 'element' : 'elements'}` : 'Nothing here yet'}</span>
+              <span className="ai-modal__count">{hasBoardContent ? `${nodeCount} ${nodeCount === 1 ? 'element' : 'elements'} · ${relationCount} ${relationCount === 1 ? 'connection' : 'connections'}` : 'Nothing here yet'}</span>
             </div>
             <div className="ai-modal__quick-actions">
               <button type="button" className="ai-action-btn" onClick={handleSummarizeBoard} disabled={isGenerating || !hasBoardContent} title={hasBoardContent ? 'Create an overview of this board' : 'Add something to the board first'}>

@@ -79,6 +79,50 @@
   gap: 4px;
 }
 
+.relation-inspector__endpoints {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-surface) 74%, transparent);
+}
+
+.relation-inspector__endpoint {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.relation-inspector__endpoint span {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.relation-inspector__endpoint strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relation-inspector__endpoint--target {
+  text-align: right;
+}
+
+.relation-inspector__endpoint-arrow {
+  color: var(--relation-active, var(--accent-primary));
+  font-size: 18px;
+  font-weight: 700;
+}
+
 .relation-inspector__label {
   font-size: 11px;
   color: var(--text-tertiary);

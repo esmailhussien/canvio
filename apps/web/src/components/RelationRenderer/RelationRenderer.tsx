@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Relation, LivingNode, useCanvasStore } from '../../store/canvasStore';
-import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from './relationUtils';
+import { generateRelationPath, generateSmartRelationPath, getRelationEndpointLabel, NodeBounds, resolveRelationPorts } from './relationUtils';
 import './RelationRenderer.css';
 
 interface Props {
@@ -60,6 +60,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
   const selectRelation = useCanvasStore((s) => s.selectRelation);
   const removeRelation = useCanvasStore((s) => s.removeRelation);
   const updateRelation = useCanvasStore((s) => s.updateRelation);
+  const snapshot = useCanvasStore((s) => s.snapshot);
   const [hoveredRelationId, setHoveredRelationId] = useState<string | null>(null);
   const [recentRelationId, setRecentRelationId] = useState<string | null>(null);
   const previousRelationIdsRef = useRef<Set<string>>(new Set(Object.keys(relations)));
@@ -172,9 +173,14 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
         }
 
         const baseLabel = rel.label || (rel.relationship && rel.relationship !== 'related_to' ? rel.relationship.replace('_', ' ') : '');
-        const displayLabel = baseLabel && distanceLabel
-          ? `${baseLabel} • ${distanceLabel}`
-          : baseLabel || distanceLabel;
+        const endpointLabel = source.type === 'map' || target.type === 'map'
+          ? `${getRelationEndpointLabel(source, rel.sourcePort).slice(0, 36)} → ${getRelationEndpointLabel(target, rel.targetPort).slice(0, 36)}`
+          : '';
+        const displayLabel = (endpointLabel
+          ? (baseLabel ? `${baseLabel} • ${endpointLabel}` : endpointLabel)
+          : baseLabel && distanceLabel
+            ? `${baseLabel} • ${distanceLabel}`
+            : baseLabel || distanceLabel)?.slice(0, 96);
 
         const lineWidth = style.width || 2;
         const shouldAnimate = style.animated || rel.relationship === 'leads_to';
@@ -187,6 +193,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
               cursor: isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
             }}
             className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${recentRelationId === rel.id ? 'relation-group--new' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''}`}
+            aria-label={`${getRelationEndpointLabel(source, rel.sourcePort)} ${rel.relationship || 'related to'} ${getRelationEndpointLabel(target, rel.targetPort)}`}
             onMouseEnter={() => setHoveredRelationId(rel.id)}
             onMouseLeave={() => setHoveredRelationId((id) => id === rel.id ? null : id)}
             onClick={(e) => {
@@ -203,6 +210,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
               e.stopPropagation();
               const nextLabel = window.prompt('Relation label', rel.label || '');
               if (nextLabel !== null) {
+                snapshot();
                 updateRelation(rel.id, { label: nextLabel.trim() });
                 selectRelation(rel.id);
               }

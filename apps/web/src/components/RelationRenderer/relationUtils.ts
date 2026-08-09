@@ -80,6 +80,24 @@ export function isMarkerPort(portId?: string | null): boolean {
   return Boolean(portId?.startsWith(MARKER_PORT_PREFIX));
 }
 
+/** A short, human-readable endpoint name for relation inspectors and map links. */
+export function getRelationEndpointLabel(node: LivingNode, portId?: string): string {
+  const data = node.data || {};
+  const rawName = data.title || data.label || data.text || data.content;
+  const nodeName = typeof rawName === 'string' && rawName.trim()
+    ? rawName.replace(/\s+/g, ' ').trim().slice(0, 64)
+    : node.type === 'map' ? 'Living map' : `${node.type} element`;
+
+  if (node.type !== 'map' || !isMarkerPort(portId)) return nodeName;
+  const markerId = portId!.slice(MARKER_PORT_PREFIX.length);
+  const markers = Array.isArray(data.markers) ? data.markers : [];
+  const marker = markers.find((candidate: any) => candidate?.id === markerId) as { label?: unknown } | undefined;
+  const markerLabel = typeof marker?.label === 'string' && marker.label.trim()
+    ? marker.label.replace(/\s+/g, ' ').trim().slice(0, 64)
+    : markerId;
+  return `${nodeName} / ${markerLabel}`;
+}
+
 export function resolveRelationPorts(
   source: LivingNode,
   target: LivingNode,

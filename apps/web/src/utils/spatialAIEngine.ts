@@ -213,15 +213,23 @@ function getNodeBounds(nodes: LivingNode[]) {
 }
 
 function buildAIContext(nodes = Object.values(useCanvasStore.getState().nodes), relations = Object.values(useCanvasStore.getState().relations)) {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   return {
     nodes: nodes.slice(0, 80).map((node) => ({
       id: node.id,
       type: node.type,
       text: getNodeText(node).slice(0, 280),
+      title: getNodeDisplayName(node),
+      ...(node.type === 'map' ? { mapPins: getMapPins(node) } : {}),
     })),
     relations: relations.slice(0, 140).map((relation) => ({
+      id: relation.id,
       sourceId: relation.sourceId,
       targetId: relation.targetId,
+      sourcePort: relation.sourcePort,
+      targetPort: relation.targetPort,
+      sourceLabel: getRelationEndpointName(nodeById.get(relation.sourceId), relation.sourcePort),
+      targetLabel: getRelationEndpointName(nodeById.get(relation.targetId), relation.targetPort),
       label: relation.label,
       relationship: relation.relationship,
     })),
@@ -231,6 +239,41 @@ function buildAIContext(nodes = Object.values(useCanvasStore.getState().nodes), 
 function getNodeText(node: LivingNode) {
   const data = node.data as Record<string, unknown> | undefined;
   return String(data?.text || data?.content || data?.title || data?.label || '');
+}
+
+function getNodeDisplayName(node: LivingNode) {
+  const data = node.data as Record<string, unknown> | undefined;
+  const raw = data?.title || data?.label || data?.text || data?.content;
+  const value = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  return value.slice(0, 120) || (node.type === 'map' ? 'Living map' : `${node.type} element`);
+}
+
+function getMapPins(node: LivingNode) {
+  const data = node.data as Record<string, unknown> | undefined;
+  const markers = Array.isArray(data?.markers) ? data.markers : [];
+  return markers.slice(0, 40).flatMap((marker) => {
+    if (!marker || typeof marker !== 'object') return [];
+    const value = marker as Record<string, unknown>;
+    const position = Array.isArray(value.position) ? value.position : [];
+    const latitude = typeof position[0] === 'number' ? position[0] : NaN;
+    const longitude = typeof position[1] === 'number' ? position[1] : NaN;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+    return [{
+      id: String(value.id || ''),
+      label: String(value.label || 'Unnamed pin').replace(/\s+/g, ' ').trim().slice(0, 100),
+      latitude,
+      longitude,
+    }];
+  });
+}
+
+function getRelationEndpointName(node: LivingNode | undefined, port?: string) {
+  if (!node) return 'Unknown element';
+  const nodeName = getNodeDisplayName(node);
+  if (node.type !== 'map' || !port?.startsWith('marker:')) return nodeName;
+  const markerId = port.slice('marker:'.length);
+  const marker = getMapPins(node).find((pin) => pin.id === markerId);
+  return marker ? `${nodeName} / pin: ${marker.label}` : `${nodeName} / pin: ${markerId}`;
 }
 
 function normalizeProvider(provider?: string): AIProvider | undefined {

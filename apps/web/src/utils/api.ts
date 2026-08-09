@@ -36,6 +36,13 @@ export interface AIContextNode {
   id: string;
   type: string;
   text: string;
+  title?: string;
+  mapPins?: Array<{
+    id: string;
+    label: string;
+    latitude: number;
+    longitude: number;
+  }>;
 }
 
 export interface AIContextRelation {
@@ -43,6 +50,10 @@ export interface AIContextRelation {
   targetId: string;
   label?: string;
   relationship?: string;
+  sourcePort?: string;
+  targetPort?: string;
+  sourceLabel?: string;
+  targetLabel?: string;
 }
 
 export interface RawAIBoardNode {

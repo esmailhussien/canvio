@@ -8,6 +8,13 @@ interface AIContextNode {
   id?: string;
   type?: string;
   text?: string;
+  title?: string;
+  mapPins?: Array<{
+    id?: string;
+    label?: string;
+    latitude?: number;
+    longitude?: number;
+  }>;
 }
 
 interface AIContextRelation {
@@ -15,6 +22,10 @@ interface AIContextRelation {
   targetId?: string;
   label?: string;
   relationship?: string;
+  sourcePort?: string;
+  targetPort?: string;
+  sourceLabel?: string;
+  targetLabel?: string;
 }
 
 interface AIRequestBody {
@@ -157,6 +168,7 @@ function resolveApiKey(provider: AIProvider) {
 function buildBoardSystemPrompt() {
   return `You are Spatial AI for Canvio, an infinite canvas knowledge workspace.
 Generate a structured spatial knowledge graph for the user's request.
+Relations are first-class meaning: read the existing graph before adding content, preserve useful links, and use relationship labels/types to explain flow, dependency, evidence, contradiction, and location. Map pins are individual endpoints, not just part of a map image.
 Return ONLY raw JSON with this schema:
 {
   "title": "Short title",
@@ -199,13 +211,28 @@ function buildGraphContext(context?: AIRequestBody['context']) {
     const id = cleanText(node.id, 80) || 'unknown';
     const type = cleanText(node.type, 30) || 'node';
     const text = cleanText(node.text, 240) || '(empty)';
-    return `- ${id} [${type}]: ${text}`;
+    const title = cleanText(node.title, 120);
+    const pins = Array.isArray(node.mapPins)
+      ? node.mapPins.slice(0, 40).map((pin) => {
+        const pinId = cleanText(pin.id, 80) || 'unknown-pin';
+        const label = cleanText(pin.label, 100) || 'Unnamed pin';
+        const latitude = typeof pin.latitude === 'number' ? pin.latitude.toFixed(5) : '?';
+        const longitude = typeof pin.longitude === 'number' ? pin.longitude.toFixed(5) : '?';
+        return `${label} [${pinId} @ ${latitude}, ${longitude}]`;
+      }).join('; ')
+      : '';
+    return `- ${title || id} (${id}) [${type}]: ${text}${pins ? ` | map pins: ${pins}` : ''}`;
   });
   const relationLines = relations.map((relation) => {
     const sourceId = cleanText(relation.sourceId, 80) || 'unknown';
     const targetId = cleanText(relation.targetId, 80) || 'unknown';
     const label = cleanText(relation.label, 120) || cleanText(relation.relationship, 80) || 'related';
-    return `- ${sourceId} -> ${targetId}: ${label}`;
+    const source = cleanText(relation.sourceLabel, 120) || sourceId;
+    const target = cleanText(relation.targetLabel, 120) || targetId;
+    const sourcePort = cleanText(relation.sourcePort, 60);
+    const targetPort = cleanText(relation.targetPort, 60);
+    const relationship = cleanText(relation.relationship, 80) || 'related_to';
+    return `- ${source} (${sourceId})${sourcePort ? ` [${sourcePort}]` : ''} --${label} / ${relationship}--> ${target} (${targetId})${targetPort ? ` [${targetPort}]` : ''}`;
   });
 
   return [
@@ -213,6 +240,7 @@ function buildGraphContext(context?: AIRequestBody['context']) {
     nodeLines.length > 0 ? nodeLines.join('\n') : '- none',
     'Existing board relations:',
     relationLines.length > 0 ? relationLines.join('\n') : '- none',
+    'Interpretation rule: a relation endpoint with [marker:<id>] refers to one specific map pin. Do not collapse it into a generic map-to-map connection.',
   ].join('\n');
 }
 

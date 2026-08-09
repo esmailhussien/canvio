@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCanvasStore, RelationshipType } from '../../store/canvasStore';
 import {
   IconMoreHorizontal,
   IconTrash,
   IconX
 } from '@canvio/ui';
-import { resolveRelationPorts } from '../RelationRenderer/relationUtils';
+import { getRelationEndpointLabel, resolveRelationPorts } from '../RelationRenderer/relationUtils';
 import './RelationInspector.css';
 
 const RELATION_TYPES: { id: RelationshipType; label: string }[] = [
@@ -36,8 +36,14 @@ export function RelationInspector() {
   const nodes = useCanvasStore((s) => s.nodes);
   const viewport = useCanvasStore((s) => s.viewport);
   const updateRelation = useCanvasStore((s) => s.updateRelation);
+  const snapshot = useCanvasStore((s) => s.snapshot);
   const removeRelation = useCanvasStore((s) => s.removeRelation);
   const selectRelation = useCanvasStore((s) => s.selectRelation);
+  const relationSnapshotTakenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    relationSnapshotTakenRef.current = null;
+  }, [selectedRelationId]);
 
   if (!selectedRelationId) return null;
   const relation = relations[selectedRelationId];
@@ -58,6 +64,17 @@ export function RelationInspector() {
   const screenY = rect.height / 2 + (worldMidY + viewport.y) * viewport.zoom;
 
   const style = relation.style || { type: 'straight', color: 'var(--relation-default)', width: 2, startArrow: 'none', endArrow: 'none' };
+  const sourceLabel = getRelationEndpointLabel(sourceNode, relation.sourcePort);
+  const targetLabel = getRelationEndpointLabel(targetNode, relation.targetPort);
+  const patchRelation = (updates: Partial<typeof relation>) => {
+    snapshot();
+    updateRelation(relation.id, updates);
+  };
+  const snapshotLabelEdit = () => {
+    if (relationSnapshotTakenRef.current === relation.id) return;
+    snapshot();
+    relationSnapshotTakenRef.current = relation.id;
+  };
 
   return (
     <div
@@ -107,6 +124,18 @@ export function RelationInspector() {
         </div>
       </div>
 
+      <div className="relation-inspector__endpoints" aria-label={`Relation from ${sourceLabel} to ${targetLabel}`}>
+        <div className="relation-inspector__endpoint">
+          <span>From</span>
+          <strong title={sourceLabel}>{sourceLabel}</strong>
+        </div>
+        <span className="relation-inspector__endpoint-arrow" aria-hidden="true">→</span>
+        <div className="relation-inspector__endpoint relation-inspector__endpoint--target">
+          <span>To</span>
+          <strong title={targetLabel}>{targetLabel}</strong>
+        </div>
+      </div>
+
       {/* Relationship Type Selection */}
       <div className="relation-inspector__section">
         <label className="relation-inspector__label">Type</label>
@@ -115,7 +144,7 @@ export function RelationInspector() {
             <button
               key={t.id}
               className={`relation-inspector__pill ${relation.relationship === t.id ? 'active' : ''}`}
-              onClick={() => updateRelation(relation.id, { relationship: t.id })}
+              onClick={() => patchRelation({ relationship: t.id })}
             >
               {t.label}
             </button>
@@ -131,7 +160,9 @@ export function RelationInspector() {
           className="relation-inspector__input"
           placeholder="e.g. 50% flow"
           value={relation.label || ''}
+          onFocus={snapshotLabelEdit}
           onChange={(e) => updateRelation(relation.id, { label: e.target.value })}
+          onBlur={() => { relationSnapshotTakenRef.current = null; }}
         />
       </div>
 
@@ -143,19 +174,19 @@ export function RelationInspector() {
             <div className="relation-inspector__button-group">
               <button
                 className={`relation-inspector__btn ${style.type === 'straight' ? 'active' : ''}`}
-                onClick={() => updateRelation(relation.id, { style: { ...style, type: 'straight' } })}
+                onClick={() => patchRelation({ style: { ...style, type: 'straight' } })}
               >
                 Straight
               </button>
               <button
                 className={`relation-inspector__btn ${style.type === 'curved' ? 'active' : ''}`}
-                onClick={() => updateRelation(relation.id, { style: { ...style, type: 'curved' } })}
+                onClick={() => patchRelation({ style: { ...style, type: 'curved' } })}
               >
                 Curved
               </button>
               <button
                 className={`relation-inspector__btn ${style.type === 'orthogonal' ? 'active' : ''}`}
-                onClick={() => updateRelation(relation.id, { style: { ...style, type: 'orthogonal' } })}
+                onClick={() => patchRelation({ style: { ...style, type: 'orthogonal' } })}
               >
                 Step
               </button>
@@ -168,25 +199,25 @@ export function RelationInspector() {
             <div className="relation-inspector__button-group">
               <button
                 className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'none' ? 'active' : ''}`}
-                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'none', endArrow: 'none' } })}
+                onClick={() => patchRelation({ style: { ...style, startArrow: 'none', endArrow: 'none' } })}
               >
                 None
               </button>
               <button
                 className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'arrow' ? 'active' : ''}`}
-                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'none', endArrow: 'arrow' } })}
+                onClick={() => patchRelation({ style: { ...style, startArrow: 'none', endArrow: 'arrow' } })}
               >
                 End
               </button>
               <button
                 className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'none' ? 'active' : ''}`}
-                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'arrow', endArrow: 'none' } })}
+                onClick={() => patchRelation({ style: { ...style, startArrow: 'arrow', endArrow: 'none' } })}
               >
                 Start
               </button>
               <button
                 className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'arrow' ? 'active' : ''}`}
-                onClick={() => updateRelation(relation.id, { style: { ...style, startArrow: 'arrow', endArrow: 'arrow' } })}
+                onClick={() => patchRelation({ style: { ...style, startArrow: 'arrow', endArrow: 'arrow' } })}
               >
                 Both
               </button>
@@ -197,7 +228,7 @@ export function RelationInspector() {
           <div className="relation-inspector__section relation-inspector__row">
             <button
               className={`relation-inspector__toggle ${style.animated ? 'active' : ''}`}
-              onClick={() => updateRelation(relation.id, {
+              onClick={() => patchRelation({
                 style: { ...style, animated: !style.animated }
               })}
             >
@@ -216,7 +247,7 @@ export function RelationInspector() {
               key={c.value}
               className={`relation-inspector__color-btn ${style.color === c.value ? 'selected' : ''}`}
               style={{ backgroundColor: c.value }}
-              onClick={() => updateRelation(relation.id, { style: { ...style, color: c.value } })}
+              onClick={() => patchRelation({ style: { ...style, color: c.value } })}
               title={c.label}
             />
           ))}
