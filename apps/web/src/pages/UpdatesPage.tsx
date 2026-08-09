@@ -171,8 +171,14 @@ export function UpdatesPage() {
                 </div>
                 <label className="updates-search">
                   <span className="material-symbols-outlined" aria-hidden="true">search</span>
-                  <span className="sr-only">Search updates</span>
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search updates" />
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search updates"
+                    aria-label="Search updates"
+                    autoComplete="off"
+                  />
                 </label>
               </div>
               <div className="updates-filters" role="tablist" aria-label="Filter updates">
