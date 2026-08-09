@@ -17,8 +17,49 @@
     <meta name="twitter:description" content="An online whiteboard for visual thinking, concept mapping, connected notes, and collaborative work." />
     <meta name="twitter:image" content="https://canvio.space/logo.png" />
     <meta name="theme-color" content="#6366f1" />
-    <title>Canvio | Visual Knowledge Workspace for Learning, Planning and Research</title>
+    <title>Canvio | Online Whiteboard for Learning, Planning and Research</title>
     <link rel="icon" type="image/png" href="/logo.png" />
+    <script type="application/ld+json" id="canvio-seo-jsonld">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://canvio.space/#organization",
+            "name": "Canvio",
+            "url": "https://canvio.space",
+            "logo": "https://canvio.space/logo.png",
+            "sameAs": ["https://github.com/esmailhussien/canvio"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://canvio.space/#website",
+            "name": "Canvio",
+            "url": "https://canvio.space",
+            "description": "Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.",
+            "publisher": { "@id": "https://canvio.space/#organization" }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://canvio.space/#application",
+            "name": "Canvio",
+            "url": "https://canvio.space",
+            "description": "Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.",
+            "applicationCategory": "EducationalApplication",
+            "operatingSystem": "Web",
+            "browserRequirements": "Requires a modern web browser",
+            "featureList": [
+              "Infinite online whiteboard",
+              "Concept mapping and connected notes",
+              "AI-assisted board creation",
+              "Real-time collaboration",
+              "Presentation and export tools"
+            ],
+            "publisher": { "@id": "https://canvio.space/#organization" }
+          }
+        ]
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -26,6 +67,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main>
+        <h1>Canvio: an online whiteboard for connected ideas</h1>
+        <p>Canvio is a visual knowledge workspace for learning, planning, research, concept mapping, and collaborative whiteboard work.</p>
+        <nav aria-label="Canvio public pages">
+          <a href="/how-it-works">How Canvio works</a>
+          <a href="/updates">Canvio updates</a>
+          <a href="/support">Canvio support</a>
+        </nav>
+      </main>
+    </noscript>
     <script src="/canvio-config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

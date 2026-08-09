@@ -1,0 +1,26 @@
+# Canvio
+
+> Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept mapping, connected notes, and collaborative work.
+
+## Public pages
+
+- [Home](https://canvio.space/): Start a blank board or open a demo workspace.
+- [How Canvio works](https://canvio.space/how-it-works): Learn the Start, Build, Connect, and Deliver workflow.
+- [Canvio updates](https://canvio.space/updates): Read product notes, design notes, guides, and releases.
+- [Canvio support](https://canvio.space/support): Report problems, ask questions, and request improvements.
+
+## Product capabilities
+
+- Infinite online whiteboard for visual thinking
+- Notes, shapes, frames, ink, highlighter, images, maps, and code
+- Relations with labels and routed connections
+- AI-assisted editable board creation
+- Presentation, collaboration, export, and import workflows
+
+## Privacy and indexing
+
+Workspace URLs under `/w/` are private working spaces and should not be indexed as public documentation. Public product information is available through the pages above and the [sitemap](https://canvio.space/sitemap.xml).
+
+## Contact
+
+For product questions, bug reports, UX feedback, or feature requests, email [support@canvio.space](mailto:support@canvio.space).
