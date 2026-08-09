@@ -61,6 +61,8 @@ export function WorldPage() {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const nodes = useCanvasStore((s) => s.nodes);
+  const canUndo = useCanvasStore((s) => s.past.length > 0);
+  const canRedo = useCanvasStore((s) => s.future.length > 0);
   const addNode = useCanvasStore((s) => s.addNode);
   const selectNode = useCanvasStore((s) => s.selectNode);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
@@ -360,8 +362,10 @@ export function WorldPage() {
             <div className="world-page__starter-section">
               <span className="world-page__starter-label">Start blank</span>
               <button className="world-page__starter-card primary" onClick={() => handleStartFromScratch(false)}>
-                <IconSticky size={22} />
-                <span>
+                <span className="world-page__starter-card-icon" aria-hidden="true">
+                  <IconSticky size={22} />
+                </span>
+                <span className="world-page__starter-card-copy">
                   <strong>Start from scratch</strong>
                   <small>Make your own board</small>
                 </span>
@@ -371,22 +375,24 @@ export function WorldPage() {
               <span className="world-page__starter-label">Start with a purpose</span>
               <div className="world-page__starter-grid">
                 <button className="world-page__starter-card lesson-card" onClick={() => handleStartTemplate('lesson-plan-board')}>
-                  <span className="material-symbols-outlined text-xl">school</span>
-                  <span>
+                  <span className="world-page__starter-card-icon material-symbols-outlined" aria-hidden="true">school</span>
+                  <span className="world-page__starter-card-copy">
                     <strong>Teach a lesson</strong>
                     <small>Plan an explanation</small>
                   </span>
                 </button>
                 <button className="world-page__starter-card study-card" onClick={() => handleStartTemplate('study-concept-map')}>
-                  <span className="material-symbols-outlined text-xl">neurology</span>
-                  <span>
+                  <span className="world-page__starter-card-icon material-symbols-outlined" aria-hidden="true">neurology</span>
+                  <span className="world-page__starter-card-copy">
                     <strong>Study a topic</strong>
                     <small>Connect what you know</small>
                   </span>
                 </button>
                 <button className="world-page__starter-card map-card" onClick={handleDropMap}>
-                  <IconMap size={22} />
-                  <span>
+                  <span className="world-page__starter-card-icon" aria-hidden="true">
+                    <IconMap size={22} />
+                  </span>
+                  <span className="world-page__starter-card-copy">
                     <strong>Explore a place</strong>
                     <small>Start with a world map</small>
                   </span>
@@ -656,6 +662,22 @@ export function WorldPage() {
             onClose={() => setIsExportMenuOpen(false)}
             containerRef={exportMenuRef}
           />
+
+          <button
+            className="world-header__surface-btn"
+            onClick={() => {
+              setIsTemplateOpen(true);
+              setIsCanvioMenuOpen(false);
+              setIsExportMenuOpen(false);
+            }}
+            aria-label="Presets & Layout"
+            aria-haspopup="dialog"
+            aria-expanded={isTemplateOpen}
+            title="Open templates and layouts"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">space_dashboard</span>
+            <span className="world-header__surface-btn-label">Templates</span>
+          </button>
         </div>
 
         {/* Center: ✨ AI Navigator (Ctrl+K) */}
@@ -676,6 +698,7 @@ export function WorldPage() {
           <button
             className="header-icon-btn"
             onClick={() => useCanvasStore.getState().undo()}
+            disabled={!canUndo}
             aria-label="Undo"
             title="Undo (Ctrl+Z)"
           >
@@ -685,6 +708,7 @@ export function WorldPage() {
           <button
             className="header-icon-btn"
             onClick={() => useCanvasStore.getState().redo()}
+            disabled={!canRedo}
             aria-label="Redo"
             title="Redo (Ctrl+Y)"
           >

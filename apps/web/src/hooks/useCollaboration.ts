@@ -4,6 +4,7 @@ import { WebsocketProvider } from 'y-websocket';
 import { useCanvasStore } from '../store/canvasStore';
 import { getCanvioApiToken, getCanvioClientId, getCanvioShareToken, getWebSocketUrl } from '../utils/runtimeConfig';
 import { getStorageItem, setStorageItem } from '../utils/storageDB';
+import { fitViewportToNodes } from '../utils/viewportFit';
 import {
   nodeToYMap,
   yMapToNode,
@@ -81,6 +82,7 @@ export function useCollaboration(worldId: string) {
     const connectTimer = window.setTimeout(() => {
       wsProvider.connect();
     }, 150);
+    let initialFitTimer: number | null = null;
 
     // ──────────────────────────────────────────────────────────────────
     // SYNC GUARDS
@@ -272,6 +274,21 @@ export function useCollaboration(worldId: string) {
         } finally {
           isReceivingRemote = false;
         }
+
+        // A shared board should open at a useful scale on every device. The
+        // viewport itself stays local after this first fit, so collaborators
+        // can pan independently without pulling one another around.
+        initialFitTimer = window.setTimeout(() => {
+          const syncedNodes = Object.values(useCanvasStore.getState().nodes);
+          if (syncedNodes.length > 0) {
+            fitViewportToNodes(syncedNodes, {
+              maxZoom: 1.05,
+              minZoom: 0.35,
+              paddingX: 220,
+              paddingY: 220,
+            });
+          }
+        }, 0);
         setPersistenceState('saved');
 
         // Small delay before enabling local push to let the store settle
@@ -448,6 +465,7 @@ export function useCollaboration(worldId: string) {
 
     return () => {
       window.clearTimeout(connectTimer);
+      if (initialFitTimer !== null) window.clearTimeout(initialFitTimer);
       if (saveTimeout !== null) window.clearTimeout(saveTimeout);
       unsubscribeNodes();
       unsubscribeRelations();

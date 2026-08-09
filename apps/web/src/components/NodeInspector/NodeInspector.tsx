@@ -228,7 +228,10 @@ export function NodeInspector({ node }: NodeInspectorProps) {
   const nodeScreenTop = viewportHeight / 2 + (node.position.y + viewport.y) * zoom;
   const nodeScreenBottom = nodeScreenTop + node.size.height * zoom;
   const nodeScreenHeight = node.size.height * zoom;
-  const topSafe = isCoarsePointer ? 86 : 70;
+  // Desktop has a second fixed selection toolbar below the header. Keep the
+  // inline inspector below that reserved band so frame controls never stack
+  // on top of "Experiment / Focus / Close" actions.
+  const topSafe = isCoarsePointer ? 86 : 190;
   const bottomSafe = viewportHeight - (isCoarsePointer ? 150 : 118);
   const inspectorScreenHeight = isCoarsePointer ? 54 : 42;
   const gap = Math.max(36, 34 * scaleFactor);

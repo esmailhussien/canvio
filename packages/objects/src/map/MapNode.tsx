@@ -365,13 +365,10 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
 
       <div
         className="map-node__map-surface"
-        onPointerMove={stopMapGesture}
-        onPointerUp={stopMapGesture}
-        onPointerCancel={stopMapGesture}
-        onMouseMove={stopMapGesture}
-        onMouseUp={stopMapGesture}
-        onTouchMove={stopMapGesture}
-        onTouchEnd={stopMapGesture}
+        // Stop only the gesture start from reaching the infinite canvas. Once
+        // Leaflet starts a drag or pinch it listens on the document, so move
+        // and end events must be allowed to bubble out of this surface.
+        onTouchStart={stopMapGesture}
         onWheel={stopMapGesture}
         onDoubleClick={stopMapGesture}
       >
@@ -381,6 +378,9 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
           zoom={data.zoom || 4}
           style={{ width: '100%', height: '100%' }}
           zoomControl={true}
+          dragging={true}
+          touchZoom={true}
+          scrollWheelZoom={true}
           attributionControl={false}
         >
           <TileLayer

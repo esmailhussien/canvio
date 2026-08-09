@@ -66,6 +66,9 @@
   min-height: 100px;
   position: relative;
   touch-action: none;
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .map-node .leaflet-container {
@@ -74,6 +77,8 @@
   min-height: 100px;
   background: #1e293b;
   cursor: crosshair;
+  /* Keep native browser scrolling out of the map; Leaflet owns the gesture. */
+  touch-action: none;
 }
 
 /* Floating Controls Bar */

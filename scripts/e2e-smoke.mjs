@@ -126,11 +126,11 @@ async function main() {
     await page.waitForFunction(() => document.querySelectorAll('.node-renderer.relation-source').length === 0);
 
     await assertState(page, 'relation committed', () => {
-      const relationSvgs = document.querySelectorAll('.canvas__world > svg').length;
+      const relationSvgs = document.querySelectorAll('.canvas__relations-layer > svg .relation-group').length;
       const source = document.querySelectorAll('.node-renderer.relation-source').length;
       return {
         ok: relationSvgs >= 1 && source === 0,
-        message: `expected rendered relations and no active source, got ${relationSvgs} svgs / ${source} sources`,
+        message: `expected rendered relations and no active source, got ${relationSvgs} relations / ${source} sources`,
       };
     });
 
@@ -144,21 +144,22 @@ async function main() {
       beforePan
     );
     const afterPan = await page.locator('.canvas__world').evaluate((el) => getComputedStyle(el).transform);
-    await clickUnique(page, 'button', 'Fit to world');
+    await clickUnique(page, 'button', 'Open Canvio workspace menu');
+    await clickUnique(page, 'button', 'Fit Viewport to Canvas');
     const afterFit = await page.locator('.canvas__world').evaluate((el) => getComputedStyle(el).transform);
     if (beforePan === afterPan) fail('pan did not change the viewport transform');
     if (afterFit === afterPan) fail('fit to world did not reframe the viewport');
 
     console.log('E2E: checking JSON and PNG exports');
-    await clickUnique(page, 'button', 'Export & Templates');
+    await clickUnique(page, 'button', 'Export');
     const jsonDownloadPromise = page.waitForEvent('download', { timeout: 10000 }).catch(() => null);
-    await page.getByRole('button', { name: '📄 Export Backup (JSON)' }).click();
+    await page.locator('.canvio-menu-item').filter({ hasText: 'Export Backup (JSON)' }).click();
     await jsonDownloadPromise;
     await page.waitForFunction(() => document.querySelector('.export-menu__status-chip')?.textContent?.includes('JSON backup ready'));
 
-    await clickUnique(page, 'button', 'Export & Templates');
+    await clickUnique(page, 'button', 'Export');
     const pngDownloadPromise = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
-    await page.getByRole('button', { name: '🖼️ Export Image (PNG)' }).click();
+    await page.locator('.canvio-menu-item').filter({ hasText: 'Export Image (PNG)' }).click();
     await pngDownloadPromise;
     await page.waitForFunction(() => document.querySelector('.export-menu__status-chip')?.textContent?.includes('PNG export ready'));
 
@@ -186,7 +187,7 @@ async function main() {
       relations: {},
     }, null, 2));
 
-    await clickUnique(page, 'button', 'Export & Templates');
+    await clickUnique(page, 'button', 'Export');
     await page.locator('input[type="file"].export-menu__file-input').setInputFiles(backupPath);
     await page.waitForFunction(() => document.querySelector('.export-menu__status-chip')?.textContent?.includes('Restored 1 nodes'));
 

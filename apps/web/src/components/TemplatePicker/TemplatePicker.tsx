@@ -66,7 +66,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
   };
 
   return (
-    <div className="template-modal__overlay" onClick={onClose}>
+    <div className="template-modal__overlay" role="dialog" aria-modal="true" aria-label="Template library" onClick={onClose}>
       <div className="template-modal__dialog" onClick={(e) => e.stopPropagation()}>
         {/* Sidebar Navigation */}
         <aside className="template-sidebar">
@@ -115,6 +115,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
                 type="text"
                 className="template-search__input"
                 placeholder="Search templates..."
+                aria-label="Search templates"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -125,7 +126,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
               )}
             </div>
 
-            <button className="template-close-btn" onClick={onClose} title="Close Template Library">
+            <button className="template-close-btn" onClick={onClose} title="Close Template Library" aria-label="Close template library">
               <IconX size={18} />
             </button>
           </header>
