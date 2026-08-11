@@ -32,6 +32,7 @@ interface AIRequestBody {
   prompt?: string;
   provider?: AIProvider;
   model?: string;
+  output?: 'summary' | 'article';
   context?: {
     nodes?: AIContextNode[];
     relations?: AIContextRelation[];
@@ -96,20 +97,29 @@ export async function aiRoutes(fastify: FastifyInstance) {
     const key = resolveApiKey(provider);
     if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
 
+    const output = request.body?.output === 'article' ? 'article' : 'summary';
     const systemPrompt = buildBoardSystemPrompt();
-    const userPrompt = [
-      'Analyze this Canvio whiteboard graph and create an executive summary board.',
-      'The summary must include: core summary, key decisions, critical risks, action plan.',
-      'Use the relation labels and relationship types to infer importance, dependencies, contradictions, and flow.',
-      buildGraphContext(request.body?.context),
-    ].join('\n\n');
+    const userPrompt = output === 'article'
+      ? [
+        'Turn this completed Canvio whiteboard into a polished, editable article draft.',
+        'Create one page-like frame, a text title, and 4 to 7 readable text sections: introduction, main ideas, how the ideas connect, evidence or examples, implications or next steps, and conclusion when supported.',
+        'Use only information present in the board. Do not invent facts. Translate relation labels and types into clear prose about evidence, dependency, contradiction, sequence, and exact map locations.',
+        'Use text nodes for article sections, keep each section concise enough to fit, and arrange them vertically inside the frame with generous spacing.',
+        buildGraphContext(request.body?.context),
+      ].join('\n\n')
+      : [
+        'Analyze this completed Canvio whiteboard graph and create a concise visual summary board.',
+        'The summary must include: core idea, key points, meaningful connections, risks or open questions, and next actions when supported by the board.',
+        'Use the relation labels and relationship types to infer importance, dependencies, contradictions, flow, and exact map locations. Do not invent facts.',
+        buildGraphContext(request.body?.context),
+      ].join('\n\n');
 
     const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
     return {
       source: 'server-ai',
       provider,
       model,
-      ...normalizeBoardPayload(parsed, 'Executive board summary'),
+      ...normalizeBoardPayload(parsed, output === 'article' ? 'Board article draft' : 'Board summary'),
     };
   });
 

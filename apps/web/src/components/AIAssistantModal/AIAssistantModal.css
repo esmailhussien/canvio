@@ -233,7 +233,7 @@
 
 .ai-modal__quick-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -285,6 +285,11 @@
 .ai-action-btn__icon--green {
   color: #34d399;
   background: rgba(16, 185, 129, 0.14);
+}
+
+.ai-action-btn__icon--blue {
+  color: #38bdf8;
+  background: rgba(14, 165, 233, 0.14);
 }
 
 .ai-action-btn__copy {
@@ -682,6 +687,10 @@
   }
 
   .ai-modal__prompt-pills {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-modal__quick-actions {
     grid-template-columns: 1fr;
   }
 

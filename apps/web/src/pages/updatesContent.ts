@@ -15,6 +15,43 @@ export interface UpdateArticle {
 
 export const UPDATE_ARTICLES: UpdateArticle[] = [
   {
+    slug: 'laser-pointer-for-live-guidance',
+    title: 'Laser Pointer: Guide Attention Without Marking the Board',
+    excerpt: 'A temporary presentation tool for pointing at ideas during lessons, reviews, and live collaboration.',
+    category: 'Feature',
+    datePublished: '2026-08-12',
+    readTime: '3 min read',
+    icon: 'flare',
+    accent: '#ef4444',
+    takeaways: [
+      'The pointer follows mouse, touch, and pen input without creating a canvas object.',
+      'It can pass over notes, shapes, maps, and frames without moving or editing them.',
+      'Choose Laser Pointer from the toolbar or press Q, then return to Select when finished.',
+    ],
+    sections: [
+      {
+        heading: 'Point without leaving a mark',
+        paragraphs: [
+          'Teaching and presenting often require a quick gesture rather than a new object. The laser pointer lets someone direct attention to a word, relation, map pin, or visual detail without adding ink that must be erased later.',
+          'The pointer is temporary and is never stored in the board. Moving away or changing tools leaves the workspace exactly as it was.',
+        ],
+      },
+      {
+        heading: 'Designed to stay out of the way',
+        paragraphs: [
+          'While Laser Pointer is active, canvas objects do not capture the gesture. That means the pointer can move across notes, shapes, maps, frames, and relations without accidentally selecting or dragging them.',
+          'The tool works with a mouse, touch input, or a tablet pen. Press Q for fast access, or choose Laser Pointer from the main toolbar when discoverability matters more than speed.',
+        ],
+      },
+      {
+        heading: 'A presentation tool, not another drawing mode',
+        paragraphs: [
+          'The pointer is intentionally simple: it communicates “look here now” and then disappears. Permanent emphasis still belongs to ink, highlighter, arrows, relations, and focused board objects.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'ai-navigator-editable-boards',
     title: 'AI Navigator: From a Prompt to an Editable Board',
     excerpt: 'Why Canvio turns an AI answer into movable, connected objects instead of a block of text.',

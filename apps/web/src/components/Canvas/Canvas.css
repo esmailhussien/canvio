@@ -24,6 +24,16 @@
   cursor: none;
 }
 
+.canvas--inking {
+  cursor: crosshair;
+}
+
+/* Ink should pass across board content instead of selecting or dragging it. */
+.canvas--inking .node-renderer,
+.canvas--inking .canvas__relations-layer {
+  pointer-events: none;
+}
+
 .canvas__relation-guide {
   position: fixed;
   left: 50%;

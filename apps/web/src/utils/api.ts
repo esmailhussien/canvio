@@ -176,6 +176,7 @@ export async function generateAIBoard(request: {
 export async function summarizeAIBoard(request: {
   provider?: AIProvider;
   model?: string;
+  output?: 'summary' | 'article';
   context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
 }) {
   return postAI<AIBoardResponse>('/api/ai/summarize', request);

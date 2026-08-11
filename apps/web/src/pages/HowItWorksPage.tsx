@@ -72,9 +72,9 @@ const TAB_CONTENT: Record<FeatureTab, {
     description: 'A good whiteboard is not only a place to draw. It becomes a lesson artifact, study map, meeting record, planning document, or shared reference.',
     points: [
       { glyph: 'P', title: 'Present mode', text: 'Hide editing tools, focus the discussion, and move through the board calmly.', color: '#6366f1' },
+      { glyph: 'LP', title: 'Laser pointer', text: 'Press Q or choose Laser Pointer to guide attention without drawing or saving a permanent mark.', color: '#ef4444' },
       { glyph: 'CO', title: 'Live collaboration', text: 'Share a board URL and work together with cursors, selection, and presence.', color: '#22c55e' },
-      { glyph: 'PDF', title: 'PDF pages', text: 'Export frame pages for lessons, reports, handouts, and structured documents.', color: '#ef4444' },
-      { glyph: 'EX', title: 'PNG and JSON', text: 'Save visuals or portable board data when you need to reuse or archive work.', color: '#f59e0b' },
+      { glyph: 'EX', title: 'Export and archive', text: 'Save frame pages, PNG visuals, or portable JSON data for reuse and long-term access.', color: '#f59e0b' },
     ],
   },
 };

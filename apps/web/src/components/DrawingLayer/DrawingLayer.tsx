@@ -8,6 +8,7 @@ interface Props {
   viewport: Viewport;
   mode?: 'draw' | 'highlighter' | 'arrow';
   opacity?: number;
+  pressureSensitive?: boolean;
 }
 
 export function getSvgPathFromStroke(stroke: number[][]): string {
@@ -103,7 +104,7 @@ function getArrowRenderPoints(points: number[][]): number[][] {
   return simplified.length >= 2 ? simplified : filtered;
 }
 
-export function DrawingLayer({ points, color, width, viewport, mode = 'draw', opacity = 1 }: Props) {
+export function DrawingLayer({ points, color, width, viewport, mode = 'draw', opacity = 1, pressureSensitive = false }: Props) {
   if (!points || points.length === 0) return null;
 
   const offsetX = viewport.x * viewport.zoom;
@@ -164,10 +165,10 @@ export function DrawingLayer({ points, color, width, viewport, mode = 'draw', op
 
   const stroke = getStroke(points, {
     size: width,
-    thinning: 0.58,
+    thinning: mode === 'highlighter' ? 0 : 0.58,
     smoothing: 0.68,
-    streamline: 0.62,
-    simulatePressure: true,
+    streamline: mode === 'highlighter' ? 0.42 : 0.62,
+    simulatePressure: mode === 'highlighter' ? false : !pressureSensitive,
   });
 
   const pathData = getSvgPathFromStroke(stroke as number[][]);

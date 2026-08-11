@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { createBoard } from '../utils/api';
@@ -92,6 +92,33 @@ const PRIORITIES = [
   { label: 'Reliable export, import, sharing, and collaboration', color: '#22c55e' },
   { label: 'Higher-quality ready-made models and AI board generation', color: '#a855f7' },
   { label: 'Readable relation routing across notes, shapes, maps, and frames', color: '#f59e0b' },
+];
+
+const ROADMAP = [
+  {
+    status: 'Now',
+    color: '#38bdf8',
+    title: 'Interaction quality everywhere',
+    text: 'Make selection, drawing, touch, pen, mobile layouts, sharing, and collaboration feel dependable on every device.',
+  },
+  {
+    status: 'Next',
+    color: '#a855f7',
+    title: 'Boards that publish clearly',
+    text: 'Turn connected board content into stronger summaries, articles, presentation outlines, and editable infographics.',
+  },
+  {
+    status: 'Exploring',
+    color: '#f59e0b',
+    title: 'Board-aware image generation',
+    text: 'Create useful diagrams and visual assets from the ideas, labels, and relationships already present on the board.',
+  },
+  {
+    status: 'Exploring',
+    color: '#22c55e',
+    title: 'Reusable learning and team workflows',
+    text: 'Improve role-based templates, activity history, review flows, and reusable board libraries without making the canvas heavier.',
+  },
 ];
 
 export function SupportPage() {
@@ -273,9 +300,43 @@ export function SupportPage() {
           </div>
         </section>
 
+        <section className="support-section support-roadmap">
+          <div className="support-roadmap__intro">
+            <div className="support-section__heading">
+              <SupportIcon value="03" color="#a855f7" />
+              <div>
+                <h2>Roadmap: what support can help unlock</h2>
+                <p>Near-term quality comes first. Larger creation ideas follow when they make the whole workspace more useful.</p>
+              </div>
+            </div>
+            <a className="support-btn-secondary" href={FEATURE_REQUEST_URL}>
+              <SupportIcon value="IDEA" color="#22c55e" />
+              <span>Shape the roadmap</span>
+            </a>
+          </div>
+
+          <div className="support-roadmap-grid">
+            {ROADMAP.map((item) => (
+              <article className="support-roadmap-item" key={item.title}>
+                <span
+                  className="support-roadmap-item__status"
+                  style={{ '--roadmap-color': item.color } as CSSProperties}
+                >
+                  {item.status}
+                </span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
+          </div>
+          <p className="support-roadmap__note">
+            “Exploring” describes product direction, not a release promise. Feedback helps decide what becomes a committed milestone.
+          </p>
+        </section>
+
         <section className="support-feedback-guide">
           <div className="support-section__heading">
-            <SupportIcon value="03" color="#a855f7" />
+            <SupportIcon value="04" color="#a855f7" />
             <div>
               <h2>Write feedback that turns into a fix</h2>
               <p>A clear report saves time and makes improvements easier to ship.</p>

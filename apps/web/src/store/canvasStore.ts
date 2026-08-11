@@ -8,6 +8,7 @@ import type {
 
 // Re-export types for backward compatibility — other files import types from here
 export type { Point, Size, Viewport, LivingNode, Relation, RelationStyle, RelationshipType, ToolMode };
+export type ThemePreference = 'system' | 'dark' | 'light';
 
 interface CanvasStore {
   // Viewport
@@ -80,8 +81,11 @@ interface CanvasStore {
 
   // Theme
   theme: 'dark' | 'light';
+  themePreference: ThemePreference;
   canvasBackground: string | null;
   toggleTheme: () => void;
+  setThemePreference: (preference: ThemePreference) => void;
+  syncSystemTheme: () => void;
   setCanvasBackground: (color: string | null) => void;
   setAppearance: (appearance: { theme?: 'dark' | 'light'; canvasBackground?: string | null }) => void;
 
@@ -113,11 +117,21 @@ interface CanvasStore {
   }) => void;
 }
 
+const getSystemTheme = (): 'dark' | 'light' => {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+};
+
+const getInitialThemePreference = (): ThemePreference => {
+  if (typeof window === 'undefined') return 'system';
+  const saved = window.localStorage.getItem('canvio-theme-preference');
+  return saved === 'dark' || saved === 'light' ? saved : 'system';
+};
+
 const getInitialTheme = (): 'dark' | 'light' => {
   if (typeof window === 'undefined') return 'dark';
-  const saved = window.localStorage.getItem('canvio-theme');
-  if (saved === 'light' || saved === 'dark') return saved;
-  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const preference = getInitialThemePreference();
+  return preference === 'system' ? getSystemTheme() : preference;
 };
 
 const getInitialCanvasBackground = (): string | null => {
@@ -510,12 +524,28 @@ export const useCanvasStore = create(
 
   // Theme
   theme: getInitialTheme(),
+  themePreference: getInitialThemePreference(),
   canvasBackground: getInitialCanvasBackground(),
-  toggleTheme: () => set((s) => {
-    const newTheme = s.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    window.localStorage.setItem('canvio-theme', newTheme);
-    return { theme: newTheme };
+  toggleTheme: () => {
+    const state = get();
+    state.setThemePreference(state.theme === 'dark' ? 'light' : 'dark');
+  },
+  setThemePreference: (themePreference) => {
+    const theme = themePreference === 'system' ? getSystemTheme() : themePreference;
+    document.documentElement.setAttribute('data-theme', theme);
+    window.localStorage.setItem('canvio-theme-preference', themePreference);
+    if (themePreference === 'system') {
+      window.localStorage.removeItem('canvio-theme');
+    } else {
+      window.localStorage.setItem('canvio-theme', theme);
+    }
+    set({ theme, themePreference });
+  },
+  syncSystemTheme: () => set((s) => {
+    if (s.themePreference !== 'system') return s;
+    const theme = getSystemTheme();
+    document.documentElement.setAttribute('data-theme', theme);
+    return theme === s.theme ? s : { theme };
   }),
   setCanvasBackground: (canvasBackground) => {
     if (canvasBackground) {
@@ -526,10 +556,9 @@ export const useCanvasStore = create(
     set({ canvasBackground });
   },
   setAppearance: (appearance) => set((s) => {
-    const theme = appearance.theme || s.theme;
+    const theme = s.themePreference === 'system' ? getSystemTheme() : s.themePreference;
     const canvasBackground = appearance.canvasBackground === undefined ? s.canvasBackground : appearance.canvasBackground;
     document.documentElement.setAttribute('data-theme', theme);
-    window.localStorage.setItem('canvio-theme', theme);
     if (canvasBackground) {
       window.localStorage.setItem('canvio-canvas-background', canvasBackground);
     } else {
@@ -587,10 +616,9 @@ export const useCanvasStore = create(
   },
 
   replaceWorld: ({ nodes, relations, viewport, appearance }) => set((s) => {
-    const theme = appearance?.theme || s.theme;
+    const theme = s.themePreference === 'system' ? getSystemTheme() : s.themePreference;
     const canvasBackground = appearance?.canvasBackground === undefined ? s.canvasBackground : appearance.canvasBackground;
     document.documentElement.setAttribute('data-theme', theme);
-    window.localStorage.setItem('canvio-theme', theme);
     if (canvasBackground) {
       window.localStorage.setItem('canvio-canvas-background', canvasBackground);
     } else {

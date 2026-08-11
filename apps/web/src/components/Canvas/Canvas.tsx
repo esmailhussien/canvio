@@ -30,6 +30,14 @@ interface CanvasProps {
   focusNodeId?: string | null;
 }
 
+function getPointerPressure(event: PointerEvent | React.PointerEvent<HTMLDivElement>) {
+  const pressureSensitive = event.pointerType === 'pen' && event.pressure > 0;
+  return {
+    pressure: pressureSensitive ? Math.max(0.05, Math.min(1, event.pressure)) : 0.5,
+    pressureSensitive,
+  };
+}
+
 export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = false, focusNodeId = null }: CanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -57,6 +65,8 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const [laserPointer, setLaserPointer] = useState<{ x: number; y: number } | null>(null);
   const [radialMenu, setRadialMenu] = useState<{ screenX: number; screenY: number; worldPos: { x: number; y: number } } | null>(null);
   const touchPanStartRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const activeDrawingPointerIdRef = useRef<number | null>(null);
+  const isInkTool = activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow';
 
   // Drag-to-Create Frame state
   const [isDrawingFrame, setIsDrawingFrame] = useState(false);
@@ -81,9 +91,11 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const {
     isDrawing,
     currentStroke,
+    pressureSensitive,
     startDrawing,
-    updateStrokePoint,
+    updateStrokePoints,
     finishDrawing,
+    cancelDrawing,
   } = useCanvasDrawingSession({
     activeTool,
     autoShapeEnabled,
@@ -124,7 +136,11 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   // Pointer Down
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!e.isPrimary || pinchStateRef.current) return;
+      if (isInkTool) {
+        if (pinchStateRef.current || activeDrawingPointerIdRef.current !== null || e.button !== 0) return;
+      } else if (!e.isPrimary || pinchStateRef.current) {
+        return;
+      }
       if (radialMenu) setRadialMenu(null);
       const target = e.target as HTMLElement;
       const isCanvasSurface =
@@ -161,9 +177,11 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
         return;
       }
 
-      if (activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow') {
+      if (isInkTool) {
         e.preventDefault();
-        startDrawing(worldPos);
+        activeDrawingPointerIdRef.current = e.pointerId;
+        const pointer = getPointerPressure(e);
+        startDrawing({ ...worldPos, pressure: pointer.pressure }, pointer.pressureSensitive);
         return;
       }
 
@@ -196,6 +214,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
     [
       activeTool,
       createNodeFromPlugin,
+      isInkTool,
       presentationMode,
       pinchStateRef,
       radialMenu,
@@ -212,7 +231,9 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   // Pointer Move
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!e.isPrimary || pinchStateRef.current) return;
+      const isActiveDrawingPointer = activeDrawingPointerIdRef.current === e.pointerId;
+      if (isDrawing && !isActiveDrawingPointer) return;
+      if (!isActiveDrawingPointer && (!e.isPrimary || pinchStateRef.current)) return;
       const worldPos = screenToWorld(e.clientX, e.clientY);
       setCursorWorldPos(worldPos);
 
@@ -232,7 +253,14 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       }
 
       if (isDrawing) {
-        updateStrokePoint(worldPos);
+        const nativeEvent = e.nativeEvent;
+        const events = nativeEvent.getCoalescedEvents?.() || [nativeEvent];
+        const samples = events.map((event) => {
+          const point = screenToWorld(event.clientX, event.clientY);
+          const pointer = getPointerPressure(event);
+          return { ...point, pressure: pointer.pressure };
+        });
+        updateStrokePoints(samples, nativeEvent.pointerType === 'pen');
       }
 
       if (isMarqueeActive) {
@@ -254,7 +282,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       screenToWorld,
       setLastMousePos,
       updateMarquee,
-      updateStrokePoint,
+      updateStrokePoints,
       viewport.zoom,
     ]
   );
@@ -262,7 +290,9 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   // Pointer Up
   const handlePointerUp = useCallback(
     (e?: React.PointerEvent<HTMLDivElement>) => {
-      if (e && !e.isPrimary) return;
+      const isActiveDrawingPointer = Boolean(e && activeDrawingPointerIdRef.current === e.pointerId);
+      if (isDrawing && e && !isActiveDrawingPointer) return;
+      if (e && !e.isPrimary && !isActiveDrawingPointer) return;
       if (e?.currentTarget.hasPointerCapture?.(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
       }
@@ -309,6 +339,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       if (isDrawing) {
         finishDrawing();
       }
+      if (isActiveDrawingPointer) activeDrawingPointerIdRef.current = null;
 
       if (isMarqueeActive) {
         finishMarquee();
@@ -331,6 +362,27 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       setLastMousePos,
     ]
   );
+
+  const handlePointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeDrawingPointerIdRef.current === e.pointerId) {
+      cancelDrawing();
+      activeDrawingPointerIdRef.current = null;
+    }
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    touchPanStartRef.current = null;
+    setIsPanning(false);
+    setLastMousePos(null);
+  }, [cancelDrawing, setIsPanning, setLastMousePos]);
+
+  const handleCanvasTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && isDrawing) {
+      cancelDrawing();
+      activeDrawingPointerIdRef.current = null;
+    }
+    handleTouchStart(e);
+  }, [cancelDrawing, handleTouchStart, isDrawing]);
 
   // Radial Menu Context Handler
   const handleContextMenu = useCallback(
@@ -425,12 +477,12 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   return (
     <div
       ref={canvasRef}
-      className={`canvas ${relationStateClass} ${activeTool === 'laser' ? 'canvas--laser' : ''} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
+      className={`canvas ${relationStateClass} ${activeTool === 'laser' ? 'canvas--laser' : ''} ${isInkTool ? 'canvas--inking' : ''} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onTouchStart={handleTouchStart}
+      onPointerCancel={handlePointerCancel}
+      onTouchStart={handleCanvasTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
@@ -658,6 +710,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           mode={activeTool === 'highlighter' ? 'highlighter' : activeTool === 'arrow' ? 'arrow' : 'draw'}
           opacity={activeTool === 'highlighter' ? 0.34 : 1}
           viewport={viewport}
+          pressureSensitive={pressureSensitive}
         />
       )}
 

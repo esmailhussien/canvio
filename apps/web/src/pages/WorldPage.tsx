@@ -70,7 +70,9 @@ export function WorldPage() {
   const nextZIndex = useCanvasStore((s) => s.nextZIndex);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const theme = useCanvasStore((s) => s.theme);
+  const themePreference = useCanvasStore((s) => s.themePreference);
   const toggleTheme = useCanvasStore((s) => s.toggleTheme);
+  const setThemePreference = useCanvasStore((s) => s.setThemePreference);
   const canvasBackground = useCanvasStore((s) => s.canvasBackground);
   const setCanvasBackground = useCanvasStore((s) => s.setCanvasBackground);
   const setAppearance = useCanvasStore((s) => s.setAppearance);
@@ -113,7 +115,7 @@ export function WorldPage() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', activeTheme);
-  }, [activeTheme]);
+  }, [activeTheme, theme]);
 
   const handleFitToWorld = () => {
     const allNodes = Object.values(nodes);
@@ -626,12 +628,27 @@ export function WorldPage() {
                 className="canvio-menu-item"
                 onClick={() => {
                   toggleTheme();
+                  setIsCanvioMenuOpen(false);
                 }}
               >
                 <span className="material-symbols-outlined text-sm">
                   {theme === 'dark' ? 'light_mode' : 'dark_mode'}
                 </span>
                 <span>{theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}</span>
+              </button>
+
+              <button
+                className="canvio-menu-item"
+                onClick={() => {
+                  setThemePreference('system');
+                  setIsCanvioMenuOpen(false);
+                }}
+              >
+                <span className="material-symbols-outlined text-sm">devices</span>
+                <span>Use Device Theme</span>
+                {themePreference === 'system' && (
+                  <span className="material-symbols-outlined text-sm" style={{ marginLeft: 'auto' }}>check</span>
+                )}
               </button>
 
               {/* Canvas Background Color Swatches */}

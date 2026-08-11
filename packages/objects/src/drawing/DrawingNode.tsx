@@ -12,6 +12,7 @@ export interface Stroke {
   complete: boolean;
   opacity?: number;
   highlighter?: boolean;
+  pressureSensitive?: boolean;
 }
 
 export interface ArrowData {
@@ -200,12 +201,13 @@ export const DrawingNode: React.FC<DrawingNodeProps> = ({ node }) => {
           </>
         )}
         {strokes.map((stroke) => {
+          const isHighlighter = stroke.highlighter || data.kind === 'highlighter';
           const outlinePoints = getStroke(stroke.points, {
             size: stroke.width,
-            thinning: 0.58,
+            thinning: isHighlighter ? 0 : 0.58,
             smoothing: 0.68,
-            streamline: 0.62,
-            simulatePressure: stroke.complete,
+            streamline: isHighlighter ? 0.42 : 0.62,
+            simulatePressure: isHighlighter ? false : !stroke.pressureSensitive,
           });
           const pathData = getSvgPathFromStroke(outlinePoints);
           const hitWidth = Math.max(30, stroke.width + 22);

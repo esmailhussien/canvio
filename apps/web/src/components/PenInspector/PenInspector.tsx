@@ -42,7 +42,14 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
   const strokeWidth = useCanvasStore((s) => s.strokeWidth);
   const setStrokeColor = useCanvasStore((s) => s.setStrokeColor);
   const setStrokeWidth = useCanvasStore((s) => s.setStrokeWidth);
-  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
+  const theme = useCanvasStore((s) => s.theme);
+
+  React.useEffect(() => {
+    if (activeTool !== 'draw' && activeTool !== 'highlighter' && activeTool !== 'arrow') return;
+    const palette = activeTool === 'highlighter' ? HIGHLIGHT_COLORS : PEN_COLORS;
+    if (palette.some((color) => color.value === strokeColor)) return;
+    setStrokeColor(activeTool === 'highlighter' ? HIGHLIGHT_COLORS[0].value : theme === 'light' ? '#0f172a' : '#f0f0f5');
+  }, [activeTool, setStrokeColor, strokeColor, theme]);
 
   if (activeTool !== 'draw' && activeTool !== 'highlighter' && activeTool !== 'arrow') return null;
 
@@ -78,6 +85,8 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
             style={{ backgroundColor: c.value }}
             onClick={() => setStrokeColor(c.value)}
             title={c.label}
+            aria-label={`${c.label} ${isHighlighter ? 'highlighter' : 'ink'}`}
+            aria-pressed={strokeColor === c.value}
           />
         ))}
       </div>
@@ -91,6 +100,9 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
             key={s.value}
             className={`pen-size-btn ${strokeWidth === s.value ? 'active' : ''}`}
             onClick={() => setStrokeWidth(s.value)}
+            title={`${s.label} stroke`}
+            aria-label={`${s.label} stroke`}
+            aria-pressed={strokeWidth === s.value}
           >
             <span
               className="pen-size-dot"

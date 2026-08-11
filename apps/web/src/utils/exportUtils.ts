@@ -282,13 +282,14 @@ function drawDrawing(ctx: CanvasContext, node: LivingNode, x: number, y: number)
 
   for (const stroke of strokes) {
     if (!stroke || !Array.isArray(stroke.points) || stroke.points.length === 0) continue;
+    const isHighlighter = stroke.highlighter === true || node.data?.kind === 'highlighter';
 
     const outline = getStroke(stroke.points, {
       size: typeof stroke.width === 'number' ? stroke.width : 3,
-      thinning: 0.55,
-      smoothing: 0.62,
-      streamline: 0.5,
-      simulatePressure: true,
+      thinning: isHighlighter ? 0 : 0.58,
+      smoothing: 0.68,
+      streamline: isHighlighter ? 0.42 : 0.62,
+      simulatePressure: isHighlighter ? false : stroke.pressureSensitive !== true,
     });
 
     if (outline.length === 0) continue;

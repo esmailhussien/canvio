@@ -18,6 +18,8 @@ export interface SpatialAIResult {
   message?: string;
 }
 
+export type BoardDocumentFormat = 'summary' | 'article';
+
 export async function generateSpatialBoardAsync(
   prompt: string,
   provider?: string,
@@ -386,54 +388,148 @@ export async function expandNodeWithAIAsync(
 
 export async function summarizeBoardWithAIAsync(
   nodes: LivingNode[],
-  relations: Relation[]
+  relations: Relation[],
+  output: BoardDocumentFormat = 'summary'
 ): Promise<SpatialAIResult> {
   const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
   const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
-
-  const viewport = useCanvasStore.getState().viewport;
-  const zoom = viewport.zoom || 1;
-  const cx = -viewport.x / zoom + (window.innerWidth / (2 * zoom));
-  const cy = -viewport.y / zoom + (window.innerHeight / (2 * zoom));
 
   try {
     const result = await summarizeAIBoard({
       provider,
       model,
+      output,
       context: buildAIContext(nodes, relations),
     });
-    const normalized = normalizeServerBoardResult(result.title, result.nodes, result.relations, 'Executive board summary', 'server');
-    if (normalized.nodes.length > 0) {
-      normalized.nodes.forEach((n, idx) => {
-        n.position = {
-          x: cx - 400 + (idx % 2) * 420,
-          y: cy - 200 + Math.floor(idx / 2) * 200,
-        };
-      });
-    }
-    return normalized;
+    const normalized = normalizeServerBoardResult(
+      result.title,
+      result.nodes,
+      result.relations,
+      output === 'article' ? 'Board article draft' : 'Board summary',
+      'server'
+    );
+    return output === 'article' ? composeArticlePage(normalized) : normalized;
   } catch (err) {
-    console.warn('Server AI summary unavailable. Falling back to local summary board.', err);
+    console.warn(`Server AI ${output} unavailable. Falling back to local board analysis.`, err);
   }
 
-  // Fallback heuristic summary
+  const localResult = createLocalBoardDocument(nodes, relations, output);
+  return output === 'article' ? composeArticlePage(localResult) : localResult;
+}
+
+function composeArticlePage(result: SpatialAIResult): SpatialAIResult {
+  const timestamp = Date.now();
+  const normalizedTitle = result.title.replace(/\s+/g, ' ').trim().toLowerCase();
+  const sections = result.nodes
+    .filter((node) => node.type !== 'frame')
+    .map((node) => getNodeText(node).trim())
+    .filter((content) => content && content.replace(/\s+/g, ' ').trim().toLowerCase() !== normalizedTitle)
+    .slice(0, 7);
+  const safeSections = sections.length > 0
+    ? sections
+    : ['Introduction\nAdd the main ideas from the board to develop this article draft.'];
+  const bodyWidth = 800;
+  const sectionGap = 22;
+  const titleHeight = 92;
+  const sectionHeights = safeSections.map((content) => {
+    const explicitLines = content.split('\n').length;
+    const wrappedLines = Math.ceil(content.length / 82);
+    return Math.max(96, Math.min(320, Math.max(explicitLines, wrappedLines) * 25 + 34));
+  });
+  const pageHeight = 62 + titleHeight + 28 + sectionHeights.reduce((sum, height) => sum + height, 0) + sectionGap * (safeSections.length - 1) + 64;
+  const pageTop = -pageHeight / 2;
+  let cursorY = pageTop + 62 + titleHeight + 28;
+
+  const articleNodes: LivingNode[] = [
+    frame(nanoid(10), -450, pageTop, 900, pageHeight, 'AI Article Draft', '#8b5cf6'),
+    textBlock(nanoid(10), -400, pageTop + 62, bodyWidth, titleHeight, result.title, 1, 28),
+  ];
+
+  safeSections.forEach((content, index) => {
+    const height = sectionHeights[index];
+    articleNodes.push(textBlock(nanoid(10), -400, cursorY, bodyWidth, height, content, index + 2, 16, 'normal'));
+    cursorY += height + sectionGap;
+  });
+
+  return {
+    ...result,
+    nodes: articleNodes.map((node) => ({ ...node, createdAt: timestamp, updatedAt: timestamp })),
+    relations: [],
+  };
+}
+
+function createLocalBoardDocument(
+  nodes: LivingNode[],
+  relations: Relation[],
+  output: BoardDocumentFormat
+): SpatialAIResult {
+  const sourceNodes = nodes.filter((node) => node.type !== 'frame');
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const ideas = sourceNodes
+    .map((node) => getNodeText(node).replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const titleSeed = sourceNodes[0] ? getNodeDisplayName(sourceNodes[0]) : 'Untitled board';
+  const keyPoints = ideas.slice(0, 6);
+  const connectionLines = relations.slice(0, 6).map((relation) => {
+    const source = getRelationEndpointName(nodeById.get(relation.sourceId), relation.sourcePort);
+    const target = getRelationEndpointName(nodeById.get(relation.targetId), relation.targetPort);
+    return `${source} ${relation.label || relation.relationship.replace(/_/g, ' ')} ${target}`;
+  });
+
+  if (output === 'article') {
+    const frameId = nanoid(10);
+    const titleId = nanoid(10);
+    const introId = nanoid(10);
+    const pointsId = nanoid(10);
+    const connectionsId = nanoid(10);
+    const conclusionId = nanoid(10);
+    const articleTitle = `Article draft: ${titleSeed.slice(0, 54)}`;
+    const overview = ideas.length > 0
+      ? `This board explores ${ideas.slice(0, 3).join('; ')}.`
+      : 'This draft is ready for the main ideas from the board.';
+    const pointText = keyPoints.length > 0
+      ? `Key ideas\n${keyPoints.map((item) => `• ${item}`).join('\n')}`
+      : 'Key ideas\nAdd more written elements to develop this section.';
+    const relationText = connectionLines.length > 0
+      ? `How the ideas connect\n${connectionLines.map((item) => `• ${item}`).join('\n')}`
+      : 'How the ideas connect\nAdd labeled relations to make the argument and sequence clearer.';
+    const conclusion = keyPoints.length > 1
+      ? `Conclusion and next step\nThe board brings together ${keyPoints.length} key ideas. Review the connections, confirm the evidence, and turn the strongest open point into the next action.`
+      : 'Conclusion and next step\nReview the draft, add missing evidence, and connect the next action to the main idea.';
+
+    return {
+      title: articleTitle,
+      nodes: [
+        frame(frameId, -380, -490, 760, 980, 'AI Article Draft', '#8b5cf6'),
+        textBlock(titleId, -330, -430, 660, 82, articleTitle, 1, 28),
+        textBlock(introId, -330, -325, 660, 130, `Introduction\n${overview}`, 2, 17, 'normal'),
+        textBlock(pointsId, -330, -170, 660, 250, pointText, 3, 16, 'normal'),
+        textBlock(connectionsId, -330, 95, 660, 220, relationText, 4, 16, 'normal'),
+        textBlock(conclusionId, -330, 330, 660, 115, conclusion, 5, 16, 'normal'),
+      ],
+      relations: [],
+      source: 'local',
+      message: 'Server AI was unavailable, so Canvio created an editable article draft from the board content and relations.',
+    };
+  }
+
   const frameId = nanoid(10);
   const s1 = nanoid(10);
   const s2 = nanoid(10);
   const s3 = nanoid(10);
   const s4 = nanoid(10);
-
-  const firstNodeData = nodes[0]?.data as Record<string, any> | undefined;
-  const firstText = String(firstNodeData?.text || 'Central whiteboard overview and key goals.');
+  const coreText = keyPoints.slice(0, 2).join('\n') || 'Add written ideas to strengthen this summary.';
+  const pointsText = keyPoints.slice(2, 5).map((item) => `• ${item}`).join('\n') || 'No additional written points yet.';
+  const relationsText = connectionLines.slice(0, 4).map((item) => `• ${item}`).join('\n') || 'Add labeled relations to reveal dependencies and flow.';
 
   return {
-    title: '✨ AI Executive Summary',
+    title: `Board summary: ${titleSeed.slice(0, 48)}`,
     nodes: [
-      frame(frameId, cx - 450, cy - 250, 900, 500, '✨ AI Executive Canvas Summary', '#8083ff'),
-      sticky(s1, cx - 410, cy - 180, 400, 180, '📌 Core Vision & Context\n' + firstText, 'purple', 2),
-      sticky(s2, cx + 20, cy - 180, 400, 180, '⚡ Key Decisions & Milestones\nIdentified high-impact trade-offs and approvals.', 'green', 3),
-      sticky(s3, cx - 410, cy + 30, 400, 180, '🚨 Critical Risks & Dependencies\nOperational bottlenecks and quality gates to monitor.', 'pink', 4),
-      sticky(s4, cx + 20, cy + 30, 400, 180, '🎯 Next Action Plan\nAssigned owners, immediate deliverables, and review dates.', 'blue', 5),
+      frame(frameId, -450, -310, 900, 620, 'AI Board Summary', '#6366f1'),
+      sticky(s1, -410, -240, 400, 210, `Core idea\n${coreText}`, 'purple', 2),
+      sticky(s2, 20, -240, 400, 210, `Key points\n${pointsText}`, 'green', 3),
+      sticky(s3, -410, 10, 400, 220, `Meaningful connections\n${relationsText}`, 'pink', 4),
+      sticky(s4, 20, 10, 400, 220, 'Next step\nConfirm the strongest evidence, resolve open questions, and assign the next concrete action.', 'blue', 5),
     ],
     relations: [
       relation(s1, s2, 'leads to', '#8b5cf6', 'leads_to'),
@@ -441,7 +537,7 @@ export async function summarizeBoardWithAIAsync(
       relation(s2, s4, 'enables', '#22c55e', 'enables'),
     ],
     source: 'local',
-    message: 'Server AI is not configured yet, so Canvio used the local summary generator.',
+    message: 'Server AI was unavailable, so Canvio summarized the board content and relations locally.',
   };
 }
 
@@ -579,7 +675,17 @@ function shape(id: string, x: number, y: number, width: number, height: number, 
   };
 }
 
-function textBlock(id: string, x: number, y: number, width: number, height: number, content: string, zIndex: number, fontSize = 20): LivingNode {
+function textBlock(
+  id: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  content: string,
+  zIndex: number,
+  fontSize = 20,
+  fontWeight: 'normal' | 'bold' = 'bold'
+): LivingNode {
   return {
     id,
     type: 'text',
@@ -588,7 +694,7 @@ function textBlock(id: string, x: number, y: number, width: number, height: numb
     rotation: 0,
     zIndex,
     locked: false,
-    data: { content, fontSize, fontWeight: 'bold', textAlign: 'left', color: 'var(--text-primary)' },
+    data: { content, fontSize, fontWeight, textAlign: 'left', color: 'var(--text-primary)' },
     createdAt: now(),
     updatedAt: now(),
   };

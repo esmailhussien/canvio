@@ -7,6 +7,12 @@ import { detectGeometricShape, detectGestureArrow } from '../../../utils/shapeDe
 const INK_SESSION_MAX_GAP_MS = 2000;
 const INK_SESSION_PROXIMITY_PX = 250;
 
+interface DrawingSample {
+  x: number;
+  y: number;
+  pressure: number;
+}
+
 interface UseCanvasDrawingSessionProps {
   activeTool: ToolMode;
   autoShapeEnabled: boolean;
@@ -29,6 +35,7 @@ export function useCanvasDrawingSession({
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<number[][] | null>(null);
+  const pressureSensitiveRef = useRef(false);
 
   const inkSessionRef = useRef<{
     nodeId: string;
@@ -45,32 +52,58 @@ export function useCanvasDrawingSession({
     }
   }, [activeTool]);
 
-  const startDrawing = useCallback((worldPos: { x: number; y: number }) => {
-    setIsDrawing(true);
-    setCurrentStroke([[worldPos.x, worldPos.y, 0.5]]);
+  const resetDrawing = useCallback(() => {
+    setIsDrawing(false);
+    setCurrentStroke(null);
+    pressureSensitiveRef.current = false;
   }, []);
 
-  const updateStrokePoint = useCallback(
-    (worldPos: { x: number; y: number }) => {
+  useEffect(() => {
+    if (activeTool !== 'draw' && activeTool !== 'highlighter' && activeTool !== 'arrow' && isDrawing) {
+      resetDrawing();
+    }
+  }, [activeTool, isDrawing, resetDrawing]);
+
+  const startDrawing = useCallback((worldPos: DrawingSample, pressureSensitive = false) => {
+    pressureSensitiveRef.current = pressureSensitive;
+    setIsDrawing(true);
+    setCurrentStroke([[worldPos.x, worldPos.y, worldPos.pressure]]);
+  }, []);
+
+  const updateStrokePoints = useCallback(
+    (samples: DrawingSample[], pressureSensitive = false) => {
       if (!isDrawing) return;
+      pressureSensitiveRef.current = pressureSensitiveRef.current || pressureSensitive;
       setCurrentStroke((prev) => {
-        const points = prev || [];
-        const last = points[points.length - 1];
-        if (last && Math.hypot(worldPos.x - last[0], worldPos.y - last[1]) < Math.max(0.75, strokeWidth * 0.2)) {
-          return points;
+        if (samples.length === 0) return prev;
+        const points = prev ? [...prev] : [];
+        let changed = false;
+
+        samples.forEach((sample) => {
+          const last = points[points.length - 1];
+          if (last && Math.hypot(sample.x - last[0], sample.y - last[1]) < Math.max(0.5, strokeWidth * 0.14)) {
+            return;
+          }
+          points.push([sample.x, sample.y, sample.pressure]);
+          changed = true;
+        });
+
+        if (!changed) {
+          return prev;
         }
-        return [...points, [worldPos.x, worldPos.y, 0.5]];
+        return points;
       });
     },
     [isDrawing, strokeWidth]
   );
 
   const finishDrawing = useCallback(() => {
-    if (!isDrawing || !currentStroke || currentStroke.length <= 1) {
-      setIsDrawing(false);
-      setCurrentStroke(null);
+    if (!isDrawing || !currentStroke || currentStroke.length === 0) {
+      resetDrawing();
       return;
     }
+
+    const pressureSensitive = pressureSensitiveRef.current;
 
     // 1. Arrow Tool
     if (activeTool === 'arrow') {
@@ -118,8 +151,7 @@ export function useCanvasDrawingSession({
         selectNode(node.id);
         setActiveTool('select');
       }
-      setIsDrawing(false);
-      setCurrentStroke(null);
+      resetDrawing();
       return;
     }
 
@@ -165,8 +197,7 @@ export function useCanvasDrawingSession({
       addNode(node);
       selectNode(node.id);
       setActiveTool('select');
-      setIsDrawing(false);
-      setCurrentStroke(null);
+      resetDrawing();
       return;
     }
 
@@ -188,8 +219,7 @@ export function useCanvasDrawingSession({
         },
       };
       addRelation(relation);
-      setIsDrawing(false);
-      setCurrentStroke(null);
+      resetDrawing();
       setActiveTool('select');
       return;
     }
@@ -254,7 +284,7 @@ export function useCanvasDrawingSession({
 
         const shiftX = existingNode.position.x - newPosition.x;
         const shiftY = existingNode.position.y - newPosition.y;
-        type InkStroke = { id: string; points: number[][]; color: string; width: number; complete: boolean };
+        type InkStroke = { id: string; points: number[][]; color: string; width: number; complete: boolean; pressureSensitive?: boolean };
         const priorStrokes = (existingNode.data?.strokes as InkStroke[] | undefined) || [];
         const existingStrokes = priorStrokes.map((s) => ({
           ...s,
@@ -280,6 +310,7 @@ export function useCanvasDrawingSession({
                 color: strokeColor,
                 width: strokeWidth,
                 complete: true,
+                pressureSensitive,
               },
             ],
           },
@@ -321,6 +352,7 @@ export function useCanvasDrawingSession({
                 color: strokeColor,
                 width: strokeWidth,
                 complete: true,
+                pressureSensitive,
               },
             ],
           },
@@ -343,8 +375,7 @@ export function useCanvasDrawingSession({
       }
     }
 
-    setIsDrawing(false);
-    setCurrentStroke(null);
+    resetDrawing();
   }, [
     activeTool,
     addNode,
@@ -353,6 +384,7 @@ export function useCanvasDrawingSession({
     currentStroke,
     isDrawing,
     nextZIndex,
+    resetDrawing,
     selectNode,
     setActiveTool,
     strokeColor,
@@ -363,8 +395,10 @@ export function useCanvasDrawingSession({
   return {
     isDrawing,
     currentStroke,
+    pressureSensitive: pressureSensitiveRef.current,
     startDrawing,
-    updateStrokePoint,
+    updateStrokePoints,
     finishDrawing,
+    cancelDrawing: resetDrawing,
   };
 }

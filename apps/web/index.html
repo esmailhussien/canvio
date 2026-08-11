@@ -17,6 +17,13 @@
     <meta name="twitter:description" content="An online whiteboard for visual thinking, concept mapping, connected notes, and collaborative work." />
     <meta name="twitter:image" content="https://canvio.space/logo.png" />
     <meta name="theme-color" content="#6366f1" />
+    <script>
+      try {
+        const preference = localStorage.getItem('canvio-theme-preference');
+        const systemTheme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.dataset.theme = preference === 'light' || preference === 'dark' ? preference : systemTheme;
+      } catch (_) {}
+    </script>
     <title>Canvio | Online Whiteboard for Learning, Planning and Research</title>
     <link rel="icon" type="image/png" href="/logo.png" />
     <script type="application/ld+json" id="canvio-seo-jsonld">
@@ -63,7 +70,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

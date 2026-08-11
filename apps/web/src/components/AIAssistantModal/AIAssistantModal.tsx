@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import {
   generateSpatialBoard,
   generateSpatialBoardAsync,
+  BoardDocumentFormat,
   summarizeBoardWithAIAsync,
   organizeAndClusterWithAIAsync
 } from '../../utils/spatialAIEngine';
 import { useCanvasStore } from '../../store/canvasStore';
-import { fitViewportToNodes } from '../../utils/viewportFit';
+import { fitTemplateToViewport, fitViewportToNodes } from '../../utils/viewportFit';
 import './AIAssistantModal.css';
 
 interface AIAssistantModalProps {
@@ -185,24 +186,30 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     }
   };
 
-  const handleSummarizeBoard = async () => {
+  const handleBoardDocument = async (output: BoardDocumentFormat) => {
     if (!hasBoardContent) {
       setAIStatus({ kind: 'info', text: 'Add a note, shape, or drawing first. Then Canvio can explain the board.' });
       return;
     }
     setIsGenerating(true);
-    setAIStatus({ kind: 'info', text: 'Reading the board graph and relations...' });
+    setAIStatus({
+      kind: 'info',
+      text: output === 'article'
+        ? 'Reading the board and writing an editable article draft...'
+        : 'Reading the board graph and building a concise summary...',
+    });
     try {
       const allNodes = Object.values(useCanvasStore.getState().nodes);
       const allRelations = Object.values(useCanvasStore.getState().relations);
-      const res = await summarizeBoardWithAIAsync(allNodes, allRelations);
-      res.nodes.forEach((n) => addNode(n));
+      const res = await summarizeBoardWithAIAsync(allNodes, allRelations, output);
+      const placedNodes = placeBoardAwayFromExisting(res.nodes, allNodes);
+      placedNodes.forEach((n) => addNode(n));
       res.relations.forEach((r) => addRelation(r));
-      fitViewportToNodes(res.nodes, { minZoom: 0.5 });
+      fitTemplateToViewport(placedNodes);
       closeWithAIStatus(res);
     } catch (err) {
-      console.error('Summarize board failed:', err);
-      setAIStatus({ kind: 'error', text: 'Summary failed. Check the server AI configuration or try again.' });
+      console.error(`Board ${output} failed:`, err);
+      setAIStatus({ kind: 'error', text: `${output === 'article' ? 'Article' : 'Summary'} failed. Please try again.` });
     } finally {
       setIsGenerating(false);
     }
@@ -325,9 +332,13 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
               <span className="ai-modal__count">{hasBoardContent ? `${nodeCount} ${nodeCount === 1 ? 'element' : 'elements'} · ${relationCount} ${relationCount === 1 ? 'connection' : 'connections'}` : 'Nothing here yet'}</span>
             </div>
             <div className="ai-modal__quick-actions">
-              <button type="button" className="ai-action-btn" onClick={handleSummarizeBoard} disabled={isGenerating || !hasBoardContent} title={hasBoardContent ? 'Create an overview of this board' : 'Add something to the board first'}>
+              <button type="button" className="ai-action-btn" onClick={() => handleBoardDocument('summary')} disabled={isGenerating || !hasBoardContent} title={hasBoardContent ? 'Create a concise summary from this board' : 'Add something to the board first'}>
                 <span className="ai-action-btn__icon ai-action-btn__icon--purple"><span className="material-symbols-outlined" aria-hidden="true">summarize</span></span>
-                <span className="ai-action-btn__copy"><strong>Understand</strong><small>Make an overview and key points</small></span>
+                <span className="ai-action-btn__copy"><strong>Summarize</strong><small>Key ideas, connections, and next steps</small></span>
+              </button>
+              <button type="button" className="ai-action-btn" onClick={() => handleBoardDocument('article')} disabled={isGenerating || !hasBoardContent} title={hasBoardContent ? 'Turn this board into an editable article draft' : 'Add something to the board first'}>
+                <span className="ai-action-btn__icon ai-action-btn__icon--blue"><span className="material-symbols-outlined" aria-hidden="true">article</span></span>
+                <span className="ai-action-btn__copy"><strong>Write article</strong><small>Build a structured draft from the board</small></span>
               </button>
               <button type="button" className="ai-action-btn" onClick={handleOrganizeCluster} disabled={isGenerating || !hasBoardContent} title={hasBoardContent ? 'Group related elements into clear areas' : 'Add something to the board first'}>
                 <span className="ai-action-btn__icon ai-action-btn__icon--green"><span className="material-symbols-outlined" aria-hidden="true">grid_view</span></span>
