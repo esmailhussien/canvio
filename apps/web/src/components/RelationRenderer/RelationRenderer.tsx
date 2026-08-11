@@ -189,8 +189,8 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
           <g
             key={rel.id}
             style={{
-              pointerEvents: (isEraser || isSelectTool || presentationMode) ? 'auto' : 'none',
-              cursor: isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
+              pointerEvents: presentationMode ? 'none' : (isEraser || isSelectTool) ? 'auto' : 'none',
+              cursor: presentationMode ? 'default' : isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
             }}
             className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${recentRelationId === rel.id ? 'relation-group--new' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''}`}
             aria-label={`${getRelationEndpointLabel(source, rel.sourcePort)} ${rel.relationship || 'related to'} ${getRelationEndpointLabel(target, rel.targetPort)}`}

@@ -171,6 +171,10 @@ export function WorldPage() {
     setActiveTool('select');
   };
 
+  const handleTogglePresentationLaser = () => {
+    setActiveTool(activeTool === 'laser' ? 'select' : 'laser');
+  };
+
   const handleNewBlankBoard = () => {
     const newId = nanoid(10);
     createBoard().catch(() => {});
@@ -297,14 +301,39 @@ export function WorldPage() {
   useEffect(() => {
     if (!isPresenting) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         handleExitPresentation();
+        return;
+      }
+      if (e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        setActiveTool(useCanvasStore.getState().activeTool === 'laser' ? 'select' : 'laser');
+        return;
+      }
+      if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        handleFitPresentationView();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPresenting]);
+  }, [isPresenting, focusNodeId, nodes]);
+
+  useEffect(() => {
+    if (!isPresenting) return;
+    let fitTimer: number | null = null;
+    const handlePresentationResize = () => {
+      if (fitTimer !== null) window.clearTimeout(fitTimer);
+      fitTimer = window.setTimeout(handleFitPresentationView, 120);
+    };
+    window.addEventListener('resize', handlePresentationResize);
+    return () => {
+      window.removeEventListener('resize', handlePresentationResize);
+      if (fitTimer !== null) window.clearTimeout(fitTimer);
+    };
+  }, [isPresenting, focusNodeId, nodes]);
 
   // Connect to collaboration
   const { connected, connectionIssue, users, persistenceState, retryConnection } = useCollaboration(worldId || '');
@@ -453,15 +482,31 @@ export function WorldPage() {
 
       {isPresenting && (
         <div className="presentation-controls" role="toolbar" aria-label="Presentation controls">
-          <button className="presentation-control-btn presentation-control-btn--primary" onClick={handleExitPresentation} title="Exit presentation">
+          <button
+            className="presentation-control-btn presentation-control-btn--primary"
+            onClick={handleExitPresentation}
+            title="Exit presentation (Esc)"
+            aria-label="Exit presentation"
+          >
             <span className="material-symbols-outlined">close_fullscreen</span>
             <span>Exit</span>
+          </button>
+          <button
+            className={`presentation-control-btn ${activeTool === 'laser' ? 'is-active' : ''}`}
+            onClick={handleTogglePresentationLaser}
+            title={activeTool === 'laser' ? 'Return to board navigation (L)' : 'Use laser pointer (L)'}
+            aria-label={activeTool === 'laser' ? 'Return to board navigation' : 'Use laser pointer'}
+            aria-pressed={activeTool === 'laser'}
+          >
+            <span className="material-symbols-outlined">{activeTool === 'laser' ? 'pan_tool' : 'flare'}</span>
+            <span>{activeTool === 'laser' ? 'Pan' : 'Laser'}</span>
           </button>
           <button
             className="presentation-control-btn"
             onClick={handleFocusSelectedNode}
             disabled={!selectedFocusNodeId}
             title="Focus selected element"
+            aria-label="Focus selected element"
           >
             <span className="material-symbols-outlined">filter_center_focus</span>
             <span>Focus</span>
@@ -471,11 +516,17 @@ export function WorldPage() {
             onClick={handleClearFocus}
             disabled={!focusNodeId}
             title="Clear focus"
+            aria-label="Show all elements"
           >
             <span className="material-symbols-outlined">visibility</span>
             <span>All</span>
           </button>
-          <button className="presentation-control-btn" onClick={handleFitPresentationView} title="Fit view">
+          <button
+            className="presentation-control-btn"
+            onClick={handleFitPresentationView}
+            title="Fit view (F)"
+            aria-label="Fit presentation view"
+          >
             <span className="material-symbols-outlined">fit_screen</span>
             <span>Fit</span>
           </button>

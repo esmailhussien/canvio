@@ -139,6 +139,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     if (presentationMode) {
       e.preventDefault();
       e.stopPropagation();
+      if (activeTool === 'laser') return;
       selectNode(node.id, e.shiftKey);
       return;
     }

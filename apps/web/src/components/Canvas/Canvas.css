@@ -79,6 +79,11 @@
   cursor: grabbing;
 }
 
+.canvas--presenting.canvas--laser,
+.canvas--presenting.canvas--laser:active {
+  cursor: none;
+}
+
 .canvas--presenting .canvas__grid {
   opacity: 0.72;
 }
@@ -226,6 +231,10 @@
   transition: all 0.15s ease;
 }
 
+.canvas__radial-title {
+  display: none;
+}
+
 .canvas__radial-center:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
@@ -334,5 +343,96 @@
 
   .canvas__radial-label {
     opacity: 1;
+  }
+}
+
+@media (max-width: 700px) {
+  .canvas__radial-ring {
+    left: 50% !important;
+    top: auto !important;
+    bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+    width: min(356px, calc(100vw - 24px));
+    height: auto;
+    max-height: calc(100dvh - 178px);
+    padding: 12px;
+    border: 1px solid var(--toolbar-border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--toolbar-bg) 97%, transparent);
+    box-shadow: var(--toolbar-shadow);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    transform: translateX(-50%);
+    pointer-events: auto;
+    animation: mobileQuickAddIn 0.18s ease-out both;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  @keyframes mobileQuickAddIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .canvas__radial-title {
+    display: block;
+    grid-column: 1 / -1;
+    min-height: 28px;
+    padding: 2px 44px 4px 4px;
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 22px;
+  }
+
+  .canvas__radial-center {
+    top: 8px;
+    right: 8px;
+    left: auto;
+    width: 36px;
+    height: 36px;
+    transform: none;
+    z-index: 2;
+  }
+
+  .canvas__radial-center:hover {
+    transform: none;
+  }
+
+  .canvas__radial-circle-item {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    height: 52px;
+    padding: 0 12px;
+    border-radius: 10px;
+    transform: none !important;
+    justify-content: flex-start;
+    gap: 10px;
+    box-shadow: none;
+    opacity: 1;
+    scale: 1;
+    animation: none;
+  }
+
+  .canvas__radial-circle-item svg {
+    flex: 0 0 auto;
+  }
+
+  .canvas__radial-label {
+    position: static;
+    min-width: 0;
+    overflow: hidden;
+    opacity: 1;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: currentColor;
+    font-size: 0.76rem;
+    text-overflow: ellipsis;
+    transform: none;
+    white-space: nowrap;
   }
 }

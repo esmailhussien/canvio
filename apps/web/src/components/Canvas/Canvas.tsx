@@ -154,6 +154,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
 
       if (presentationMode) {
         e.preventDefault();
+        if (activeTool === 'laser') return;
         touchPanStartRef.current = { x: e.clientX, y: e.clientY, moved: false };
         setIsPanning(true);
         setLastMousePos({ x: e.clientX, y: e.clientY });
@@ -762,11 +763,13 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
             style={{ left: radialMenu.screenX, top: radialMenu.screenY }}
             onClick={(e) => e.stopPropagation()}
           >
+            <span className="canvas__radial-title">Quick add</span>
             <button
               type="button"
               className="canvas__radial-center"
               onClick={() => setRadialMenu(null)}
               title="Close (Esc)"
+              aria-label="Close quick add"
             >
               <IconX size={15} />
             </button>
@@ -791,10 +794,9 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
                   type="button"
                   className={`canvas__radial-circle-item ${item.isAI ? 'ai-item' : ''}`}
                   style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` }}
-                  onPointerDown={handleTrigger}
-                  onMouseDown={handleTrigger}
                   onClick={handleTrigger}
                   title={item.label}
+                  aria-label={`Add ${item.label}`}
                 >
                   <item.icon size={20} />
                   <span className="canvas__radial-label">{item.label}</span>

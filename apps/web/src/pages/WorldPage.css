@@ -873,6 +873,13 @@
   border-color: color-mix(in srgb, var(--accent-primary) 42%, var(--border-subtle));
 }
 
+.presentation-control-btn.is-active {
+  background: color-mix(in srgb, #ef4444 16%, var(--bg-surface));
+  border-color: color-mix(in srgb, #ef4444 58%, var(--border-subtle));
+  color: color-mix(in srgb, #ef4444 78%, var(--text-primary));
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ef4444 14%, transparent);
+}
+
 .selection-quick-actions {
   position: fixed;
   top: 62px;
@@ -1118,7 +1125,7 @@
   }
 
   .presentation-controls {
-    top: 10px;
+    top: max(10px, env(safe-area-inset-top, 0px));
     width: calc(100vw - 20px);
     justify-content: center;
     gap: 6px;
@@ -1132,6 +1139,10 @@
     height: 46px;
     padding: 0 8px;
     font-size: 0.78rem;
+  }
+
+  .presentation-control-btn > span:last-child {
+    display: none;
   }
 
   .selection-quick-actions {
