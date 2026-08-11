@@ -54,6 +54,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const setRelationSourceId = useCanvasStore((s) => s.setRelationSourceId);
 
   const [cursorWorldPos, setCursorWorldPos] = useState<{ x: number; y: number } | null>(null);
+  const [laserPointer, setLaserPointer] = useState<{ x: number; y: number } | null>(null);
   const [radialMenu, setRadialMenu] = useState<{ screenX: number; screenY: number; worldPos: { x: number; y: number } } | null>(null);
   const touchPanStartRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
@@ -152,6 +153,11 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
 
       if (activeTool === 'relation') {
         setRelationSourceId(null);
+        return;
+      }
+
+      if (activeTool === 'laser') {
+        e.preventDefault();
         return;
       }
 
@@ -368,6 +374,36 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
     };
   }, []);
 
+  // The laser follows the screen pointer instead of the world transform, so
+  // it remains a precise presentation cue while the board is zoomed or panned.
+  useEffect(() => {
+    if (activeTool !== 'laser') {
+      setLaserPointer(null);
+      return;
+    }
+
+    const handleLaserPointerMove = (event: PointerEvent) => {
+      if (!event.isPrimary) return;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const isInsideCanvas =
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom;
+
+      setLaserPointer(
+        isInsideCanvas
+          ? { x: event.clientX - rect.left, y: event.clientY - rect.top }
+          : null
+      );
+    };
+
+    window.addEventListener('pointermove', handleLaserPointerMove);
+    return () => window.removeEventListener('pointermove', handleLaserPointerMove);
+  }, [activeTool]);
+
   const transform = `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})`;
   const relationStateClass =
     !presentationMode && activeTool === 'relation'
@@ -389,7 +425,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   return (
     <div
       ref={canvasRef}
-      className={`canvas ${relationStateClass} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
+      className={`canvas ${relationStateClass} ${activeTool === 'laser' ? 'canvas--laser' : ''} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -595,6 +631,17 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           />
         )}
       </div>
+
+      {activeTool === 'laser' && laserPointer && (
+        <div
+          className="canvas__laser-pointer"
+          style={{ left: laserPointer.x, top: laserPointer.y }}
+          aria-hidden="true"
+        >
+          <span className="canvas__laser-pointer-dot" />
+          <span className="canvas__laser-pointer-halo" />
+        </div>
+      )}
 
       {/* Drawing Preview Layer */}
       {isDrawing && currentStroke && (

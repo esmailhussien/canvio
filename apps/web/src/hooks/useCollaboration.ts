@@ -27,6 +27,14 @@ function isStoredViewport(value: unknown): value is Viewport {
   return Number.isFinite(viewport.x) && Number.isFinite(viewport.y) && Number.isFinite(viewport.zoom);
 }
 
+function getCollaboratorName() {
+  try {
+    return localStorage.getItem('CANVIO_COLLABORATOR_NAME') || getRandomName();
+  } catch {
+    return getRandomName();
+  }
+}
+
 export function useCollaboration(worldId: string) {
   const [connected, setConnected] = useState(false);
   const [connectionIssue, setConnectionIssue] = useState<string | null>(null);
@@ -201,7 +209,7 @@ export function useCollaboration(worldId: string) {
     }
 
     // ─── Awareness (user presence) ────────────────────────────────────
-    const userName = getRandomName();
+    const userName = getCollaboratorName();
     const userColor = getRandomColor();
     const awareness = wsProvider.awareness;
 
@@ -210,6 +218,17 @@ export function useCollaboration(worldId: string) {
       cursor: null,
       selectedNodeIds: [],
     });
+
+    const handleCollaboratorNameChange = (event: Event) => {
+      const nextName = (event as CustomEvent<{ name?: string }>).detail?.name?.trim();
+      if (!nextName) return;
+      const currentUser = awareness.getLocalState()?.user || {};
+      awareness.setLocalStateField('user', {
+        ...currentUser,
+        name: nextName.slice(0, 48),
+      });
+    };
+    window.addEventListener('canvio:collaborator-name', handleCollaboratorNameChange);
 
     const handleProviderStatus = (event: { status: string }) => {
       const isConnected = event.status === 'connected';
@@ -472,6 +491,7 @@ export function useCollaboration(worldId: string) {
       unsubscribeSelection();
       unsubscribeLocalSave();
       window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('canvio:collaborator-name', handleCollaboratorNameChange);
       wsProvider.off('status', handleProviderStatus);
       wsProvider.off('sync', handleProviderSync);
       wsProvider.off('connection-error', handleConnectionFailure);

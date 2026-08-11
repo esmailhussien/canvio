@@ -60,6 +60,6 @@
 
 .frame-node--selected .frame-node__body {
   border-style: solid;
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 1px var(--accent-primary);
+  border-color: var(--frame-accent, var(--accent-primary)) !important;
+  box-shadow: 0 0 0 1px var(--frame-accent, var(--accent-primary));
 }

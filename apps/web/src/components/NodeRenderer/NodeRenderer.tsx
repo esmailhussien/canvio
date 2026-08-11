@@ -142,6 +142,14 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       selectNode(node.id, e.shiftKey);
       return;
     }
+
+    // The laser is a presentation aid, not a board-editing tool. Keep nodes
+    // from intercepting the pointer so the laser can pass over any content.
+    if (activeTool === 'laser') {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     
     // Eraser Tool
     if (activeTool === 'eraser') {

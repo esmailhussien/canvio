@@ -435,6 +435,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
+  min-width: 0;
   z-index: var(--z-toolbar);
   pointer-events: none;
 }
@@ -447,6 +448,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   position: relative;
 }
 
@@ -500,6 +502,7 @@
 .canvio-brand-text {
   font-weight: 800;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .canvio-arrow {
@@ -691,6 +694,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .header-icon-btn,
@@ -995,8 +1000,8 @@
 
   .connection-status {
     top: auto;
-    right: 12px;
-    bottom: 74px;
+    right: auto;
+    bottom: auto;
     max-width: 78px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1162,17 +1167,61 @@
 }
 
 @media (max-width: 520px) {
+  .canvio-brand-btn {
+    width: auto;
+    min-width: 0 !important;
+    height: 44px;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 0 4px 0 6px;
+    font-size: 0.92rem;
+  }
 
-  .canvio-brand-text,
+  .canvio-brand-text {
+    display: inline;
+  }
+
   .canvio-arrow {
+    display: inline;
+    font-size: 0.68rem;
+  }
+
+  .canvio-brand-menu-toggle {
+    width: 32px;
+    min-width: 32px;
+    height: 44px;
+  }
+
+  .world-header {
+    padding: 0 6px;
+    gap: 2px;
+  }
+
+  .world-header__left,
+  .world-header__right {
+    gap: 2px;
+  }
+
+  .world-header__right .header-ai-btn[aria-label="Present Board"],
+  .world-header__right .header-divider {
     display: none;
   }
 
-  .canvio-brand-btn {
-    width: 44px;
-    height: 44px;
-    justify-content: center;
+  .world-header__surface-btn {
+    display: none;
+  }
+
+  .connection-status {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
     padding: 0;
+    justify-content: center;
+  }
+
+  .connection-status > span:not(.material-symbols-outlined) {
+    display: none;
   }
 
   .presence-avatar-stack {

@@ -122,6 +122,7 @@ export function useCanvasKeyboardShortcuts() {
         case 'v': case 'V': store.setActiveTool('select'); break;
         case 'a': case 'A': store.setActiveTool('arrow'); break;
         case 'k': case 'K': store.setActiveTool('highlighter'); break;
+        case 'q': case 'Q': store.setActiveTool('laser'); break;
         case 'h': case 'H': store.setActiveTool('pan'); break;
         case 'd': case 'D': case 'p': case 'P': store.setActiveTool('draw'); break;
         case 't': case 'T': store.setActiveTool('text'); break;

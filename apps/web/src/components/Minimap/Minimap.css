@@ -28,10 +28,6 @@
 
 @media (max-width: 768px) {
   .minimap-container {
-    bottom: 62px;
-    right: 10px;
-    width: 96px;
-    height: 66px;
-    opacity: 0.85;
+    display: none;
   }
 }

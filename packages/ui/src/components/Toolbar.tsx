@@ -5,6 +5,7 @@ import {
   IconPan,
   IconDraw,
   IconHighlighter,
+  IconLaserPointer,
   IconArrowTool,
   IconText,
   IconSticky,
@@ -19,7 +20,7 @@ import {
 } from '../icons';
 import './Toolbar.css';
 
-export type ToolMode = 'select' | 'pan' | 'draw' | 'highlighter' | 'arrow' | 'text' | 'sticky' | 'map' | 'relation' | 'eraser' | 'image' | 'shape' | 'frame' | 'code';
+export type ToolMode = 'select' | 'pan' | 'draw' | 'highlighter' | 'laser' | 'arrow' | 'text' | 'sticky' | 'map' | 'relation' | 'eraser' | 'image' | 'shape' | 'frame' | 'code';
 
 interface ToolbarProps {
   activeTool: ToolMode;
@@ -31,6 +32,7 @@ const PRIMARY_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?:
   { id: 'pan', icon: IconPan, label: 'Pan (Space)', group: '1' },
   { id: 'draw', icon: IconDraw, label: 'Draw (P)', group: '2' },
   { id: 'highlighter', icon: IconHighlighter, label: 'Highlighter (K)', group: '2' },
+  { id: 'laser', icon: IconLaserPointer, label: 'Laser pointer (Q)', group: '2' },
   { id: 'arrow', icon: IconArrowTool, label: 'Arrow (A)', group: '2' },
   { id: 'text', icon: IconText, label: 'Text (T)', group: '3' },
   { id: 'sticky', icon: IconSticky, label: 'Sticky (S)', group: '3' },
@@ -53,10 +55,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
   const toolbarRef = useRef<HTMLDivElement>(null);
   const isAdvancedActive = ADVANCED_TOOLS.some((tool) => tool.id === activeTool);
   const isMobileSecondaryActive = PRIMARY_TOOLS.some((tool) => tool.id === activeTool && !MOBILE_PRIMARY_TOOLS.has(tool.id));
-  const mobileMenuTools = [
-    ...PRIMARY_TOOLS.filter((tool) => !MOBILE_PRIMARY_TOOLS.has(tool.id)),
-    ...ADVANCED_TOOLS,
-  ];
 
   useEffect(() => {
     if (!isMoreOpen) return;
@@ -74,7 +72,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
     compact = false,
     className = ''
   ) => (
-    <Tooltip key={`${className || 'toolbar'}-${tool.id}`} content={tool.label} position={compact ? 'right' : 'top'}>
+    <Tooltip
+      key={`${className || 'toolbar'}-${tool.id}`}
+      content={tool.label}
+      position={compact ? 'right' : 'top'}
+      className={className.includes('canvio-toolbar-button--mobile-menu') ? 'canvio-toolbar-more__mobile-secondary' : ''}
+    >
       <button
         className={`canvio-toolbar-button ${compact ? 'canvio-toolbar-button--menu' : ''} ${className} ${activeTool === tool.id ? 'active' : ''}`}
         data-tool-id={tool.id}
@@ -95,7 +98,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
     <div className="canvio-toolbar-container canvio-toolbar-enter" ref={toolbarRef}>
       {isMoreOpen && (
         <div className="canvio-toolbar-more__menu" role="menu" aria-label="Advanced tools">
-          {mobileMenuTools.map((tool) => renderToolButton(tool, true, 'canvio-toolbar-button--mobile-menu'))}
+          {PRIMARY_TOOLS
+            .filter((tool) => !MOBILE_PRIMARY_TOOLS.has(tool.id))
+            .map((tool) => renderToolButton(tool, true, 'canvio-toolbar-button--mobile-menu'))}
           {ADVANCED_TOOLS.map((tool) => renderToolButton(tool, true))}
         </div>
       )}

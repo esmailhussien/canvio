@@ -99,8 +99,9 @@
   left: 50%;
   bottom: calc(100% + 12px);
   transform: translateX(-50%);
-  min-width: 184px;
-  padding: 8px;
+  width: min(260px, calc(100vw - 24px));
+  min-width: 220px;
+  padding: 7px;
   border: 1px solid var(--toolbar-border, var(--glass-border, rgba(255, 255, 255, 0.12)));
   border-radius: 14px;
   background: var(--toolbar-bg, var(--glass-bg, rgba(19, 19, 27, 0.94)));
@@ -110,6 +111,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow: visible;
   z-index: 1;
 }
 
@@ -126,19 +128,36 @@
   border-bottom: 1px solid var(--toolbar-border, var(--glass-border, rgba(255, 255, 255, 0.12)));
 }
 
+.canvio-toolbar-more__mobile-secondary {
+  display: none;
+}
+
+.canvio-toolbar-more__menu .canvio-tooltip-wrapper {
+  width: 100%;
+  min-width: 0;
+}
+
+.canvio-toolbar-more__menu .canvio-tooltip {
+  display: none;
+}
+
 .canvio-toolbar-button--menu {
   width: 100%;
-  height: 42px;
-  flex: 0 0 42px;
+  min-width: 0;
+  height: 40px;
+  flex: 1 1 auto;
   justify-content: flex-start;
-  gap: 10px;
-  padding: 0 12px;
+  gap: 8px;
+  padding: 0 9px;
   border-radius: 10px;
   color: var(--text-primary, #f8fafc);
 }
 
 .canvio-toolbar-button--menu span {
-  font-size: 0.82rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -179,15 +198,18 @@
     display: flex;
   }
 
-  .canvio-toolbar-more__menu .canvio-toolbar-button--menu:not(.canvio-toolbar-button--mobile-menu) {
-    display: none;
+  .canvio-toolbar-more__mobile-secondary {
+    display: inline-flex;
   }
 
   .canvio-toolbar-more__menu {
     width: min(280px, calc(100vw - 24px));
-    max-height: min(420px, calc(100vh - 140px));
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+  }
+
+  .canvio-toolbar-more__menu .canvio-toolbar-button--menu {
+    width: 100%;
+    height: 42px;
+    flex: 1 1 auto;
   }
 }
 
@@ -234,5 +256,10 @@
     width: 46px;
     height: 46px;
     flex-basis: 46px;
+  }
+
+  .canvio-toolbar-more__menu .canvio-toolbar-button--menu {
+    height: 42px;
+    flex: 1 1 auto;
   }
 }

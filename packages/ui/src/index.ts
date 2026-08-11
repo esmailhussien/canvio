@@ -3,6 +3,7 @@ export {
   IconPan,
   IconDraw,
   IconHighlighter,
+  IconLaserPointer,
   IconArrowTool,
   IconText,
   IconSticky,

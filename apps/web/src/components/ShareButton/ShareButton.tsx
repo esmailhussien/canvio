@@ -1,20 +1,80 @@
-import { useState } from 'react';
-import { IconShare } from '@canvio/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { IconCopy, IconShare, IconX } from '@canvio/ui';
 import { ApiRequestError, createBoardShareLink } from '../../utils/api';
 import './ShareButton.css';
 
-export function ShareButton({ worldId }: { worldId: string }) {
-  const [status, setStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
-  const [errorText, setErrorText] = useState('Copy failed');
+type ShareStatus = 'idle' | 'loading' | 'ready' | 'copied' | 'error';
 
-  const handleShare = async () => {
+function getSavedName() {
+  try {
+    return localStorage.getItem('CANVIO_COLLABORATOR_NAME') || '';
+  } catch {
+    return '';
+  }
+}
+
+export function ShareButton({ worldId }: { worldId: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [status, setStatus] = useState<ShareStatus>('idle');
+  const [shareUrl, setShareUrl] = useState('');
+  const [name, setName] = useState(getSavedName);
+  const [errorText, setErrorText] = useState('Unable to create a share link.');
+
+  const openShare = async () => {
+    setIsOpen(true);
+    setStatus('loading');
+    setShareUrl('');
+    setErrorText('Unable to create a share link.');
+
     try {
-      setStatus('copying');
       const shareResult = worldId ? await createBoardShareLink(worldId) : null;
-      const shareUrl = shareResult?.url
+      const nextUrl = shareResult?.url
         ? new URL(shareResult.url, window.location.origin).href
         : window.location.href;
+      setShareUrl(nextUrl);
+      setStatus('ready');
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 429) {
+        setErrorText('Too many requests. Try again shortly.');
+      } else if (error instanceof ApiRequestError && error.status === 403) {
+        setErrorText('You do not have access to share this board.');
+      } else if (error instanceof ApiRequestError) {
+        setErrorText(error.message);
+      }
+      setStatus('error');
+    }
+  };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  const qrUrl = useMemo(() => (
+    shareUrl
+      ? `https://quickchart.io/qr?text=${encodeURIComponent(shareUrl)}&size=240&margin=2`
+      : ''
+  ), [shareUrl]);
+
+  const saveName = (value: string) => {
+    setName(value);
+    try {
+      localStorage.setItem('CANVIO_COLLABORATOR_NAME', value.trim());
+    } catch {
+      // The name is optional; sharing still works when storage is blocked.
+    }
+    window.dispatchEvent(new CustomEvent('canvio:collaborator-name', {
+      detail: { name: value.trim() },
+    }));
+  };
+
+  const copyLink = async () => {
+    if (!shareUrl) return;
+    try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareUrl);
       } else {
@@ -28,27 +88,107 @@ export function ShareButton({ worldId }: { worldId: string }) {
         input.remove();
       }
       setStatus('copied');
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 429) {
-        setErrorText('Try again soon');
-      } else if (error instanceof ApiRequestError && error.status === 403) {
-        setErrorText('No access');
-      } else {
-        setErrorText('Copy failed');
-      }
+      window.setTimeout(() => setStatus((current) => current === 'copied' ? 'ready' : current), 1800);
+    } catch {
       setStatus('error');
+      setErrorText('Copy failed. Select the link and copy it manually.');
     }
+  };
 
-    setTimeout(() => {
-      setStatus('idle');
-      setErrorText('Copy failed');
-    }, 2000);
+  const nativeShare = async () => {
+    if (!shareUrl || !navigator.share) return copyLink();
+    try {
+      await navigator.share({
+        title: 'Canvio collaboration board',
+        text: 'Join my Canvio board',
+        url: shareUrl,
+      });
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') {
+        setErrorText('System sharing is unavailable. Copy the link instead.');
+      }
+    }
   };
 
   return (
-    <button className="share-btn" onClick={handleShare} title="Copy link to clipboard">
-      <IconShare size={16} />
-      <span>{status === 'copying' ? 'Sharing...' : status === 'copied' ? 'Copied!' : status === 'error' ? errorText : 'Share'}</span>
-    </button>
+    <>
+      <button className="share-btn" onClick={openShare} title="Share this board" aria-label="Share this board">
+        <IconShare size={16} />
+        <span>Share</span>
+      </button>
+
+      {isOpen && (
+        <div className="share-dialog__overlay" role="presentation" onClick={() => setIsOpen(false)}>
+          <section
+            className="share-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="share-dialog__header">
+              <div>
+                <p className="share-dialog__eyebrow">Live collaboration</p>
+                <h2 id="share-dialog-title">Invite people to this board</h2>
+              </div>
+              <button className="share-dialog__close" onClick={() => setIsOpen(false)} aria-label="Close share dialog" title="Close">
+                <IconX size={20} />
+              </button>
+            </header>
+
+            <label className="share-dialog__field">
+              <span>Your name</span>
+              <input
+                value={name}
+                onChange={(event) => saveName(event.target.value)}
+                placeholder="Enter your name"
+                autoComplete="name"
+              />
+            </label>
+
+            {status === 'loading' && (
+              <div className="share-dialog__loading" role="status">Creating a private collaboration link...</div>
+            )}
+
+            {status === 'error' && (
+              <div className="share-dialog__error" role="alert">
+                <span>{errorText}</span>
+                <button type="button" onClick={openShare}>Try again</button>
+              </div>
+            )}
+
+            {shareUrl && status !== 'loading' && (
+              <>
+                <div className="share-dialog__field">
+                  <span>Link</span>
+                  <div className="share-dialog__link-row">
+                    <input value={shareUrl} readOnly aria-label="Share link" onFocus={(event) => event.currentTarget.select()} />
+                    <button className="share-dialog__icon-action" onClick={nativeShare} aria-label="Share link" title="Share link">
+                      <IconShare size={19} />
+                    </button>
+                    <button className="share-dialog__copy-action" onClick={copyLink}>
+                      <IconCopy size={18} />
+                      <span>{status === 'copied' ? 'Copied' : 'Copy link'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="share-dialog__qr-wrap">
+                  <img src={qrUrl} alt="QR code for the Canvio collaboration link" />
+                </div>
+
+                <div className="share-dialog__privacy">
+                  <strong>
+                    <span className="material-symbols-outlined" aria-hidden="true">lock</span>
+                    Private board link
+                  </strong>
+                  <p>Only people with this link can join. Board content is not added to public search.</p>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+    </>
   );
 }

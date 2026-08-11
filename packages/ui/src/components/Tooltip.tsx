@@ -5,11 +5,12 @@ interface TooltipProps {
   content: ReactNode;
   children: ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
+  className?: string;
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top' }) => {
+export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', className = '' }) => {
   return (
-    <div className="canvio-tooltip-wrapper">
+    <div className={`canvio-tooltip-wrapper ${className}`.trim()}>
       {children}
       <div className={`canvio-tooltip canvio-tooltip-${position}`}>
         {content}

@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { LivingNode, Relation, useCanvasStore } from '../store/canvasStore';
-import { fitViewportToNodes } from './viewportFit';
+import { fitTemplateToViewport } from './viewportFit';
 
 export interface CanvasTemplate {
   id: string;
@@ -1018,5 +1018,5 @@ export function applyTemplate(templateId: string) {
   });
   relations.forEach((r) => store.addRelation(r));
 
-  fitViewportToNodes(insertedNodes);
+  fitTemplateToViewport(insertedNodes);
 }

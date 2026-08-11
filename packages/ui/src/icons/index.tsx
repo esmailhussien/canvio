@@ -58,6 +58,20 @@ export const IconArrowTool = (props: IconProps) => (
   </IconBase>
 );
 
+export const IconLaserPointer = (props: IconProps) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2v4" />
+    <path d="M12 18v4" />
+    <path d="M2 12h4" />
+    <path d="M18 12h4" />
+    <path d="m5 5 3 3" />
+    <path d="m16 16 3 3" />
+    <path d="m19 5-3 3" />
+    <path d="m8 16-3 3" />
+  </IconBase>
+);
+
 export const IconText = (props: IconProps) => (
   <IconBase {...props}>
     <polyline points="4 7 4 4 20 4 20 7" />

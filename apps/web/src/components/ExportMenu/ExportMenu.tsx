@@ -3,6 +3,7 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { CanvioBackupError, parseCanvioBackup } from '../../utils/backupSchema';
 import { exportAsJSON, exportAsPDF, exportAsPNG } from '../../utils/exportUtils';
 import { PRESET_TEMPLATES } from '../../utils/presetTemplates';
+import { fitTemplateToViewport } from '../../utils/viewportFit';
 import './ExportMenu.css';
 
 interface ExportMenuProps {
@@ -50,6 +51,7 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
 
     newNodes.forEach((n) => addNode(n));
     newRelations.forEach((r) => addRelation(r));
+    fitTemplateToViewport(newNodes);
     setShowPresets(false);
     onClose();
   };

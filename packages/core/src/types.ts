@@ -66,7 +66,7 @@ export interface NodePlugin<T extends Record<string, unknown> = Record<string, u
 }
 
 // Tool mode
-export type ToolMode = 'select' | 'pan' | 'draw' | 'highlighter' | 'arrow' | 'text' | 'sticky' | 'map' | 'relation' | 'eraser' | 'image' | 'shape' | 'frame' | 'code';
+export type ToolMode = 'select' | 'pan' | 'draw' | 'highlighter' | 'laser' | 'arrow' | 'text' | 'sticky' | 'map' | 'relation' | 'eraser' | 'image' | 'shape' | 'frame' | 'code';
 
 // User presence
 export interface UserPresence {

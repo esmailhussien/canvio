@@ -51,6 +51,10 @@
   gap: 4px;
 }
 
+.node-inspector__colors--frame {
+  padding: 0 2px;
+}
+
 .node-inspector__color-btn {
   width: 18px;
   height: 18px;

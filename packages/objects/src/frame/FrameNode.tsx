@@ -41,7 +41,10 @@ export const FrameNode: React.FC<FrameNodeProps> = ({ node, selected, onChange }
   const accentColor = data.color || 'var(--accent-primary)';
 
   return (
-    <div className={`frame-node ${selected ? 'frame-node--selected' : ''}`}>
+    <div
+      className={`frame-node ${selected ? 'frame-node--selected' : ''}`}
+      style={{ '--frame-accent': accentColor } as React.CSSProperties}
+    >
       {/* Frame Header Bar */}
       <div className="frame-node__header" style={{ color: accentColor }}>
         {isEditing ? (

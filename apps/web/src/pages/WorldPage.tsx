@@ -25,6 +25,7 @@ const TOOL_GUIDANCE: Record<string, { label: string; detail: string }> = {
   pan: { label: 'Pan', detail: 'Drag the canvas to move around. Release Space to return.' },
   draw: { label: 'Pen', detail: 'Draw freely. Select the stroke afterward to move it.' },
   highlighter: { label: 'Highlighter', detail: 'Mark an area, then switch to Select to move it.' },
+  laser: { label: 'Laser pointer', detail: 'Point at an idea while presenting. It is temporary and never saved.' },
   arrow: { label: 'Arrow', detail: 'Draw a line and Canvio will keep its arrow head editable.' },
   text: { label: 'Text', detail: 'Click anywhere to place a text block.' },
   sticky: { label: 'Sticky note', detail: 'Click anywhere to place a note.' },
@@ -306,6 +307,7 @@ export function WorldPage() {
   // Connect to collaboration
   const { connected, connectionIssue, users, persistenceState, retryConnection } = useCollaboration(worldId || '');
   const toolGuidance = TOOL_GUIDANCE[activeTool] || TOOL_GUIDANCE.select;
+  const showStarter = Object.keys(nodes).length === 0 && !isStarterDismissed && !isPresenting;
   const saveLabel = persistenceState === 'loading'
     ? 'Restoring board'
     : persistenceState === 'saving'
@@ -343,7 +345,7 @@ export function WorldPage() {
         focusNodeId={focusNodeId}
       />
 
-      {Object.keys(nodes).length === 0 && !isStarterDismissed && !isPresenting && (
+      {showStarter && (
         <div className="world-page__empty-launcher" aria-label="Start canvas">
           {/* Subtle animated magical background for empty state */}
           <div className="world-page__empty-bg-glow"></div>
@@ -428,14 +430,16 @@ export function WorldPage() {
       <Cursors users={users} />
       {!isPresenting && (
         <>
-          <div className="world-page__tool-status" role="status" aria-live="polite">
-            <span className="world-page__tool-status-main">
-              <span className="material-symbols-outlined">{activeTool === 'select' ? 'near_me' : 'edit'}</span>
-              <strong>{toolGuidance.label}</strong>
-            </span>
-            <span className="world-page__tool-status-detail">{toolGuidance.detail}</span>
-            {activeTool !== 'select' && <kbd>Esc</kbd>}
-          </div>
+          {!showStarter && (
+            <div className="world-page__tool-status" role="status" aria-live="polite">
+              <span className="world-page__tool-status-main">
+                <span className="material-symbols-outlined">{activeTool === 'select' ? 'near_me' : 'edit'}</span>
+                <strong>{toolGuidance.label}</strong>
+              </span>
+              <span className="world-page__tool-status-detail">{toolGuidance.detail}</span>
+              {activeTool !== 'select' && <kbd>Esc</kbd>}
+            </div>
+          )}
           <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
           <PenInspector
             autoShapeEnabled={autoShapeEnabled}
@@ -801,7 +805,7 @@ export function WorldPage() {
       />
 
       <AIAssistantModal isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
-      {!isPresenting && <Minimap />}
+      {!isPresenting && Object.keys(nodes).length > 0 && <Minimap />}
     </div>
   );
 }

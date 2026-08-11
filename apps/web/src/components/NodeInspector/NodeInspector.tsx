@@ -73,7 +73,6 @@ interface NodeInspectorProps {
 
 export function NodeInspector({ node }: NodeInspectorProps) {
   const [isExpanding, setIsExpanding] = useState(false);
-  const [isFrameColorOpen, setIsFrameColorOpen] = useState(false);
   const [isFrameMoreOpen, setIsFrameMoreOpen] = useState(false);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -228,10 +227,9 @@ export function NodeInspector({ node }: NodeInspectorProps) {
   const nodeScreenTop = viewportHeight / 2 + (node.position.y + viewport.y) * zoom;
   const nodeScreenBottom = nodeScreenTop + node.size.height * zoom;
   const nodeScreenHeight = node.size.height * zoom;
-  // Desktop has a second fixed selection toolbar below the header. Keep the
-  // inline inspector below that reserved band so frame controls never stack
-  // on top of "Experiment / Focus / Close" actions.
-  const topSafe = isCoarsePointer ? 86 : 190;
+  // Frames are commonly large enough to fill the viewport. Prefer the clear
+  // space above their border before placing controls over frame content.
+  const topSafe = isCoarsePointer ? 86 : isFrame ? 96 : 190;
   const bottomSafe = viewportHeight - (isCoarsePointer ? 150 : 118);
   const inspectorScreenHeight = isCoarsePointer ? 54 : 42;
   const gap = Math.max(36, 34 * scaleFactor);
@@ -461,34 +459,21 @@ export function NodeInspector({ node }: NodeInspectorProps) {
               <span>Fit</span>
             </button>
           </div>
-          <div className="node-inspector__frame-color">
-            <button
-              className="node-inspector__color-btn node-inspector__color-btn--frame selected"
-              style={{ backgroundColor: currentFrameColor }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsFrameColorOpen((prev) => !prev);
-                setIsFrameMoreOpen(false);
-              }}
-              title="Frame color"
-            />
-            {isFrameColorOpen && (
-              <div className="node-inspector__popover node-inspector__frame-color-popover" role="menu" aria-label="Frame colors">
-                {SHAPE_COLORS.map((c) => (
-                  <button
-                    key={c.id}
-                    className={`node-inspector__color-btn ${currentFrameColor === c.stroke ? 'selected' : ''}`}
-                    style={{ backgroundColor: c.stroke }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      updateNodeData(node.id, { color: c.stroke });
-                      setIsFrameColorOpen(false);
-                    }}
-                    title={`Change frame color to ${c.id}`}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="node-inspector__colors node-inspector__colors--frame" role="group" aria-label="Frame color">
+            {SHAPE_COLORS.map((c) => (
+              <button
+                key={c.id}
+                className={`node-inspector__color-btn ${currentFrameColor === c.stroke ? 'selected' : ''}`}
+                style={{ backgroundColor: c.stroke }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateNodeData(node.id, { color: c.stroke, fill: c.fill });
+                  setIsFrameMoreOpen(false);
+                }}
+                title={`Change frame color to ${c.id}`}
+                aria-label={`${c.id} frame color`}
+              />
+            ))}
           </div>
           <div className="node-inspector__divider" />
           <div className="node-inspector__frame-more">
@@ -497,7 +482,6 @@ export function NodeInspector({ node }: NodeInspectorProps) {
               onClick={(e) => {
                 e.stopPropagation();
                 setIsFrameMoreOpen((prev) => !prev);
-                setIsFrameColorOpen(false);
               }}
               title="More frame actions"
               aria-label="More frame actions"
