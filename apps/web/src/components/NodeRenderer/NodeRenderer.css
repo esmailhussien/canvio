@@ -59,6 +59,19 @@
   pointer-events: none;
 }
 
+/* A frame is a boundary, not a glass pane over its contents. */
+.node-renderer.node-type-frame {
+  pointer-events: none;
+}
+
+.node-renderer.node-type-frame .frame-node__header,
+.node-renderer.node-type-frame .frame-node__edge,
+.node-renderer.node-type-frame .node-port,
+.node-renderer.node-type-frame .resize-handle,
+.node-renderer.node-type-frame .node-inspector {
+  pointer-events: auto;
+}
+
 .node-renderer.node-type-drawing path,
 .node-renderer.node-type-drawing line,
 .node-renderer.node-type-drawing g,

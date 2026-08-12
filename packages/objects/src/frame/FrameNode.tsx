@@ -62,6 +62,7 @@ export const FrameNode: React.FC<FrameNodeProps> = ({ node, selected, onChange }
         ) : (
           <span
             className="frame-node__title"
+            data-node-drag-handle
             onDoubleClick={(e) => {
               e.stopPropagation();
               setIsEditing(true);
@@ -97,6 +98,10 @@ export const FrameNode: React.FC<FrameNodeProps> = ({ node, selected, onChange }
           borderColor: selected ? accentColor : 'var(--border-default)',
         }}
       />
+      <div className="frame-node__edge frame-node__edge--top" data-node-drag-handle aria-hidden="true" />
+      <div className="frame-node__edge frame-node__edge--right" data-node-drag-handle aria-hidden="true" />
+      <div className="frame-node__edge frame-node__edge--bottom" data-node-drag-handle aria-hidden="true" />
+      <div className="frame-node__edge frame-node__edge--left" data-node-drag-handle aria-hidden="true" />
     </div>
   );
 };

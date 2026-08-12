@@ -19,6 +19,12 @@
   letter-spacing: 0.03em;
   user-select: none;
   z-index: 5;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.frame-node__header:active {
+  cursor: grabbing;
 }
 
 .frame-node__title {
@@ -56,6 +62,54 @@
   border-radius: var(--radius-lg);
   transition: border-color var(--transition-fast), background-color var(--transition-fast);
   pointer-events: none;
+}
+
+.frame-node__edge {
+  position: absolute;
+  z-index: 4;
+  pointer-events: auto;
+}
+
+.frame-node__edge--top,
+.frame-node__edge--bottom {
+  left: 10px;
+  right: 10px;
+  height: 12px;
+  cursor: grab;
+}
+
+.frame-node__edge--left,
+.frame-node__edge--right {
+  top: 10px;
+  bottom: 10px;
+  width: 12px;
+  cursor: grab;
+}
+
+.frame-node__edge--top { top: -5px; }
+.frame-node__edge--right { right: -5px; }
+.frame-node__edge--bottom { bottom: -5px; }
+.frame-node__edge--left { left: -5px; }
+
+.frame-node__edge:active {
+  cursor: grabbing;
+}
+
+@media (pointer: coarse) {
+  .frame-node__edge--top,
+  .frame-node__edge--bottom {
+    height: 20px;
+  }
+
+  .frame-node__edge--left,
+  .frame-node__edge--right {
+    width: 20px;
+  }
+
+  .frame-node__edge--top { top: -9px; }
+  .frame-node__edge--right { right: -9px; }
+  .frame-node__edge--bottom { bottom: -9px; }
+  .frame-node__edge--left { left: -9px; }
 }
 
 .frame-node--selected .frame-node__body {
