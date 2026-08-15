@@ -1,11 +1,31 @@
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
   "headers": [
     {
-      "source": "/w/:path*",
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/w/(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",
           "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/(how-it-works|updates|support|sitemap.xml|robots.txt|llms.txt)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400"
         }
       ]
     }
@@ -14,6 +34,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://canvio-l3bk.onrender.com/api/:path*"
+    },
+    {
+      "source": "/w/:path*",
+      "destination": "/index.html"
     },
     {
       "source": "/(.*)",
