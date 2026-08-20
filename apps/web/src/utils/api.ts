@@ -37,7 +37,7 @@ export interface BoardRecord {
   url?: string;
 }
 
-export type AIProvider = 'gemini' | 'openai' | 'anthropic';
+export type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'groq';
 
 export interface AIContextNode {
   id: string;

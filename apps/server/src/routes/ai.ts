@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createAuthHook, createRateLimitHook, readPositiveIntEnv } from '../security.js';
 
-type AIProvider = 'gemini' | 'openai' | 'anthropic';
-type RelationshipType = 'related_to' | 'leads_to' | 'based_on' | 'part_of' | 'depends_on' | 'contradicts' | 'enables';
+type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'groq';
+type RelationshipType = 'related_to' | 'leads_to' | 'based_on' | 'part_of' | 'depends_on' | 'contradicts' | 'enables' | 'explains' | 'causes' | 'example_of' | 'mitigates' | 'inspired_by' | 'same_as' | 'custom';
 
 interface AIContextNode {
   id?: string;
@@ -57,10 +57,11 @@ interface RawAIRelation {
   targetPort?: unknown;
 }
 
-const PROVIDERS: AIProvider[] = ['gemini', 'openai', 'anthropic'];
-const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'enables'];
+const PROVIDERS: AIProvider[] = ['gemini', 'openai', 'anthropic', 'groq'];
+const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'enables', 'explains', 'causes', 'example_of', 'mitigates', 'inspired_by'];
 const NODE_TYPES = ['sticky', 'shape', 'text', 'frame'];
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 export async function aiRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', createRateLimitHook({
@@ -74,29 +75,26 @@ export async function aiRoutes(fastify: FastifyInstance) {
     const prompt = cleanText(request.body?.prompt, 4000);
     if (!prompt) return reply.code(400).send({ error: 'Prompt is required' });
 
-    const provider = resolveProvider(request.body?.provider);
-    const model = resolveModel(provider, request.body?.model);
-    const key = resolveApiKey(provider);
-    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
-
+    const primaryProvider = resolveProvider(request.body?.provider);
     const systemPrompt = buildBoardSystemPrompt();
     const userPrompt = `User request:\n${prompt}\n\n${buildGraphContext(request.body?.context)}`;
-    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
 
-    return {
-      source: 'server-ai',
-      provider,
-      model,
-      ...normalizeBoardPayload(parsed, prompt),
-    };
+    try {
+      const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
+      return {
+        source: 'server-ai',
+        provider,
+        model,
+        ...normalizeBoardPayload(parsed, prompt),
+      };
+    } catch (err: any) {
+      fastify.log.error({ err }, 'AI board generation failed');
+      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+    }
   });
 
   fastify.post('/summarize', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
-    const provider = resolveProvider(request.body?.provider);
-    const model = resolveModel(provider, request.body?.model);
-    const key = resolveApiKey(provider);
-    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
-
+    const primaryProvider = resolveProvider(request.body?.provider);
     const output = request.body?.output === 'article' ? 'article' : 'summary';
     const systemPrompt = buildBoardSystemPrompt();
     const userPrompt = output === 'article'
@@ -114,21 +112,22 @@ export async function aiRoutes(fastify: FastifyInstance) {
         buildGraphContext(request.body?.context),
       ].join('\n\n');
 
-    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
-    return {
-      source: 'server-ai',
-      provider,
-      model,
-      ...normalizeBoardPayload(parsed, output === 'article' ? 'Board article draft' : 'Board summary'),
-    };
+    try {
+      const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
+      return {
+        source: 'server-ai',
+        provider,
+        model,
+        ...normalizeBoardPayload(parsed, output === 'article' ? 'Board article draft' : 'Board summary'),
+      };
+    } catch (err: any) {
+      fastify.log.error({ err }, 'AI summarize failed');
+      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+    }
   });
 
   fastify.post('/organize', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
-    const provider = resolveProvider(request.body?.provider);
-    const model = resolveModel(provider, request.body?.model);
-    const key = resolveApiKey(provider);
-    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
-
+    const primaryProvider = resolveProvider(request.body?.provider);
     const nodes = (request.body?.context?.nodes || []).slice(0, 80);
     if (nodes.length === 0) return { source: 'server-ai', clusters: [] };
 
@@ -141,22 +140,23 @@ Return ONLY raw JSON:
 }
 Every input node id should appear in exactly one cluster when possible.`;
     const userPrompt = buildGraphContext(request.body?.context);
-    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
 
-    return {
-      source: 'server-ai',
-      provider,
-      model,
-      clusters: normalizeClusters(parsed, nodes),
-    };
+    try {
+      const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
+      return {
+        source: 'server-ai',
+        provider,
+        model,
+        clusters: normalizeClusters(parsed, nodes),
+      };
+    } catch (err: any) {
+      fastify.log.error({ err }, 'AI organize failed');
+      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+    }
   });
 
   fastify.post('/analyze-graph', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
-    const provider = resolveProvider(request.body?.provider);
-    const model = resolveModel(provider, request.body?.model);
-    const key = resolveApiKey(provider);
-    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
-
+    const primaryProvider = resolveProvider(request.body?.provider);
     const systemPrompt = `You are the Canvio Visual Reasoning Engine & Thinking Partner.
 Your goal is to critically evaluate the user's spatial knowledge graph, analyze their mental model, identify logical inconsistencies or contradictions, find missing evidentiary links, and suggest high-value connections.
 Return ONLY raw JSON with this exact schema:
@@ -189,21 +189,22 @@ Return ONLY raw JSON with this exact schema:
       buildGraphContext(request.body?.context),
     ].join('\n\n');
 
-    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
-    return {
-      source: 'server-ai',
-      provider,
-      model,
-      ...parsed,
-    };
+    try {
+      const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
+      return {
+        source: 'server-ai',
+        provider,
+        model,
+        ...parsed,
+      };
+    } catch (err: any) {
+      fastify.log.error({ err }, 'AI graph analysis failed');
+      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+    }
   });
 
   fastify.post('/challenge', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
-    const provider = resolveProvider(request.body?.provider);
-    const model = resolveModel(provider, request.body?.model);
-    const key = resolveApiKey(provider);
-    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
-
+    const primaryProvider = resolveProvider(request.body?.provider);
     const systemPrompt = `You are a Socratic Thinking Partner and Devil's Advocate for Canvio.
 Your job is NOT to blindly agree with the user's board, but to constructively stress-test their assumptions, expose blindspots, and provide steelmanned counter-arguments.
 Return ONLY raw JSON with this schema:
@@ -243,21 +244,22 @@ Return ONLY raw JSON with this schema:
       buildGraphContext(request.body?.context),
     ].join('\n\n');
 
-    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
-    return {
-      source: 'server-ai',
-      provider,
-      model,
-      ...parsed,
-    };
+    try {
+      const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
+      return {
+        source: 'server-ai',
+        provider,
+        model,
+        ...parsed,
+      };
+    } catch (err: any) {
+      fastify.log.error({ err }, 'AI challenge failed');
+      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+    }
   });
 
   fastify.post('/socratic', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
-    const provider = resolveProvider(request.body?.provider);
-    const model = resolveModel(provider, request.body?.model);
-    const key = resolveApiKey(provider);
-    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
-
+    const primaryProvider = resolveProvider(request.body?.provider);
     const systemPrompt = `You are a Socratic Inquirer for Canvio, assisting the user in learning and reasoning through mental model construction.
 Instead of giving direct answers or lecturing, formulate 3-5 deep, probing questions about the connections, causality, and mechanisms on their board.
 Return ONLY raw JSON:
@@ -278,24 +280,30 @@ Return ONLY raw JSON:
       buildGraphContext(request.body?.context),
     ].join('\n\n');
 
-    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
-    return {
-      source: 'server-ai',
-      provider,
-      model,
-      ...parsed,
-    };
+    try {
+      const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
+      return {
+        source: 'server-ai',
+        provider,
+        model,
+        ...parsed,
+      };
+    } catch (err: any) {
+      fastify.log.error({ err }, 'AI socratic failed');
+      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+    }
   });
 }
 
 function resolveProvider(provider?: string): AIProvider {
   if (provider && PROVIDERS.includes(provider as AIProvider)) return provider as AIProvider;
   const envProvider = process.env.CANVIO_AI_PROVIDER;
-  return PROVIDERS.includes(envProvider as AIProvider) ? envProvider as AIProvider : 'gemini';
+  return PROVIDERS.includes(envProvider as AIProvider) ? envProvider as AIProvider : 'groq';
 }
 
 function resolveModel(provider: AIProvider, model?: string) {
   const cleaned = cleanText(model, 80);
+  if (provider === 'groq') return cleaned || process.env.CANVIO_GROQ_MODEL || DEFAULT_GROQ_MODEL;
   if (provider === 'openai') return cleaned || process.env.CANVIO_OPENAI_MODEL || 'gpt-4o-mini';
   if (provider === 'anthropic') return cleaned || process.env.CANVIO_ANTHROPIC_MODEL || 'claude-3-5-sonnet';
 
@@ -306,48 +314,96 @@ function resolveModel(provider: AIProvider, model?: string) {
 }
 
 function resolveApiKey(provider: AIProvider) {
+  if (provider === 'groq') return process.env.CANVIO_GROQ_API_KEY || process.env.GROQ_API_KEY || '';
   if (provider === 'openai') return process.env.CANVIO_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
   if (provider === 'anthropic') return process.env.CANVIO_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
   return process.env.CANVIO_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 }
 
+async function callAIWithFallback(
+  primaryProvider: AIProvider,
+  requestedModel: string | undefined,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<{ parsed: any; provider: AIProvider; model: string }> {
+  const candidateProviders: AIProvider[] = [primaryProvider];
+  const defaultFallback: AIProvider = primaryProvider === 'groq' ? 'gemini' : 'groq';
+  const configuredFallback = (process.env.CANVIO_AI_FALLBACK_PROVIDER || defaultFallback) as AIProvider;
+
+  if (PROVIDERS.includes(configuredFallback) && !candidateProviders.includes(configuredFallback)) {
+    candidateProviders.push(configuredFallback);
+  }
+
+  // Also try any other provider with a valid key as a second safety net
+  for (const p of PROVIDERS) {
+    if (!candidateProviders.includes(p) && resolveApiKey(p)) {
+      candidateProviders.push(p);
+    }
+  }
+
+  let lastError: Error | null = null;
+  for (const prov of candidateProviders) {
+    const key = resolveApiKey(prov);
+    if (!key) continue;
+
+    const mod = resolveModel(prov, prov === primaryProvider ? requestedModel : undefined);
+    try {
+      const parsed = await callProviderForJson(prov, key, mod, systemPrompt, userPrompt);
+      return { parsed, provider: prov, model: mod };
+    } catch (err: any) {
+      console.warn(`[Canvio AI Fallback Agent] Provider "${prov}" failed:`, err?.message || err);
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  throw lastError || new Error('AI_NOT_CONFIGURED');
+}
+
 function buildBoardSystemPrompt() {
-  return `You are Spatial AI for Canvio, an infinite canvas knowledge workspace.
-Generate a structured spatial knowledge graph for the user's request.
-Relations are first-class meaning: read the existing graph before adding content, preserve useful links, and use relationship labels/types to explain flow, dependency, evidence, contradiction, and location. Map pins are individual endpoints, not just part of a map image.
-Return ONLY raw JSON with this schema:
+  return `You are Spatial AI for Canvio, an infinite canvas visual thinking & knowledge workspace.
+Your mission is to generate deep, highly useful, structured spatial knowledge graphs.
+Avoid generic meta-placeholders (never write "Add your idea here" or "Worked example placeholder"). Instead, ALWAYS write real, concrete, high-value subject matter content: actual rules, formulas, realistic code/grammar examples, pitfalls, and actionable takeaways.
+
+Content Guidelines:
+1. For Educational/Language/Math topics: Provide the real grammatical or mathematical formulas (e.g. "If + Present Simple, will + Verb"), real-world example sentences, common pitfalls to avoid (e.g. "❌ Incorrect vs ✅ Correct"), and a quick practice quiz node.
+2. For Engineering/System topics: Include actual architecture components, protocols, data flows, and failure modes.
+3. For Business/Strategy topics: Provide concrete metrics, risks, competitive moats, and next milestones.
+
+Spatial & Graph Rules:
+- Relations are first-class: Use descriptive labels on arrows (e.g., "satisfies", "causes", "transforms into", "example of").
+- Use visual variety: Place a central theme in a Shape (hexagon/rectangle), group topics logically with clear X/Y spacing (horizontal offset ~300px, vertical offset ~180px), use colored Stickies for sub-points, and put everything inside an overarching Frame.
+
+Return ONLY raw JSON with this exact schema:
 {
-  "title": "Short title",
+  "title": "Short descriptive board title",
   "nodes": [
     {
-      "id": "stable_local_id",
-      "type": "sticky",
+      "id": "node_1",
+      "type": "sticky", // 'sticky' | 'shape' | 'text' | 'frame'
       "position": { "x": 0, "y": 0 },
       "size": { "width": 260, "height": 140 },
       "data": {
-        "title": "Frame title",
-        "color": "blue",
-        "text": "Card text",
+        "title": "Node title (for frames)",
+        "color": "blue", // 'blue' | 'yellow' | 'green' | 'pink' | 'orange' | 'purple'
+        "text": "Detailed content with real rules & examples",
         "label": "Shape label",
-        "shape": "rectangle"
+        "shape": "rectangle" // 'rectangle' | 'circle' | 'diamond' | 'hexagon'
       }
     }
   ],
   "relations": [
     {
-      "sourceId": "stable_local_id",
-      "targetId": "other_local_id",
-      "label": "relationship label",
-      "relationship": "depends_on",
+      "sourceId": "node_1",
+      "targetId": "node_2",
+      "label": "descriptive relation label",
+      "relationship": "leads_to", // 'depends_on' | 'leads_to' | 'enables' | 'based_on' | 'contradicts' | 'part_of' | 'explains' | 'causes' | 'example_of' | 'mitigates' | 'related_to'
       "color": "#6366f1"
     }
   ]
 }
 Allowed node types: sticky, shape, text, frame.
-Sticky colors: blue, yellow, green, pink, orange, purple.
-Relationships: depends_on, leads_to, enables, based_on, contradicts, part_of, related_to.
-Keep the board practical, readable, and not more than 18 nodes unless the request clearly needs more.
-Use visual variety for diagrams: do not make every node a sticky note. For a board with four or more nodes, include a frame when useful, use a shape for the central concept or decision, use text for a clear title, and reserve sticky notes for supporting ideas. Keep frames behind their contents and place nodes with enough spacing for labeled relations.`;
+Allowed sticky colors: blue (rules/concepts), green (examples/success), yellow (warm-up/overview), pink (pitfalls/risks), purple (exercises/deep dive), orange (actions/next steps).
+Keep the board focused, highly readable, visually clean, and typically between 5 to 14 nodes.`;
 }
 
 function buildGraphContext(context?: AIRequestBody['context']) {
@@ -393,8 +449,12 @@ function buildGraphContext(context?: AIRequestBody['context']) {
 async function callProviderForJson(provider: AIProvider, apiKey: string, model: string, systemPrompt: string, userPrompt: string) {
   let text = '';
 
-  if (provider === 'openai') {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  if (provider === 'openai' || provider === 'groq') {
+    const endpoint = provider === 'groq'
+      ? 'https://api.groq.com/openai/v1/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions';
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -410,7 +470,10 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
       }),
       signal: AbortSignal.timeout(25_000),
     });
-    if (!response.ok) throw new Error(`OpenAI API HTTP ${response.status}`);
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      throw new Error(`${provider.toUpperCase()} API HTTP ${response.status}: ${errBody}`);
+    }
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     text = data.choices?.[0]?.message?.content || '';
   } else if (provider === 'anthropic') {
@@ -429,7 +492,10 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
       }),
       signal: AbortSignal.timeout(25_000),
     });
-    if (!response.ok) throw new Error(`Anthropic API HTTP ${response.status}`);
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      throw new Error(`Anthropic API HTTP ${response.status}: ${errBody}`);
+    }
     const data = await response.json() as { content?: Array<{ text?: string }> };
     text = data.content?.[0]?.text || '';
   } else {
@@ -448,7 +514,10 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
       }),
       signal: AbortSignal.timeout(25_000),
     });
-    if (!response.ok) throw new Error(`Gemini API HTTP ${response.status}`);
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      throw new Error(`Gemini API HTTP ${response.status}: ${errBody}`);
+    }
     const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
     text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }

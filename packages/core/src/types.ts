@@ -18,11 +18,11 @@ export interface LivingNode {
   updatedAt: number;
 }
 
-// Relation — semantic connection between nodes
 export type RelationshipType =
   | 'related_to' | 'leads_to' | 'based_on' | 'part_of'
   | 'depends_on' | 'contradicts' | 'same_as' | 'enables'
-  | 'inspired_by' | 'custom';
+  | 'inspired_by' | 'explains' | 'causes' | 'example_of'
+  | 'mitigates' | 'custom';
 
 export interface RelationStyle {
   type: 'straight' | 'curved' | 'orthogonal';

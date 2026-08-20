@@ -287,7 +287,7 @@ function getRelationEndpointName(node: LivingNode | undefined, port?: string) {
 }
 
 function normalizeProvider(provider?: string): AIProvider | undefined {
-  return provider === 'openai' || provider === 'anthropic' || provider === 'gemini' ? provider : undefined;
+  return provider === 'openai' || provider === 'anthropic' || provider === 'gemini' || provider === 'groq' ? provider : undefined;
 }
 
 function getAIFallbackMessage(error: unknown) {
@@ -1030,40 +1030,103 @@ export function generateSpatialBoard(prompt: string): SpatialAIResult {
     };
   }
 
-  if (p.includes('lesson') || p.includes('study') || p.includes('quiz') || p.includes('student') || p.includes('teacher') || p.includes('classroom') || p.includes('education')) {
+  // Specific Grammar & Conditionals Board
+  if (p.includes('condition') || p.includes('conditional') || p.includes('grammar') || p.includes('if clause') || p.includes('english')) {
     const frameId = nanoid(10);
-    const topicId = nanoid(10);
-    const goalId = nanoid(10);
-    const warmupId = nanoid(10);
-    const explainId = nanoid(10);
-    const activityId = nanoid(10);
-    const checkId = nanoid(10);
+    const centerId = nanoid(10);
+    const zeroId = nanoid(10);
+    const firstId = nanoid(10);
+    const secondId = nanoid(10);
+    const thirdId = nanoid(10);
+    const pitfallsId = nanoid(10);
     const quizId = nanoid(10);
-    const reviewId = nanoid(10);
 
     const nodes: LivingNode[] = [
-      frame(frameId, cx - 540, cy - 290, 1080, 580, 'AI Learning Board', '#38bdf8'),
-      shape(topicId, cx - 125, cy - 80, 250, 130, prompt.slice(0, 42) || 'Learning Topic', 'rgba(56, 189, 248, 0.16)', '#38bdf8', 'ellipse', 5),
-      sticky(goalId, cx - 500, cy - 210, 250, 130, 'Learning goal\nWhat should learners understand or be able to do?', 'blue', 1),
-      sticky(warmupId, cx - 500, cy + 10, 250, 130, 'Warm-up\nOne quick question to activate prior knowledge.', 'yellow', 2),
-      sticky(explainId, cx - 135, cy - 245, 270, 130, 'Explanation\nKey idea, worked example, visual model, or mini demo.', 'purple', 3),
-      sticky(activityId, cx + 250, cy - 210, 250, 130, 'Student activity\nPractice, discussion, pair work, or board response.', 'green', 4),
-      sticky(checkId, cx + 250, cy + 10, 250, 130, 'Check understanding\nWhat evidence shows the idea is clear?', 'orange', 6),
-      sticky(quizId, cx - 135, cy + 150, 270, 130, 'Quiz prompts\n1. Recall\n2. Apply\n3. Explain the mistake\n4. Reflect', 'pink', 7),
-      shape(reviewId, cx + 250, cy + 210, 250, 92, 'Review Plan', 'rgba(34, 197, 94, 0.14)', '#22c55e', 'rectangle', 8),
+      frame(frameId, cx - 620, cy - 350, 1240, 700, '📚 English Grammar: Conditional Sentences (If Clauses)', '#6366f1'),
+      shape(centerId, cx - 110, cy - 40, 220, 110, 'English If Conditionals\n(Rules & Usage)', 'rgba(99, 102, 241, 0.2)', '#6366f1', 'hexagon', 5),
+      sticky(zeroId, cx - 560, cy - 250, 250, 160, '0️⃣ Zero Conditional\n\n📐 Rule: If + Present Simple, ... Present Simple\n💡 Usage: Scientific truths & universal facts\n📝 Example: "If water reaches 100°C, it boils."', 'blue', 1),
+      sticky(firstId, cx + 310, cy - 250, 250, 160, '1️⃣ First Conditional\n\n📐 Rule: If + Present Simple, ... will + Verb\n💡 Usage: Real possibilities in the future\n📝 Example: "If you study hard, you will pass the exam."', 'green', 2),
+      sticky(secondId, cx - 560, cy + 90, 250, 160, '2️⃣ Second Conditional\n\n📐 Rule: If + Past Simple, ... would + Verb\n💡 Usage: Imaginary present / hypothetical situations\n📝 Example: "If I won the lottery, I would travel the world."', 'yellow', 3),
+      sticky(thirdId, cx + 310, cy + 90, 250, 160, '3️⃣ Third Conditional\n\n📐 Rule: If + Past Perfect, ... would have + V3\n💡 Usage: Impossible past conditions & regrets\n📝 Example: "If I had set an alarm, I would not have been late."', 'orange', 4),
+      sticky(pitfallsId, cx - 270, cy - 280, 250, 140, '⚠️ Common Pitfalls\n\n❌ "If it will rain tomorrow..."\n✅ "If it rains tomorrow..."\n💡 Never use "will" inside the if-clause!', 'pink', 6),
+      sticky(quizId, cx + 20, cy - 280, 250, 140, '✍️ Quick Practice Quiz\n\n1. "If she _____ (call), tell her I will call back."\n2. "If I _____ (know) the answer, I would tell you."', 'purple', 7),
     ];
 
     return {
-      title: 'AI Learning Board',
+      title: 'English Conditional Sentences',
       nodes,
       relations: [
-        relation(goalId, topicId, 'sets focus', '#38bdf8', 'leads_to'),
-        relation(warmupId, topicId, 'prepares', '#f59e0b', 'leads_to'),
-        relation(topicId, explainId, 'explained by', '#8b5cf6', 'leads_to'),
-        relation(explainId, activityId, 'practiced in', '#22c55e', 'leads_to'),
-        relation(activityId, checkId, 'reveals', '#f59e0b', 'based_on'),
-        relation(checkId, quizId, 'turns into', '#ec4899', 'leads_to'),
-        relation(quizId, reviewId, 'drives', '#22c55e', 'leads_to'),
+        relation(centerId, zeroId, 'explains facts', '#3b82f6', 'explains'),
+        relation(centerId, firstId, 'future chances', '#22c55e', 'leads_to'),
+        relation(centerId, secondId, 'unreal present', '#eab308', 'explains'),
+        relation(centerId, thirdId, 'past regrets', '#f97316', 'based_on'),
+        relation(firstId, pitfallsId, 'watch out', '#ec4899', 'contradicts'),
+        relation(firstId, quizId, 'test your knowledge', '#a855f7', 'leads_to'),
+      ],
+    };
+  }
+
+  // 5 Whys Root Cause
+  if (p.includes('5 why') || p.includes('root cause') || p.includes('why why')) {
+    const frameId = nanoid(10);
+    const probId = nanoid(10);
+    const w1Id = nanoid(10);
+    const w2Id = nanoid(10);
+    const w3Id = nanoid(10);
+    const rootId = nanoid(10);
+    const mitId = nanoid(10);
+
+    const nodes: LivingNode[] = [
+      frame(frameId, cx - 600, cy - 240, 1200, 480, '🔍 5 Whys Root Cause Analysis', '#ef4444'),
+      shape(probId, cx - 560, cy - 60, 170, 120, '🚨 Problem\nStatement', 'rgba(239, 68, 68, 0.2)', '#ef4444', 'diamond', 1),
+      sticky(w1Id, cx - 350, cy - 60, 160, 120, '1. Why?\nDirect symptom / observable trigger event.', 'yellow', 2),
+      sticky(w2Id, cx - 160, cy - 60, 160, 120, '2. Why?\nImmediate mechanism failure.', 'orange', 3),
+      sticky(w3Id, cx + 30, cy - 60, 160, 120, '3. Why?\nOperating standard / procedure gap.', 'pink', 4),
+      shape(rootId, cx + 220, cy - 60, 160, 120, '🎯 Root Cause\nSystemic Driver', 'rgba(139, 92, 246, 0.22)', '#8b5cf6', 'hexagon', 5),
+      sticky(mitId, cx + 410, cy - 60, 160, 120, '🛡️ Safeguard\nPermanent fix & preventive action.', 'green', 6),
+    ];
+
+    return {
+      title: '5 Whys Root Cause Analysis',
+      nodes,
+      relations: [
+        relation(probId, w1Id, 'why?', '#f59e0b', 'causes'),
+        relation(w1Id, w2Id, 'why?', '#f97316', 'causes'),
+        relation(w2Id, w3Id, 'why?', '#ec4899', 'causes'),
+        relation(w3Id, rootId, 'uncovers', '#8b5cf6', 'leads_to'),
+        relation(rootId, mitId, 'mitigates', '#22c55e', 'mitigates'),
+      ],
+    };
+  }
+
+  if (p.includes('lesson') || p.includes('study') || p.includes('quiz') || p.includes('student') || p.includes('teacher') || p.includes('classroom') || p.includes('education')) {
+    const frameId = nanoid(10);
+    const topicId = nanoid(10);
+    const coreRuleId = nanoid(10);
+    const exampleId = nanoid(10);
+    const practiceId = nanoid(10);
+    const pitfallId = nanoid(10);
+    const quizId = nanoid(10);
+
+    const nodes: LivingNode[] = [
+      frame(frameId, cx - 540, cy - 290, 1080, 580, `Interactive Learning: ${prompt.slice(0, 36)}`, '#38bdf8'),
+      shape(topicId, cx - 110, cy - 40, 220, 110, prompt.slice(0, 36) || 'Core Subject', 'rgba(56, 189, 248, 0.18)', '#38bdf8', 'hexagon', 5),
+      sticky(coreRuleId, cx - 480, cy - 220, 250, 140, '💡 Core Principle & Rules\nKey concepts, fundamental formulas, and operational definitions.', 'blue', 1),
+      sticky(exampleId, cx + 230, cy - 220, 250, 140, '📝 Worked Examples\nRealistic scenario walkthrough with step-by-step resolution.', 'green', 2),
+      sticky(pitfallId, cx - 480, cy + 60, 250, 140, '⚠️ Common Misconceptions\nFrequent errors to avoid and contrast between valid and invalid patterns.', 'pink', 3),
+      sticky(practiceId, cx + 230, cy + 60, 250, 140, '✍️ Guided Practice\nInteractive exercises and application challenges for learners.', 'yellow', 4),
+      sticky(quizId, cx - 125, cy + 130, 250, 120, '🎯 Check Understanding\n1. Explain the mechanism\n2. Solve edge case\n3. Self-evaluate', 'purple', 6),
+    ];
+
+    return {
+      title: `Learning Board: ${prompt.slice(0, 32)}`,
+      nodes,
+      relations: [
+        relation(topicId, coreRuleId, 'defines', '#38bdf8', 'explains'),
+        relation(coreRuleId, exampleId, 'demonstrated by', '#22c55e', 'example_of'),
+        relation(topicId, pitfallId, 'warns against', '#ec4899', 'contradicts'),
+        relation(exampleId, practiceId, 'practiced in', '#eab308', 'leads_to'),
+        relation(practiceId, quizId, 'evaluates', '#a855f7', 'leads_to'),
       ],
     };
   }

@@ -73,9 +73,14 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
           <div className="template-sidebar__brand">
             <div className="template-sidebar__logo">
               <CanvioLogoIcon size={24} />
-              <span className="template-sidebar__title">Canvio</span>
+              <div className="template-sidebar__brand-text">
+                <span className="template-sidebar__title">Canvio</span>
+                <span className="template-sidebar__badge">Template Library</span>
+              </div>
             </div>
-            <span className="template-sidebar__badge">Template Library</span>
+            <button className="template-sidebar__mobile-close" onClick={onClose} title="Close Template Library" aria-label="Close template library">
+              <IconX size={18} />
+            </button>
           </div>
 
           <nav className="template-sidebar__nav">

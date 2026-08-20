@@ -595,15 +595,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 24px;
+  gap: 24px;
+  padding: 24px 28px;
+}
+
+.support-cta-band > div:first-child {
+  min-width: 0;
+  flex: 1;
 }
 
 .support-cta-band__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.support-cta-band__actions .support-btn-primary,
+.support-cta-band__actions .support-btn-secondary {
+  white-space: nowrap;
+  padding: 10px 16px;
+  font-size: 0.88rem;
 }
 
 .support-footer {

@@ -31,11 +31,13 @@ const RELATION_TYPES: {
   { id: 'part_of', label: 'Part of', Icon: IconPartOf, shortcut: '5', color: '#8b5cf6' },
   { id: 'leads_to', label: 'Leads to', Icon: IconLeadsTo, shortcut: '6', color: '#3b82f6' },
   { id: 'inspired_by', label: 'Inspired by', Icon: IconInspiredBy, shortcut: '7', color: '#ec4899' },
-  { id: 'related_to', label: 'Related to', Icon: IconRelatedTo, shortcut: '8', color: '#94a3b8' },
+  { id: 'explains', label: 'Explains', Icon: IconBasedOn, shortcut: '8', color: '#8b5cf6' },
+  { id: 'causes', label: 'Causes', Icon: IconLeadsTo, shortcut: '9', color: '#f97316' },
+  { id: 'related_to', label: 'Related to', Icon: IconRelatedTo, shortcut: '0', color: '#94a3b8' },
 ];
 
 const SUGGESTED_LABELS = [
-  'blocks', 'accelerates', 'validates', 'mitigates', 'critical dependency', 'alternative to', 'direct consequence', 'evidenced by'
+  'explains', 'causes', 'example of', 'mitigates', 'future outcome', 'rule for', 'watch out', 'blocks', 'accelerates', 'validates', 'critical dependency', 'alternative to', 'direct consequence', 'evidenced by'
 ];
 
 const LINE_COLORS = [
