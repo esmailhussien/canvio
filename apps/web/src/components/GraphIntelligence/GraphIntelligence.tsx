@@ -7,7 +7,7 @@ import {
   socraticInquiryWithAIAsync,
 } from '../../utils/spatialAIEngine';
 import { fitViewportToNodes } from '../../utils/viewportFit';
-import { GraphInsight } from '@canvio/core';
+import { GraphInsight, RelationshipType } from '@canvio/core';
 import './GraphIntelligence.css';
 
 interface GraphIntelligenceProps {
@@ -130,7 +130,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
       id: Math.random().toString(36).slice(2, 11),
       sourceId: bridge.sourceId,
       targetId: bridge.targetId,
-      relationship: (bridge.relationship || 'leads_to') as any,
+      relationship: (bridge.relationship || 'leads_to') as RelationshipType,
       label: bridge.label || 'informs',
       style: {
         type: 'orthogonal' as const,

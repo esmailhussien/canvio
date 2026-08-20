@@ -431,10 +431,10 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-    const prevent = (e: Event) => e.preventDefault();
-    el.addEventListener('wheel', prevent as any, { passive: false });
+    const prevent: EventListener = (e) => e.preventDefault();
+    el.addEventListener('wheel', prevent, { passive: false });
     return () => {
-      el.removeEventListener('wheel', prevent as any);
+      el.removeEventListener('wheel', prevent);
     };
   }, []);
 

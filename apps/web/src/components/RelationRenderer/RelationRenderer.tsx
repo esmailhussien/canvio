@@ -32,14 +32,14 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
 
 function getNodeGeoCoords(node: LivingNode, portId?: string): [number, number] | null {
   if (!node || node.type !== 'map' || !node.data) return null;
-  const data = node.data as any;
-  const markers = Array.isArray(data.markers) ? data.markers : [];
+  const data = node.data;
+  const markers = Array.isArray(data.markers) ? data.markers as Array<{ id: string; position: [number, number] }> : [];
 
   if (portId && portId.startsWith('marker:')) {
     const markerId = portId.replace('marker:', '');
-    const found = markers.find((m: any) => m.id === markerId);
+    const found = markers.find((m) => m.id === markerId);
     if (found && Array.isArray(found.position) && found.position.length === 2) {
-      return found.position as [number, number];
+      return found.position;
     }
   }
 

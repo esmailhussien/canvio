@@ -683,24 +683,24 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     >
       {/* Type specific rendering */}
       <div className="node-content" style={{ width: '100%', height: '100%' }}>
-        {node.type === 'drawing' && <DrawingNode node={node as any} />}
-        {node.type === 'sticky' && <StickyNote node={node as any} selected={isSelected} onChange={updateNode as any} />}
+        {node.type === 'drawing' && <DrawingNode node={node} />}
+        {node.type === 'sticky' && <StickyNote node={node} selected={isSelected} onChange={updateNode} />}
         {node.type === 'map' && (
           <MapNode
-            node={node as any}
+            node={node}
             selected={isSelected}
-            onChange={updateNode as any}
+            onChange={updateNode}
             relationMode={!presentationMode && activeTool === 'relation'}
             relationSourcePort={relationSourceId === node.id ? relationSourcePort : null}
             onMarkerRelation={handleMarkerRelation}
             onMarkerRelationHover={handleMarkerRelationHover}
           />
         )}
-        {node.type === 'text' && <TextNode node={node as any} selected={isSelected} onChange={updateNode as any} />}
-        {node.type === 'image' && <ImageNode node={node as any} selected={isSelected} onChange={updateNode as any} />}
-        {node.type === 'shape' && <ShapeNode node={node as any} selected={isSelected} onChange={updateNode as any} />}
-        {node.type === 'frame' && <FrameNode node={node as any} selected={isSelected} onChange={updateNode as any} />}
-        {node.type === 'code' && <CodeNode node={node as any} selected={isSelected} onChange={updateNode as any} />}
+        {node.type === 'text' && <TextNode node={node} selected={isSelected} onChange={updateNode} />}
+        {node.type === 'image' && <ImageNode node={node} selected={isSelected} onChange={updateNode} />}
+        {node.type === 'shape' && <ShapeNode node={node} selected={isSelected} onChange={updateNode} />}
+        {node.type === 'frame' && <FrameNode node={node} selected={isSelected} onChange={updateNode} />}
+        {node.type === 'code' && <CodeNode node={node} selected={isSelected} onChange={updateNode} />}
       </div>
 
       {/* Interactive Connection Ports (rendered on hover, selection, or relation mode) */}
