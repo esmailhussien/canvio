@@ -2,23 +2,44 @@
 
 ### *Connect ideas. Create knowledge.*
 
-> The first collaborative workspace built on maps. Free. Open source. No signup.
+> A visual reasoning workspace where the spatial layout is the thinking — and AI acts as a partner that reads the structure, not a generator that replaces it.
 
-Canvio is an infinite canvas where every element is a **Living Node** — objects that understand their content and connect with meaningful **Relations**. Drop a map, draw, write, connect — all in real-time with anyone, no account needed.
+Canvio is an infinite canvas built for structured visual work. Every element is a **Living Node** — an object that understands its content and connects to other objects through **Semantic Relations** that carry logical meaning. Draw freely, connect deliberately, and let the graph intelligence surface what your board is actually saying.
 
-## ✨ Features (Phase 0)
+**No signup required.** Open a board, share the URL, start working.
 
-- 🎨 **Infinite Canvas** — pan, zoom, draw without limits
-- 🗺️ **Living Map Node** — real interactive maps with markers, satellite view, multiple tile layers
-- 📝 **Sticky Notes** — colored cards with rich text
-- ✏️ **Freehand Drawing** — pressure-sensitive, beautiful strokes
-- 🔗 **Semantic Relations** — labeled connections that carry meaning
-- 👥 **Real-Time Collaboration** — live cursors, instant sync via Yjs
-- 🔗 **Share via URL** — no signup required, just send the link
-- 💾 **Auto-Save** — never lose your work
-- 🌙 **Dark Mode** — premium dark theme by default
+---
 
-## 🚀 Quick Start
+## What Canvio Does
+
+### Canvas & Objects
+- **Infinite canvas** — pan, zoom, snap grid, multi-select, keyboard-driven workflow
+- **8 node types** — sticky notes, text blocks, interactive maps, images, shapes, frames, code blocks, and drawings
+- **Freehand ink layer** — pressure-sensitive pen and highlighter on a separate layer that never enters the semantic graph
+- **Ink-to-Sticky conversion** — measure a sketch's bounding box and convert it to an editable, connectable note in one click
+
+### Semantic Relations
+- **Quick-Connect drag** — drag from any node edge port to connect to an existing note, or drop on empty canvas to auto-spawn a connected sticky
+- **8 relationship types** — Contradicts, Depends on, Enables, Based on, Part of, Leads to, Inspired by, Related to
+- **Keyboard hotkeys** — press `1`–`8` while a relation is selected to assign its type instantly
+- **Custom vector icons** — each type has a distinct color, dash pattern, animation, and SVG icon rendered directly on the canvas
+
+### Graph Intelligence
+- **Reasoning Partner** (`Ctrl+Shift+R`) — local graph analysis with health score (0–100), orphan detection, contradiction pairs, critical path identification
+- **Challenge Mode** — AI tests weak assumptions and unanchored claims in your board
+- **Socratic Inquiry** — generates follow-up questions from your graph structure
+- **AI Navigator** (`Ctrl+K`) — prompt-based board generation that creates structured nodes and relations
+
+### Collaboration & Presentation
+- **Real-time sync** — live cursors, instant updates via Yjs with offline IndexedDB fallback
+- **URL sharing** — no accounts, no signup, just send the link
+- **Presenter mode** — hide editing UI for clean walkthroughs
+- **Laser pointer** (`Q`) — guide attention without creating permanent marks
+- **Export** — PNG, PDF, and JSON snapshots
+
+---
+
+## Quick Start
 
 ### Prerequisites
 - Node.js 20+
@@ -42,10 +63,10 @@ The app runs at `http://localhost:5173`
 docker compose up
 ```
 
-### Server-side Gemini AI
+### Server-side AI Configuration
 
-Canvio can use Gemini 2.5 Flash through the API server. Keep the provider key on
-the server only; never add it to the web app, a `VITE_*` variable, localStorage,
+Canvio uses Gemini 2.5 Flash through the API server. The provider key stays on
+the server only — never add it to the web app, a `VITE_*` variable, localStorage,
 the URL, or a committed file. Copy `apps/server/.env.example` as a reference
 and configure these as server environment variables:
 
@@ -63,31 +84,70 @@ For a public deployment, add real user/session authentication before enabling
 `CANVIO_REQUIRE_AI_AUTH=true`. Origin checks and rate limits reduce abuse but do
 not replace authentication.
 
-## 🏗️ Architecture
+---
+
+## Architecture
 
 ```
 canvio/
 ├── packages/
 │   ├── core/           # Canvas engine, types, Zustand store
-│   ├── collaboration/  # Yjs real-time sync
-│   ├── objects/        # Living Node implementations
-│   └── ui/             # Design system, icons, components
+│   ├── collaboration/  # Yjs real-time sync with offline fallback
+│   ├── objects/        # Living Node plugins (8 types)
+│   └── ui/             # Design system, icons (30+), toolbar, components
 ├── apps/
-│   ├── web/            # React + Vite frontend
-│   └── server/         # Fastify + Yjs WebSocket backend
+│   ├── web/            # React + Vite frontend (11 prerendered routes)
+│   └── server/         # Fastify + Yjs WebSocket + AI proxy
+├── scripts/            # Prerender, smoke tests, e2e
 └── docker/             # Docker Compose setup
 ```
 
-**Tech Stack:** React 19, TypeScript, Vite, Zustand, Yjs, Leaflet, Fastify, PostgreSQL
+### Key Components
 
-## 🤝 Contributing
+| Component | Path | Purpose |
+|---|---|---|
+| Canvas | `apps/web/src/components/Canvas/` | Infinite canvas with pan, zoom, snap, selection |
+| NodeRenderer | `apps/web/src/components/NodeRenderer/` | Renders all node types with edge ports for Quick-Connect |
+| RelationRenderer | `apps/web/src/components/RelationRenderer/` | Semantic line rendering with type-specific visuals |
+| RelationInspector | `apps/web/src/components/RelationInspector/` | Floating inspector for relation type, label, and assertions |
+| FreeInkLayer | `apps/web/src/components/FreeInkLayer/` | Pressure-sensitive ink, highlighter, eraser (separate from graph) |
+| GraphIntelligence | `apps/web/src/components/GraphIntelligence/` | Reasoning Partner panel with graph health analysis |
+| AIAssistantModal | `apps/web/src/components/AIAssistantModal/` | AI Navigator for prompt-based board generation |
 
-Canvio is open source under the AGPL-3.0 license. Contributions are welcome!
+### Tech Stack
 
-## 📄 License
-
-[AGPL-3.0](LICENSE) — free to use, modify, and distribute. If you run a modified version as a service, you must share your changes.
+React 19 · TypeScript · Vite · Zustand · Yjs · Leaflet · perfect-freehand · Fastify · PostgreSQL
 
 ---
 
-**❤️ Support Canvio** — If this project helps you, [support its development](https://github.com/sponsors/canvio).
+## Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| `V` | Select and move |
+| `P` | Freehand pen |
+| `E` | Stroke eraser |
+| `Q` | Laser pointer |
+| `1` – `8` | Assign semantic relation type |
+| `Ctrl + K` | AI Navigator |
+| `Ctrl + Shift + R` | Reasoning Partner |
+| `Space + drag` | Pan canvas |
+| `Ctrl + Z` / `Ctrl + Y` | Undo / Redo |
+
+---
+
+## Project Status
+
+**Phases A & B are complete.** The core workspace is fully functional with semantic relations, freehand ink, graph intelligence, real-time collaboration, and AI-assisted board generation.
+
+**Phase C (next):** Public Worlds (read-only sharing), Board Forking ("Remix this thinking"), and a Community Gallery for discoverable templates.
+
+---
+
+## Contributing
+
+Canvio is open source under the AGPL-3.0 license. Contributions are welcome.
+
+## License
+
+[AGPL-3.0](LICENSE) — free to use, modify, and distribute. If you run a modified version as a service, you must share your changes.
