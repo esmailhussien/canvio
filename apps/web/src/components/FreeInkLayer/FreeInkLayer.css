@@ -6,6 +6,7 @@
   height: 100000px;
   overflow: visible;
   pointer-events: none;
+  z-index: 35;
 }
 
 .free-ink-stroke {
@@ -13,7 +14,7 @@
 }
 
 .free-ink-stroke--highlighter {
-  mix-blend-mode: screen;
+  mix-blend-mode: normal;
 }
 
 [data-theme="light"] .free-ink-stroke--highlighter {

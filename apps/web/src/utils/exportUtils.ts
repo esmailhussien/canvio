@@ -732,7 +732,6 @@ export async function exportAsPNG(worldId: string) {
   }
 
   drawRelations(ctx, allRelations, nodes, minX, minY, casingColor, labelBg, textColor);
-  drawFreeInkStrokes(ctx, inkStrokes, minX, minY);
 
   for (const node of allNodes) {
     const x = node.position.x - minX;
@@ -764,6 +763,9 @@ export async function exportAsPNG(worldId: string) {
       }
     }
   }
+
+  // Draw free ink & highlighter annotations on top of nodes
+  drawFreeInkStrokes(ctx, inkStrokes, minX, minY);
 
   await new Promise<void>((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -881,6 +883,7 @@ async function renderRegionToCanvas(
   const store = useCanvasStore.getState();
   const nodes = store.nodes || {};
   const relations = store.relations || {};
+  const inkStrokes = store.inkStrokes || [];
   const allNodes = Object.values(nodes).sort((a, b) => a.zIndex - b.zIndex);
   const allRelations = Object.values(relations);
   const canvasBackground = store.canvasBackground || (store.theme === 'light' ? '#ffffff' : '#0a0a0f');
@@ -954,6 +957,9 @@ async function renderRegionToCanvas(
       }
     }
   }
+
+  // Draw free ink & highlighter annotations on top of nodes
+  drawFreeInkStrokes(ctx, inkStrokes, minX, minY);
 
   const widthPt = exportWidth * 0.75;
   const heightPt = exportHeight * 0.75;

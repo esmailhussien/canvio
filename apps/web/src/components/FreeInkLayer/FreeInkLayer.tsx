@@ -53,7 +53,7 @@ export const FreeInkLayer: React.FC<FreeInkLayerProps> = ({ presentationMode = f
         height: 100000,
         overflow: 'visible',
         pointerEvents: 'none',
-        zIndex: 5,
+        zIndex: 35,
       }}
       viewBox="-50000 -50000 100000 100000"
       aria-label="Freehand ink annotations"
@@ -69,7 +69,7 @@ export const FreeInkLayer: React.FC<FreeInkLayerProps> = ({ presentationMode = f
           key={s.id}
           d={s.pathData}
           fill={s.color}
-          opacity={s.opacity}
+          fillOpacity={s.opacity}
           className={`free-ink-stroke ${s.isHighlighter ? 'free-ink-stroke--highlighter' : ''} ${isEraser ? 'free-ink-stroke--erasable' : ''}`}
           style={{
             pointerEvents: isEraser ? 'auto' : 'none',

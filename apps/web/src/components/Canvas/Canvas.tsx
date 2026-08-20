@@ -617,9 +617,6 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           <RelationRenderer relations={relations} nodes={nodes} presentationMode={presentationMode} focusNodeId={focusNodeId} />
         </div>
 
-        {/* Free Ink Layer (Freehand annotations & sketch overlay) */}
-        <FreeInkLayer presentationMode={presentationMode} />
-
         {/* Nodes layer (Virtualization / Viewport Culled for high performance) */}
         <div
           className="canvas__nodes-layer"
@@ -629,6 +626,9 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
             <NodeRenderer key={node.id} node={node} presentationMode={presentationMode} focusNodeId={focusNodeId} />
           ))}
         </div>
+
+        {/* Free Ink Layer (Freehand annotations & highlighter overlay rendered above nodes) */}
+        <FreeInkLayer presentationMode={presentationMode} />
 
         {/* Smart Snapping Guides */}
         {snapLines && (
