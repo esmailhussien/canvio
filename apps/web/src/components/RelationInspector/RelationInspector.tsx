@@ -3,20 +3,39 @@ import { useCanvasStore, RelationshipType } from '../../store/canvasStore';
 import {
   IconMoreHorizontal,
   IconTrash,
-  IconX
+  IconX,
+  IconContradicts,
+  IconDependsOn,
+  IconEnables,
+  IconBasedOn,
+  IconPartOf,
+  IconLeadsTo,
+  IconInspiredBy,
+  IconRelatedTo,
+  IconProps
 } from '@canvio/ui';
 import { getRelationEndpointLabel, resolveRelationPorts } from '../RelationRenderer/relationUtils';
 import './RelationInspector.css';
 
-const RELATION_TYPES: { id: RelationshipType; label: string }[] = [
-  { id: 'related_to', label: 'Related to' },
-  { id: 'leads_to', label: 'Leads to' },
-  { id: 'depends_on', label: 'Depends on' },
-  { id: 'contradicts', label: 'Contradicts' },
-  { id: 'enables', label: 'Enables' },
-  { id: 'part_of', label: 'Part of' },
-  { id: 'inspired_by', label: 'Inspired by' },
-  { id: 'based_on', label: 'Based on' }
+const RELATION_TYPES: {
+  id: RelationshipType;
+  label: string;
+  Icon: React.ComponentType<IconProps>;
+  shortcut: string;
+  color: string;
+}[] = [
+  { id: 'contradicts', label: 'Contradicts', Icon: IconContradicts, shortcut: '1', color: '#ef4444' },
+  { id: 'depends_on', label: 'Depends on', Icon: IconDependsOn, shortcut: '2', color: '#f59e0b' },
+  { id: 'enables', label: 'Enables', Icon: IconEnables, shortcut: '3', color: '#10b981' },
+  { id: 'based_on', label: 'Based on', Icon: IconBasedOn, shortcut: '4', color: '#06b6d4' },
+  { id: 'part_of', label: 'Part of', Icon: IconPartOf, shortcut: '5', color: '#8b5cf6' },
+  { id: 'leads_to', label: 'Leads to', Icon: IconLeadsTo, shortcut: '6', color: '#3b82f6' },
+  { id: 'inspired_by', label: 'Inspired by', Icon: IconInspiredBy, shortcut: '7', color: '#ec4899' },
+  { id: 'related_to', label: 'Related to', Icon: IconRelatedTo, shortcut: '8', color: '#94a3b8' },
+];
+
+const SUGGESTED_LABELS = [
+  'blocks', 'accelerates', 'validates', 'mitigates', 'critical dependency', 'alternative to', 'direct consequence', 'evidenced by'
 ];
 
 const LINE_COLORS = [
@@ -45,6 +64,27 @@ export function RelationInspector() {
     relationSnapshotTakenRef.current = null;
   }, [selectedRelationId]);
 
+  // Keyboard shortcut listener (1-8 to pick relationship type instantly)
+  useEffect(() => {
+    if (!selectedRelationId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is actively typing in an input/textarea
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+
+      const matched = RELATION_TYPES.find((t) => t.shortcut === e.key);
+      if (matched) {
+        e.preventDefault();
+        snapshot();
+        updateRelation(selectedRelationId, { relationship: matched.id });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRelationId, snapshot, updateRelation]);
+
   if (!selectedRelationId) return null;
   const relation = relations[selectedRelationId];
   if (!relation) return null;
@@ -66,24 +106,32 @@ export function RelationInspector() {
   const style = relation.style || { type: 'straight', color: 'var(--relation-default)', width: 2, startArrow: 'none', endArrow: 'none' };
   const sourceLabel = getRelationEndpointLabel(sourceNode, relation.sourcePort);
   const targetLabel = getRelationEndpointLabel(targetNode, relation.targetPort);
+
   const patchRelation = (updates: Partial<typeof relation>) => {
     snapshot();
     updateRelation(relation.id, updates);
   };
+
   const snapshotLabelEdit = () => {
     if (relationSnapshotTakenRef.current === relation.id) return;
     snapshot();
     relationSnapshotTakenRef.current = relation.id;
   };
 
+  const isNearTop = screenY < 440;
+  const clampedX = Math.max(170, Math.min(rect.width - 170, screenX));
+  const transform = isNearTop
+    ? 'translate(-50%, 20px)'
+    : 'translate(-50%, -100%) translateY(-20px)';
+
   return (
     <div
       className="relation-inspector canvio-toolbar-enter"
       style={{
         position: 'absolute',
-        left: `${screenX}px`,
+        left: `${clampedX}px`,
         top: `${screenY}px`,
-        transform: 'translate(-50%, -100%) translateY(-20px)',
+        transform,
         zIndex: 250
       }}
       onClick={(e) => e.stopPropagation()}
@@ -91,7 +139,9 @@ export function RelationInspector() {
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="relation-inspector__header">
-        <span className="relation-inspector__title">Relation Options</span>
+        <span className="relation-inspector__title">
+          <span>Semantic Relation</span>
+        </span>
         <div className="relation-inspector__header-actions">
           <button
             className={`relation-inspector__close ${isAdvancedOpen ? 'active' : ''}`}
@@ -117,7 +167,7 @@ export function RelationInspector() {
           <button
             className="relation-inspector__close"
             onClick={() => selectRelation(null)}
-            title="Close inspector"
+            title="Close inspector (Esc)"
           >
             <IconX size={14} />
           </button>
@@ -136,34 +186,68 @@ export function RelationInspector() {
         </div>
       </div>
 
-      {/* Relationship Type Selection */}
+      {/* Semantic Relationship Type Selection */}
       <div className="relation-inspector__section">
-        <label className="relation-inspector__label">Type</label>
-        <div className="relation-inspector__pills">
-          {RELATION_TYPES.map((t) => (
-            <button
-              key={t.id}
-              className={`relation-inspector__pill ${relation.relationship === t.id ? 'active' : ''}`}
-              onClick={() => patchRelation({ relationship: t.id })}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="relation-inspector__label-row">
+          <label className="relation-inspector__label">Semantic Type</label>
+          <span className="relation-inspector__hint">Press 1-8</span>
+        </div>
+        <div className="relation-inspector__pills relation-inspector__pills--grid">
+          {RELATION_TYPES.map((t) => {
+            const isSelected = relation.relationship === t.id;
+            return (
+              <button
+                key={t.id}
+                className={`relation-inspector__pill ${isSelected ? 'active' : ''}`}
+                style={{
+                  borderColor: isSelected ? t.color : undefined,
+                  boxShadow: isSelected ? `0 0 12px ${t.color}33` : undefined,
+                }}
+                onClick={() => patchRelation({ relationship: t.id })}
+                title={`Press ${t.shortcut} for ${t.label}`}
+              >
+                <span className="relation-inspector__pill-icon" style={{ color: t.color }}>
+                  <t.Icon size={14} />
+                </span>
+                <span className="relation-inspector__pill-text">{t.label}</span>
+                <span className="relation-inspector__pill-key">{t.shortcut}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Custom Label Input */}
+      {/* Custom Label Input & Autocomplete Suggestions */}
       <div className="relation-inspector__section">
-        <label className="relation-inspector__label">Custom Label</label>
+        <label className="relation-inspector__label">Assertion / Label</label>
         <input
           type="text"
           className="relation-inspector__input"
-          placeholder="e.g. 50% flow"
+          placeholder="e.g. blocks rollout, requires review"
           value={relation.label || ''}
           onFocus={snapshotLabelEdit}
           onChange={(e) => updateRelation(relation.id, { label: e.target.value })}
           onBlur={() => { relationSnapshotTakenRef.current = null; }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              (e.target as HTMLElement).blur();
+            }
+          }}
         />
+
+        {/* Quick Autocomplete Suggestions */}
+        <div className="relation-inspector__suggestions">
+          {SUGGESTED_LABELS.map((sug) => (
+            <button
+              key={sug}
+              type="button"
+              className="relation-inspector__suggestion-chip"
+              onClick={() => patchRelation({ label: sug })}
+            >
+              +{sug}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isAdvancedOpen && (
@@ -188,82 +272,67 @@ export function RelationInspector() {
                 className={`relation-inspector__btn ${style.type === 'orthogonal' ? 'active' : ''}`}
                 onClick={() => patchRelation({ style: { ...style, type: 'orthogonal' } })}
               >
-                Step
+                Smart Step
               </button>
             </div>
           </div>
 
-          {/* Arrow Heads Control (Start & End) */}
+          {/* Color Palette */}
           <div className="relation-inspector__section">
-            <label className="relation-inspector__label">Arrow Heads</label>
-            <div className="relation-inspector__button-group">
-              <button
-                className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'none' ? 'active' : ''}`}
-                onClick={() => patchRelation({ style: { ...style, startArrow: 'none', endArrow: 'none' } })}
-              >
-                None
-              </button>
-              <button
-                className={`relation-inspector__btn ${style.startArrow === 'none' && style.endArrow === 'arrow' ? 'active' : ''}`}
-                onClick={() => patchRelation({ style: { ...style, startArrow: 'none', endArrow: 'arrow' } })}
-              >
-                End
-              </button>
-              <button
-                className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'none' ? 'active' : ''}`}
-                onClick={() => patchRelation({ style: { ...style, startArrow: 'arrow', endArrow: 'none' } })}
-              >
-                Start
-              </button>
-              <button
-                className={`relation-inspector__btn ${style.startArrow === 'arrow' && style.endArrow === 'arrow' ? 'active' : ''}`}
-                onClick={() => patchRelation({ style: { ...style, startArrow: 'arrow', endArrow: 'arrow' } })}
-              >
-                Both
-              </button>
+            <label className="relation-inspector__label">Custom Color Override</label>
+            <div className="relation-inspector__colors">
+              {LINE_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  className={`relation-inspector__color-swatch ${style.color === c.value ? 'selected' : ''}`}
+                  style={{ backgroundColor: c.value }}
+                  onClick={() => patchRelation({ style: { ...style, color: c.value } })}
+                  title={c.label}
+                  aria-label={`${c.label} connection`}
+                />
+              ))}
             </div>
           </div>
 
-          {/* Animation Flow Toggle */}
-          <div className="relation-inspector__section relation-inspector__row">
-            <button
-              className={`relation-inspector__toggle ${style.animated ? 'active' : ''}`}
-              onClick={() => patchRelation({
-                style: { ...style, animated: !style.animated }
-              })}
-            >
-              Animated Flow
-            </button>
+          {/* Stroke Width */}
+          <div className="relation-inspector__section">
+            <label className="relation-inspector__label">Width: {style.width}px</label>
+            <input
+              type="range"
+              min="1"
+              max="8"
+              value={style.width}
+              onChange={(e) => patchRelation({ style: { ...style, width: parseInt(e.target.value) } })}
+              className="relation-inspector__range"
+            />
+          </div>
+
+          {/* Flow Animation Toggle */}
+          <div className="relation-inspector__section">
+            <label className="relation-inspector__checkbox-label">
+              <input
+                type="checkbox"
+                checked={Boolean(style.animated)}
+                onChange={(e) => patchRelation({ style: { ...style, animated: e.target.checked } })}
+              />
+              <span>Pulse / Dynamic Flow Animation</span>
+            </label>
           </div>
         </div>
       )}
 
-      {/* Color Palette */}
-      <div className="relation-inspector__section">
-        <label className="relation-inspector__label">Color</label>
-        <div className="relation-inspector__colors">
-          {LINE_COLORS.map((c) => (
-            <button
-              key={c.value}
-              className={`relation-inspector__color-btn ${style.color === c.value ? 'selected' : ''}`}
-              style={{ backgroundColor: c.value }}
-              onClick={() => patchRelation({ style: { ...style, color: c.value } })}
-              title={c.label}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Delete Action */}
+      {/* Footer / Delete */}
       <div className="relation-inspector__footer">
         <button
           className="relation-inspector__delete-btn"
           onClick={() => {
+            snapshot();
             removeRelation(relation.id);
-            selectRelation(null);
           }}
+          title="Delete this relation"
         >
-          <IconTrash size={14} /> Delete Relation
+          <IconTrash size={13} />
+          <span>Delete Connection</span>
         </button>
       </div>
     </div>

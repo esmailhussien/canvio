@@ -8,7 +8,15 @@ import {
   RawAIBoardNode,
   RawAIBoardRelation,
   summarizeAIBoard,
+  analyzeAIGraph,
+  challengeAIBoard,
+  socraticInquiryAI,
+  AIGraphAnalysisResponse,
+  AIChallengeResponse,
+  AISocraticResponse,
 } from './api';
+import { analyzeGraphStructure, getNodeTitle } from './graphQueries';
+import type { GraphInsight } from '@canvio/core';
 
 export interface SpatialAIResult {
   title: string;
@@ -591,6 +599,261 @@ export async function organizeAndClusterWithAIAsync(
     clustersCount: localClusters.length,
     source: 'local',
     message: 'Server AI is not configured yet, so Canvio used the local organizer.',
+  };
+}
+
+export async function analyzeGraphWithAIAsync(
+  nodes: LivingNode[],
+  relations: Relation[]
+): Promise<{
+  critique: string;
+  healthScore: number;
+  insights: GraphInsight[];
+  suggestedRelations: Array<{ sourceId: string; targetId: string; relationship: Relation['relationship']; label: string; reason?: string }>;
+  source: 'server' | 'local';
+}> {
+  const nodesRecord = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  const relationsRecord = Object.fromEntries(relations.map((r) => [r.id, r]));
+  const localAnalysis = analyzeGraphStructure(nodesRecord, relationsRecord);
+
+  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
+  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+
+  try {
+    const result = await analyzeAIGraph({
+      provider,
+      model,
+      context: buildAIContext(nodes, relations),
+    });
+
+    if (result && result.critique) {
+      const serverInsights: GraphInsight[] = (result.insights || []).map((ins, idx) => ({
+        id: ins.id || `ai_ins_${idx}`,
+        type: ins.type || 'suggestion',
+        severity: ins.severity || 'info',
+        title: ins.title || 'Reasoning Observation',
+        description: ins.description || '',
+        nodeIds: Array.isArray(ins.nodeIds) ? ins.nodeIds : [],
+      }));
+
+      const mergedInsights = [...serverInsights, ...localAnalysis.insights.filter((li) => !serverInsights.some((si) => si.title === li.title))];
+
+      return {
+        critique: result.critique,
+        healthScore: typeof result.healthScore === 'number' ? result.healthScore : localAnalysis.metrics.reasoningHealthScore,
+        insights: mergedInsights,
+        suggestedRelations: (result.suggestedRelations || []).map((sr) => ({
+          sourceId: sr.sourceId,
+          targetId: sr.targetId,
+          relationship: normalizeRelationship(sr.relationship),
+          label: sr.label || 'relates to',
+          reason: sr.reason,
+        })),
+        source: 'server',
+      };
+    }
+  } catch (err) {
+    console.warn('Server AI graph analysis unavailable. Using local reasoning engine.', err);
+  }
+
+  // Local Reasoning Synthesis
+  const nodeCount = nodes.length;
+  const contraCount = localAnalysis.contradictions.length;
+  const orphanCount = localAnalysis.orphans.length;
+  const maxDepth = localAnalysis.metrics.maxDependencyDepth;
+
+  let critique = '';
+  if (nodeCount === 0) {
+    critique = 'The canvas is currently empty. Start by placing concepts, data, or field pins to build your reasoning graph.';
+  } else if (contraCount > 0) {
+    critique = `Found ${contraCount} active contradiction${contraCount > 1 ? 's' : ''} in your model. Reconcile conflicting premises or specify conditional boundaries between them.`;
+  } else if (orphanCount > 1) {
+    critique = `Your board has ${orphanCount} unanchored thoughts that aren't integrated into the main causal flow. Connect them with labeled relations to strengthen the argument.`;
+  } else if (maxDepth >= 3) {
+    critique = `Strong directional depth (${maxDepth} levels). Your reasoning follows a structured chain from underlying premises to final actions.`;
+  } else {
+    critique = `Good conceptual foundation (${nodeCount} elements). Consider linking supporting evidence or defining downstream dependencies to expand depth.`;
+  }
+
+  // Suggest local logical bridges for orphans
+  const suggestedRelations: Array<{ sourceId: string; targetId: string; relationship: Relation['relationship']; label: string; reason?: string }> = [];
+  if (localAnalysis.orphans.length > 0 && nodes.length > localAnalysis.orphans.length) {
+    const nonOrphan = nodes.find((n) => !localAnalysis.orphans.some((o) => o.id === n.id));
+    if (nonOrphan) {
+      const orphan = localAnalysis.orphans[0];
+      suggestedRelations.push({
+        sourceId: nonOrphan.id,
+        targetId: orphan.id,
+        relationship: 'leads_to',
+        label: 'informs',
+        reason: `Connect unanchored idea "${getNodeTitle(orphan)}" to "${getNodeTitle(nonOrphan)}"`,
+      });
+    }
+  }
+
+  return {
+    critique,
+    healthScore: localAnalysis.metrics.reasoningHealthScore,
+    insights: localAnalysis.insights,
+    suggestedRelations,
+    source: 'local',
+  };
+}
+
+export async function challengeBoardWithAIAsync(
+  nodes: LivingNode[],
+  relations: Relation[]
+): Promise<{
+  challengeSummary: string;
+  challenges: Array<{ targetNodeId: string; critique: string; counterPerspective: string }>;
+  challengerNodes: LivingNode[];
+  challengerRelations: Relation[];
+  source: 'server' | 'local';
+}> {
+  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
+  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+
+  try {
+    const result = await challengeAIBoard({
+      provider,
+      model,
+      context: buildAIContext(nodes, relations),
+    });
+
+    if (result && result.challengeSummary) {
+      const normalizedResult = normalizeServerBoardResult(
+        'Challenger Critique',
+        result.challengerNodes || [],
+        result.challengerRelations || [],
+        'Challenge',
+        'server'
+      );
+
+      return {
+        challengeSummary: result.challengeSummary,
+        challenges: result.challenges || [],
+        challengerNodes: normalizedResult.nodes,
+        challengerRelations: normalizedResult.relations,
+        source: 'server',
+      };
+    }
+  } catch (err) {
+    console.warn('Server AI challenge unavailable. Using local devil advocate.', err);
+  }
+
+  // Local Devil's Advocate heuristic
+  const targetNode = nodes.find((n) => n.type === 'sticky' || n.type === 'shape') || nodes[0];
+  const targetTitle = getNodeTitle(targetNode);
+  const cx = targetNode ? targetNode.position.x + 360 : 0;
+  const cy = targetNode ? targetNode.position.y : 0;
+  const challengerId = nanoid(10);
+
+  return {
+    challengeSummary: `Stress-testing assumption around "${targetTitle}". What edge cases or alternative explanations could falsify this reasoning?`,
+    challenges: [
+      {
+        targetNodeId: targetNode?.id || '',
+        critique: `Assumes "${targetTitle}" holds under all conditions without accounting for external dependencies or cost constraints.`,
+        counterPerspective: `What happens if primary assumptions fail or resource constraints double?`,
+      },
+    ],
+    challengerNodes: targetNode ? [
+      sticky(
+        challengerId,
+        cx,
+        cy,
+        260,
+        140,
+        `⚡ Counter-Hypothesis:\nWhat if the premise behind "${targetTitle}" is invalid in edge cases?`,
+        'pink',
+        targetNode.zIndex + 1
+      ),
+    ] : [],
+    challengerRelations: targetNode ? [
+      relation(challengerId, targetNode.id, 'challenges', '#ef4444', 'contradicts'),
+    ] : [],
+    source: 'local',
+  };
+}
+
+export async function socraticInquiryWithAIAsync(
+  nodes: LivingNode[],
+  relations: Relation[]
+): Promise<{
+  inquiryFocus: string;
+  questions: Array<{ id: string; question: string; relatedNodeIds?: string[]; learningGoal?: string }>;
+  source: 'server' | 'local';
+}> {
+  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
+  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+
+  try {
+    const result = await socraticInquiryAI({
+      provider,
+      model,
+      context: buildAIContext(nodes, relations),
+    });
+
+    if (result && result.questions && result.questions.length > 0) {
+      return {
+        inquiryFocus: result.inquiryFocus || 'Mental Model Reflection',
+        questions: result.questions,
+        source: 'server',
+      };
+    }
+  } catch (err) {
+    console.warn('Server Socratic inquiry unavailable. Using local questioning engine.', err);
+  }
+
+  // Local Socratic Questioning Heuristic
+  const nodesRecord = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  const relationsRecord = Object.fromEntries(relations.map((r) => [r.id, r]));
+  const analysis = analyzeGraphStructure(nodesRecord, relationsRecord);
+
+  const questions: Array<{ id: string; question: string; relatedNodeIds?: string[]; learningGoal?: string }> = [];
+
+  if (analysis.contradictions.length > 0) {
+    const c = analysis.contradictions[0];
+    questions.push({
+      id: 'soc_contra',
+      question: `How can "${getNodeTitle(c.sourceNode)}" and "${getNodeTitle(c.targetNode)}" both be true? Under what exact conditions does each apply?`,
+      relatedNodeIds: [c.sourceNode.id, c.targetNode.id],
+      learningGoal: 'Synthesizing conflicting ideas into higher-order mental models',
+    });
+  }
+
+  if (analysis.criticalPaths.length > 0 && analysis.criticalPaths[0].depth >= 2) {
+    const cp = analysis.criticalPaths[0];
+    questions.push({
+      id: 'soc_path',
+      question: `What is the physical or logical mechanism that translates "${getNodeTitle(cp.rootNode)}" into "${getNodeTitle(cp.leafNode)}"?`,
+      relatedNodeIds: [cp.rootNode.id, cp.leafNode.id],
+      learningGoal: 'Uncovering causal mechanisms behind correlation',
+    });
+  }
+
+  if (analysis.orphans.length > 0) {
+    const orphan = analysis.orphans[0];
+    questions.push({
+      id: 'soc_orphan',
+      question: `What fundamental idea or real-world observation gave rise to "${getNodeTitle(orphan)}"?`,
+      relatedNodeIds: [orphan.id],
+      learningGoal: 'Connecting isolated insights to first principles',
+    });
+  }
+
+  if (questions.length === 0) {
+    questions.push({
+      id: 'soc_general',
+      question: 'What is the single most critical assumption underpinning this entire board?',
+      learningGoal: 'Identifying core dependencies',
+    });
+  }
+
+  return {
+    inquiryFocus: 'Mental Model & First Principles Examination',
+    questions,
+    source: 'local',
   };
 }
 

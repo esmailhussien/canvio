@@ -8,6 +8,10 @@ export interface BoardRecord {
   ownerId?: string;
   shareToken?: string;
   shareCreatedAt?: string;
+  isPublic?: boolean;
+  forkedFromId?: string;
+  forkedFromTitle?: string;
+  forkCount?: number;
   appearance?: {
     theme?: 'dark' | 'light';
     canvasBackground?: string | null;

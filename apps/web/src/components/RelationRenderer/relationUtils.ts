@@ -594,7 +594,7 @@ export function generateSmartRelationPath(
 
   return {
     pathD: roundedPolylinePath(finalPoints, 14),
-    midPoint: pointAtHalfLength(finalPoints),
+    midPoint: findBestLabelPoint(finalPoints),
     angle: 0
   };
 }
@@ -951,6 +951,36 @@ function moveToward(from: Point, to: Point, amount: number): Point {
   };
 }
 
+function findBestLabelPoint(points: Point[]): Point {
+  if (!points || points.length === 0) return { x: 0, y: 0 };
+  if (points.length <= 2) {
+    return pointAtHalfLength(points);
+  }
+
+  // Find the longest straight segment in the polyline
+  let maxSegLen = -1;
+  let bestSegIndex = 1;
+  for (let i = 1; i < points.length; i++) {
+    const len = distance(points[i - 1], points[i]);
+    if (len > maxSegLen) {
+      maxSegLen = len;
+      bestSegIndex = i;
+    }
+  }
+
+  // If the longest segment is at least 32px, place the label at its center (avoids 90deg corner bends)
+  if (maxSegLen >= 32) {
+    const p1 = points[bestSegIndex - 1];
+    const p2 = points[bestSegIndex];
+    return {
+      x: (p1.x + p2.x) / 2,
+      y: (p1.y + p2.y) / 2,
+    };
+  }
+
+  return pointAtHalfLength(points);
+}
+
 function pointAtHalfLength(points: Point[]): Point {
   const total = points.slice(1).reduce((sum, point, index) => sum + distance(points[index], point), 0);
   let traveled = 0;
@@ -971,3 +1001,4 @@ function pointAtHalfLength(points: Point[]): Point {
 function distance(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
+

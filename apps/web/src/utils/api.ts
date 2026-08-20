@@ -21,6 +21,13 @@ function requestHeaders(json = false) {
 export interface BoardRecord {
   id: string;
   title: string;
+  ownerId?: string;
+  shareToken?: string;
+  shareCreatedAt?: string;
+  isPublic?: boolean;
+  forkedFromId?: string;
+  forkedFromTitle?: string;
+  forkCount?: number;
   appearance?: {
     theme?: 'dark' | 'light';
     canvasBackground?: string | null;
@@ -94,6 +101,60 @@ export interface AIClusterResponse {
   }>;
 }
 
+export interface AIGraphInsight {
+  id: string;
+  type: 'contradiction' | 'missing_evidence' | 'dependency_chain' | 'unanchored_claim' | 'suggestion';
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  description: string;
+  nodeIds?: string[];
+}
+
+export interface AISuggestedRelation {
+  sourceId: string;
+  targetId: string;
+  relationship: string;
+  label: string;
+  reason?: string;
+}
+
+export interface AIGraphAnalysisResponse {
+  source: 'server-ai';
+  provider: AIProvider;
+  model: string;
+  critique: string;
+  healthScore: number;
+  insights: AIGraphInsight[];
+  suggestedRelations: AISuggestedRelation[];
+}
+
+export interface AIChallengeResponse {
+  source: 'server-ai';
+  provider: AIProvider;
+  model: string;
+  challengeSummary: string;
+  challenges: Array<{
+    targetNodeId: string;
+    critique: string;
+    counterPerspective: string;
+  }>;
+  challengerNodes?: RawAIBoardNode[];
+  challengerRelations?: RawAIBoardRelation[];
+}
+
+export interface AISocraticResponse {
+  source: 'server-ai';
+  provider: AIProvider;
+  model: string;
+  inquiryFocus: string;
+  questions: Array<{
+    id: string;
+    question: string;
+    relatedNodeIds?: string[];
+    learningGoal?: string;
+  }>;
+}
+
 export class ApiRequestError extends Error {
   status: number;
   code?: string;
@@ -133,6 +194,24 @@ export async function createBoard() {
   return response.json() as Promise<BoardRecord>;
 }
 
+export async function forkBoard(id: string) {
+  const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}/fork`), {
+    method: 'POST',
+    headers: requestHeaders(true),
+    body: '{}',
+  });
+  if (!response.ok) throw await createApiRequestError(response, 'Failed to fork board');
+  return response.json() as Promise<BoardRecord>;
+}
+
+export async function listPublicBoards() {
+  const response = await fetch(apiUrl('/api/boards/public'), {
+    headers: requestHeaders(),
+  });
+  if (!response.ok) throw await createApiRequestError(response, 'Failed to list public boards');
+  return response.json() as Promise<{ boards: BoardRecord[] }>;
+}
+
 export async function touchBoard(id: string) {
   const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}`), {
     headers: requestHeaders(),
@@ -154,14 +233,24 @@ export async function updateBoardAppearance(
   return response.json() as Promise<BoardRecord>;
 }
 
-export async function createBoardShareLink(id: string) {
+export async function updateBoardPublicStatus(id: string, isPublic: boolean) {
+  const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}`), {
+    method: 'PATCH',
+    headers: requestHeaders(true),
+    body: JSON.stringify({ isPublic }),
+  });
+  if (!response.ok) throw await createApiRequestError(response, 'Failed to update board public status');
+  return response.json() as Promise<BoardRecord>;
+}
+
+export async function createBoardShareLink(id: string, isPublic = false) {
   const response = await fetch(apiUrl(`/api/boards/${encodeURIComponent(id)}/share`), {
     method: 'POST',
     headers: requestHeaders(true),
-    body: '{}',
+    body: JSON.stringify({ isPublic }),
   });
   if (!response.ok) throw await createApiRequestError(response, 'Failed to create share link');
-  return response.json() as Promise<{ url: string; shareToken: string }>;
+  return response.json() as Promise<{ url: string; shareToken: string; isPublic?: boolean }>;
 }
 
 export async function generateAIBoard(request: {
@@ -188,6 +277,30 @@ export async function organizeAIClusters(request: {
   context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
 }) {
   return postAI<AIClusterResponse>('/api/ai/organize', request);
+}
+
+export async function analyzeAIGraph(request: {
+  provider?: AIProvider;
+  model?: string;
+  context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
+}) {
+  return postAI<AIGraphAnalysisResponse>('/api/ai/analyze-graph', request);
+}
+
+export async function challengeAIBoard(request: {
+  provider?: AIProvider;
+  model?: string;
+  context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
+}) {
+  return postAI<AIChallengeResponse>('/api/ai/challenge', request);
+}
+
+export async function socraticInquiryAI(request: {
+  provider?: AIProvider;
+  model?: string;
+  context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };
+}) {
+  return postAI<AISocraticResponse>('/api/ai/socratic', request);
 }
 
 async function postAI<T>(path: string, body: unknown): Promise<T> {

@@ -20,7 +20,24 @@ import {
 } from '../icons';
 import './Toolbar.css';
 
-export type ToolMode = 'select' | 'pan' | 'draw' | 'highlighter' | 'laser' | 'arrow' | 'text' | 'sticky' | 'map' | 'relation' | 'eraser' | 'image' | 'shape' | 'frame' | 'code';
+export type ToolMode =
+  | 'select'
+  | 'pan'
+  | 'draw'
+  | 'highlighter'
+  | 'laser'
+  | 'arrow'
+  | 'text'
+  | 'sticky'
+  | 'map'
+  | 'relation'
+  | 'eraser'
+  | 'image'
+  | 'shape'
+  | 'frame'
+  | 'code'
+  | 'ink'
+  | 'lasso';
 
 interface ToolbarProps {
   activeTool: ToolMode;

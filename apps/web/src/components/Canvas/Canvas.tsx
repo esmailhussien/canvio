@@ -5,6 +5,7 @@ import { MultiSelectionInspector } from '../NodeInspector/MultiSelectionInspecto
 import { RelationRenderer } from '../RelationRenderer/RelationRenderer';
 import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from '../RelationRenderer/relationUtils';
 import { DrawingLayer } from '../DrawingLayer/DrawingLayer';
+import { FreeInkLayer } from '../FreeInkLayer/FreeInkLayer';
 import { nanoid } from 'nanoid';
 import {
   IconSticky,
@@ -60,6 +61,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const relationTargetId = useCanvasStore((s) => s.relationTargetId);
   const relationTargetPort = useCanvasStore((s) => s.relationTargetPort);
   const setRelationSourceId = useCanvasStore((s) => s.setRelationSourceId);
+  const eraseInkAt = useCanvasStore((s) => s.eraseInkAt);
 
   const [cursorWorldPos, setCursorWorldPos] = useState<{ x: number; y: number } | null>(null);
   const [laserPointer, setLaserPointer] = useState<{ x: number; y: number } | null>(null);
@@ -178,6 +180,11 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
         return;
       }
 
+      if (activeTool === 'eraser') {
+        eraseInkAt(worldPos, 22);
+        return;
+      }
+
       if (isInkTool) {
         e.preventDefault();
         activeDrawingPointerIdRef.current = e.pointerId;
@@ -262,6 +269,10 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           return { ...point, pressure: pointer.pressure };
         });
         updateStrokePoints(samples, nativeEvent.pointerType === 'pen');
+      }
+
+      if (activeTool === 'eraser' && (e.buttons === 1 || e.pressure > 0)) {
+        eraseInkAt(worldPos, 20);
       }
 
       if (isMarqueeActive) {
@@ -509,7 +520,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
 
       <div className="canvas__world" style={{ transform }}>
         {/* Relation preview line */}
-        {!presentationMode && activeTool === 'relation' && relationSourceId && cursorWorldPos && (() => {
+        {!presentationMode && relationSourceId && cursorWorldPos && (() => {
           const sourceNode = nodes[relationSourceId];
           if (!sourceNode) return null;
           const hasSnapTarget = Boolean(
@@ -605,6 +616,9 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
         <div className="canvas__relations-layer">
           <RelationRenderer relations={relations} nodes={nodes} presentationMode={presentationMode} focusNodeId={focusNodeId} />
         </div>
+
+        {/* Free Ink Layer (Freehand annotations & sketch overlay) */}
+        <FreeInkLayer presentationMode={presentationMode} />
 
         {/* Nodes layer (Virtualization / Viewport Culled for high performance) */}
         <div

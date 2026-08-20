@@ -19,6 +19,11 @@ export async function boardRoutes(fastify: FastifyInstance) {
     return { boards: boards.filter((board) => !board.ownerId || board.ownerId === ownerId) };
   });
 
+  fastify.get('/public', async () => {
+    const boards = await listBoards();
+    return { boards: boards.filter((board) => Boolean(board.isPublic)) };
+  });
+
   fastify.post('/', async (request: FastifyRequest, reply: FastifyReply) => {
     if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
@@ -36,7 +41,41 @@ export async function boardRoutes(fastify: FastifyInstance) {
     return { url: '/w/' + id, ...board };
   });
 
-  fastify.post('/:id/share', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  fastify.post('/:id/fork', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH', allowShareToken: true })) {
+      return reply.code(401).send({ error: 'AUTH_REQUIRED' });
+    }
+
+    const { id } = request.params;
+    const sourceBoard = await getBoard(id);
+    if (!sourceBoard) {
+      return reply.code(404).send({ error: 'SOURCE_BOARD_NOT_FOUND' });
+    }
+
+    // Increment source fork count
+    await saveBoard({
+      ...sourceBoard,
+      forkCount: (sourceBoard.forkCount || 0) + 1,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const newId = nanoid(10);
+    const now = new Date().toISOString();
+    const forkedBoard = {
+      id: newId,
+      title: `Remix: ${sourceBoard.title}`,
+      ownerId: getRequestOwnerId(request),
+      forkedFromId: sourceBoard.id,
+      forkedFromTitle: sourceBoard.title,
+      appearance: sourceBoard.appearance,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await saveBoard(forkedBoard);
+    return { url: '/w/' + newId, ...forkedBoard };
+  });
+
+  fastify.post('/:id/share', async (request: FastifyRequest<{ Params: { id: string }; Body?: { isPublic?: boolean } }>, reply: FastifyReply) => {
     if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
     }
@@ -49,9 +88,11 @@ export async function boardRoutes(fastify: FastifyInstance) {
     }
 
     const shareToken = board.shareToken || nanoid(32);
+    const isPublic = request.body?.isPublic !== undefined ? Boolean(request.body.isPublic) : board.isPublic;
     await saveBoard({
       ...board,
       shareToken,
+      isPublic,
       shareCreatedAt: board.shareCreatedAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -59,6 +100,7 @@ export async function boardRoutes(fastify: FastifyInstance) {
     return {
       url: `/w/${encodeURIComponent(id)}?share=${encodeURIComponent(shareToken)}`,
       shareToken,
+      isPublic,
     };
   });
 
@@ -70,7 +112,9 @@ export async function boardRoutes(fastify: FastifyInstance) {
     const { id } = request.params;
     const existing = await getBoard(id);
     if (existing) {
-      if (!canAccessBoard(existing.ownerId, request, existing.shareToken)) return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
+      if (!existing.isPublic && !canAccessBoard(existing.ownerId, request, existing.shareToken)) {
+        return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
+      }
       return saveBoard({ ...existing, updatedAt: new Date().toISOString() });
     }
 
@@ -79,7 +123,7 @@ export async function boardRoutes(fastify: FastifyInstance) {
 
   fastify.patch('/:id', async (request: FastifyRequest<{
     Params: { id: string };
-    Body: { title?: string; appearance?: { theme?: 'dark' | 'light'; canvasBackground?: string | null } };
+    Body: { title?: string; isPublic?: boolean; appearance?: { theme?: 'dark' | 'light'; canvasBackground?: string | null } };
   }>, reply: FastifyReply) => {
     if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH', allowShareToken: true })) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
@@ -94,6 +138,9 @@ export async function boardRoutes(fastify: FastifyInstance) {
     const title = typeof request.body?.title === 'string' && request.body.title.trim()
       ? request.body.title.trim()
       : board.title;
+    const isPublic = typeof request.body?.isPublic === 'boolean'
+      ? request.body.isPublic
+      : board.isPublic;
     const appearance = request.body?.appearance
       ? {
           theme: request.body.appearance.theme === 'light' ? 'light' as const : request.body.appearance.theme === 'dark' ? 'dark' as const : board.appearance?.theme,
@@ -106,6 +153,7 @@ export async function boardRoutes(fastify: FastifyInstance) {
     return saveBoard({
       ...board,
       title,
+      isPublic,
       appearance,
       updatedAt: new Date().toISOString(),
     });

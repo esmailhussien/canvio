@@ -141,6 +141,29 @@
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
 }
 
+.pen-convert-btn {
+  background: color-mix(in srgb, var(--accent-warning, #f59e0b) 16%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--accent-warning, #f59e0b) 45%, var(--border-default));
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.pen-convert-btn:hover {
+  background: color-mix(in srgb, var(--accent-warning, #f59e0b) 28%, var(--bg-surface));
+  border-color: var(--accent-warning, #f59e0b);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+
 .pen-finish-btn {
   background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;

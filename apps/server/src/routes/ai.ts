@@ -150,6 +150,142 @@ Every input node id should appear in exactly one cluster when possible.`;
       clusters: normalizeClusters(parsed, nodes),
     };
   });
+
+  fastify.post('/analyze-graph', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
+    const provider = resolveProvider(request.body?.provider);
+    const model = resolveModel(provider, request.body?.model);
+    const key = resolveApiKey(provider);
+    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
+
+    const systemPrompt = `You are the Canvio Visual Reasoning Engine & Thinking Partner.
+Your goal is to critically evaluate the user's spatial knowledge graph, analyze their mental model, identify logical inconsistencies or contradictions, find missing evidentiary links, and suggest high-value connections.
+Return ONLY raw JSON with this exact schema:
+{
+  "critique": "A sharp, 2-3 sentence executive synthesis of the user's reasoning strengths and vulnerability points.",
+  "healthScore": 85,
+  "insights": [
+    {
+      "id": "insight_1",
+      "type": "contradiction", // one of: contradiction, missing_evidence, dependency_chain, unanchored_claim, suggestion
+      "severity": "critical", // one of: info, warning, critical
+      "title": "Short punchy title",
+      "description": "Concrete explanation of why this reasoning needs attention.",
+      "nodeIds": ["node-id-1", "node-id-2"]
+    }
+  ],
+  "suggestedRelations": [
+    {
+      "sourceId": "node-id-1",
+      "targetId": "node-id-2",
+      "relationship": "depends_on", // one of: depends_on, leads_to, enables, based_on, contradicts, part_of
+      "label": "logical bridge label",
+      "reason": "Why this connection strengthens the mental model"
+    }
+  ]
+}`;
+
+    const userPrompt = [
+      'Analyze this spatial knowledge graph:',
+      buildGraphContext(request.body?.context),
+    ].join('\n\n');
+
+    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
+    return {
+      source: 'server-ai',
+      provider,
+      model,
+      ...parsed,
+    };
+  });
+
+  fastify.post('/challenge', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
+    const provider = resolveProvider(request.body?.provider);
+    const model = resolveModel(provider, request.body?.model);
+    const key = resolveApiKey(provider);
+    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
+
+    const systemPrompt = `You are a Socratic Thinking Partner and Devil's Advocate for Canvio.
+Your job is NOT to blindly agree with the user's board, but to constructively stress-test their assumptions, expose blindspots, and provide steelmanned counter-arguments.
+Return ONLY raw JSON with this schema:
+{
+  "challengeSummary": "Sharp overview of what assumptions the board is taking for granted.",
+  "challenges": [
+    {
+      "targetNodeId": "node-id",
+      "critique": "What assumption is vulnerable here?",
+      "counterPerspective": "Alternative hypothesis or contrary evidence to consider."
+    }
+  ],
+  "challengerNodes": [
+    {
+      "id": "challenger_1",
+      "type": "sticky",
+      "position": { "x": 100, "y": 100 },
+      "size": { "width": 260, "height": 140 },
+      "data": {
+        "color": "pink",
+        "text": "Counter-Hypothesis or Risk: ..."
+      }
+    }
+  ],
+  "challengerRelations": [
+    {
+      "sourceId": "challenger_1",
+      "targetId": "target_node_id",
+      "relationship": "contradicts",
+      "label": "conflicts with"
+    }
+  ]
+}`;
+
+    const userPrompt = [
+      'Stress-test and challenge this board reasoning:',
+      buildGraphContext(request.body?.context),
+    ].join('\n\n');
+
+    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
+    return {
+      source: 'server-ai',
+      provider,
+      model,
+      ...parsed,
+    };
+  });
+
+  fastify.post('/socratic', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
+    const provider = resolveProvider(request.body?.provider);
+    const model = resolveModel(provider, request.body?.model);
+    const key = resolveApiKey(provider);
+    if (!key) return reply.code(503).send({ error: 'AI_NOT_CONFIGURED', provider });
+
+    const systemPrompt = `You are a Socratic Inquirer for Canvio, assisting the user in learning and reasoning through mental model construction.
+Instead of giving direct answers or lecturing, formulate 3-5 deep, probing questions about the connections, causality, and mechanisms on their board.
+Return ONLY raw JSON:
+{
+  "inquiryFocus": "Main theme being examined",
+  "questions": [
+    {
+      "id": "q1",
+      "question": "What causal mechanism connects Node A to Node B?",
+      "relatedNodeIds": ["id1", "id2"],
+      "learningGoal": "Understand mechanism vs mere correlation"
+    }
+  ]
+}`;
+
+    const userPrompt = [
+      'Generate Socratic questions for active learning on this board:',
+      buildGraphContext(request.body?.context),
+    ].join('\n\n');
+
+    const parsed = await callProviderForJson(provider, key, model, systemPrompt, userPrompt);
+    return {
+      source: 'server-ai',
+      provider,
+      model,
+      ...parsed,
+    };
+  });
 }
 
 function resolveProvider(provider?: string): AIProvider {

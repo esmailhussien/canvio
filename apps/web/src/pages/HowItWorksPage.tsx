@@ -29,61 +29,61 @@ const TAB_CONTENT: Record<FeatureTab, {
     icon: '+',
     label: 'Start',
     eyebrow: '01 / Begin anywhere',
-    title: 'Open a blank board, use a model, or ask AI to draft the first structure.',
-    description: 'Canvio should feel familiar from the first click: choose a blank canvas, a ready-made board, or a guided AI start without learning a complicated workflow.',
+    title: 'Open a blank board, choose a model, or draft an initial structure with AI.',
+    description: 'Start immediately without complex setup: begin on an open canvas, load a curated model, or prompt the AI Navigator to lay out the first set of nodes.',
     points: [
-      { glyph: 'B', title: 'Blank canvas', text: 'Start from scratch when the idea is still open and messy.', color: '#38bdf8' },
-      { glyph: 'M', title: 'Ready-made models', text: 'Use lesson, study, strategy, flow, and planning boards as clean starting points.', color: '#22c55e' },
-      { glyph: 'AI', title: 'AI first draft', text: 'Ask the navigator to create a useful board structure from a prompt.', color: '#a855f7' },
-      { glyph: 'T', title: 'Readable themes', text: 'Switch dark, light, and board background colors for different rooms and devices.', color: '#f59e0b' },
+      { glyph: 'B', title: 'Blank canvas', text: 'Start from scratch when exploring an open-ended idea or rough architecture.', color: '#38bdf8' },
+      { glyph: 'M', title: 'Curated models', text: 'Use study, strategy, logic tree, and planning boards as clean starting points.', color: '#22c55e' },
+      { glyph: 'AI', title: 'AI board draft', text: 'Prompt the navigator (Ctrl+K) to generate structured notes and relationships.', color: '#a855f7' },
+      { glyph: 'T', title: 'Readable themes', text: 'Switch dark, light, and board background styles for different rooms and devices.', color: '#f59e0b' },
     ],
   },
   build: {
     icon: 'B',
     label: 'Build',
-    eyebrow: '02 / Think visually',
-    title: 'Add notes, shapes, ink, highlights, frames, maps, images, and code as living objects.',
-    description: 'Everything on the canvas is an object you can move, resize, connect, focus, present, export, or reuse. The board stays flexible without becoming chaotic.',
+    eyebrow: '02 / Capture & sketch',
+    title: 'Capture structured notes and sketch freely without mixing raw ink into the graph.',
+    description: 'Structured objects and freehand drawings live side by side. Ink stays separate until you choose to graduate it into an editable note.',
     points: [
-      { glyph: 'N', title: 'Notes and text', text: 'Capture ideas quickly, then edit and arrange them like real whiteboard material.', color: '#facc15' },
-      { glyph: 'P', title: 'Pen and highlighter', text: 'Draw, mark, annotate, and turn rough shapes or arrows into cleaner visual elements.', color: '#ef4444' },
-      { glyph: 'F', title: 'Frames and pages', text: 'Wrap content into pages, sections, lessons, slides, or export-ready groups.', color: '#6366f1' },
-      { glyph: 'O', title: 'Rich objects', text: 'Bring in maps, images, code, and structured blocks when the board needs more than text.', color: '#06b6d4' },
+      { glyph: 'N', title: 'Notes and text', text: 'Create sticky notes and text blocks to capture assertions, questions, and evidence.', color: '#facc15' },
+      { glyph: 'INK', title: 'Freehand ink layer', text: 'Sketch annotations with pressure sensitivity and highlighter without cluttering the graph.', color: '#ef4444' },
+      { glyph: 'CONV', title: 'To Sticky conversion', text: 'Measure handwritten sketches and convert them into connectable sticky notes in one click.', color: '#22c55e' },
+      { glyph: 'O', title: 'Rich objects', text: 'Bring in maps, images, frames, and code blocks when ideas need more than text.', color: '#06b6d4' },
     ],
   },
   connect: {
     icon: 'C',
     label: 'Connect',
-    eyebrow: '03 / Make meaning',
-    title: 'Draw relationships between ideas, places, decisions, activities, and evidence.',
-    description: 'Relations are not decoration. They explain cause, sequence, proof, dependency, and flow. Smart routing keeps connections readable as the board changes.',
+    eyebrow: '03 / Structure reasoning',
+    title: 'Connect ideas with quick-drag ports, assign semantic meaning, and audit board health.',
+    description: 'Lines in Canvio explain how ideas relate. Drag from any edge to connect, assign logical assertions like Contradicts or Depends on, and check graph health.',
     points: [
-      { glyph: '->', title: 'Dynamic arrows', text: 'Connect objects with readable routed lines that avoid important content.', color: '#38bdf8' },
-      { glyph: 'L', title: 'Meaningful labels', text: 'Name the relation: starts with, proves, prepares, depends on, or reveals.', color: '#f472b6' },
-      { glyph: 'PIN', title: 'Pin-level context', text: 'Map pins can act like real canvas anchors for site visits and place-based work.', color: '#22c55e' },
-      { glyph: 'F', title: 'Focus mode', text: 'Spotlight one object and its connected context during review or teaching.', color: '#a855f7' },
+      { glyph: 'QD', title: 'Quick-Connect drag', text: 'Drag from any node edge port to connect to an existing note or spawn a new connected note on empty space.', color: '#38bdf8' },
+      { glyph: '1-8', title: '8 Semantic types', text: 'Press 1–8 on any relation to specify Contradicts, Depends on, Enables, Based on, Part of, Leads to, or Inspired by.', color: '#f472b6' },
+      { glyph: 'R', title: 'Reasoning Partner (Ctrl+Shift+R)', text: 'Run local graph queries to detect orphans, circular dependencies, and contradiction pairs with health score 0–100.', color: '#a855f7' },
+      { glyph: 'CH', title: 'Challenge & Socratic modes', text: 'Ask the assistant to test weak assumptions or generate follow-up questions from the graph.', color: '#10b981' },
     ],
   },
   deliver: {
     icon: 'D',
     label: 'Deliver',
-    eyebrow: '04 / Share the result',
-    title: 'Present, collaborate, export, and keep the board useful after the session ends.',
-    description: 'A good whiteboard is not only a place to draw. It becomes a lesson artifact, study map, meeting record, planning document, or shared reference.',
+    eyebrow: '04 / Share & verify',
+    title: 'Present cleanly, guide attention with the laser pointer, and collaborate in real time.',
+    description: 'Keep the board useful during live reviews, collaborative work sessions, and long-term reference.',
     points: [
-      { glyph: 'P', title: 'Present mode', text: 'Hide editing tools, focus the discussion, and move through the board calmly.', color: '#6366f1' },
-      { glyph: 'LP', title: 'Laser pointer', text: 'Press Q or choose Laser Pointer to guide attention without drawing or saving a permanent mark.', color: '#ef4444' },
-      { glyph: 'CO', title: 'Live collaboration', text: 'Share a board URL and work together with cursors, selection, and presence.', color: '#22c55e' },
-      { glyph: 'EX', title: 'Export and archive', text: 'Save frame pages, PNG visuals, or portable JSON data for reuse and long-term access.', color: '#f59e0b' },
+      { glyph: 'P', title: 'Present mode', text: 'Hide editing tools, focus attention on the canvas, and navigate smoothly.', color: '#6366f1' },
+      { glyph: 'LP', title: 'Laser pointer (Q)', text: 'Guide live attention during discussions without creating or saving permanent marks.', color: '#ef4444' },
+      { glyph: 'CO', title: 'Real-time collaboration', text: 'Share a board URL to work simultaneously with live cursors and instant synchronization.', color: '#22c55e' },
+      { glyph: 'EX', title: 'Export & archive', text: 'Save PNG images, PDF exports, or raw JSON snapshots for backup and reuse.', color: '#f59e0b' },
     ],
   },
 };
 
 const CORE_STEPS: Array<{ id: FeatureTab; glyph: string; title: string; text: string }> = [
-  { id: 'start', glyph: '01', title: 'Start', text: 'Blank, model, or AI draft.' },
-  { id: 'build', glyph: '02', title: 'Add', text: 'Notes, shapes, ink, frames, media.' },
-  { id: 'connect', glyph: '03', title: 'Connect', text: 'Relations show how ideas work.' },
-  { id: 'deliver', glyph: '04', title: 'Use', text: 'Present, share, export, revisit.' },
+  { id: 'start', glyph: '01', title: 'Start', text: 'Blank, template, or AI draft.' },
+  { id: 'build', glyph: '02', title: 'Build & Sketch', text: 'Notes, media, and decoupled ink.' },
+  { id: 'connect', glyph: '03', title: 'Connect & Audit', text: 'Quick-connect, semantics, graph health.' },
+  { id: 'deliver', glyph: '04', title: 'Share & Present', text: 'Laser pointer, live sync, exports.' },
 ];
 
 const USE_CASES = [
@@ -270,12 +270,15 @@ export function HowItWorksPage() {
         </section>
 
         <section className="guide-shortcuts-section">
-          <h2>Quick controls</h2>
+          <h2>Quick keyboard controls</h2>
           <div className="shortcuts-grid">
             <div className="shortcut-card"><kbd>V</kbd><span>Select and move</span></div>
-            <div className="shortcut-card"><kbd>P</kbd><span>Draw with pen</span></div>
-            <div className="shortcut-card"><kbd>A</kbd><span>Draw arrow</span></div>
-            <div className="shortcut-card"><kbd>K</kbd><span>Highlighter</span></div>
+            <div className="shortcut-card"><kbd>P</kbd><span>Freehand pen</span></div>
+            <div className="shortcut-card"><kbd>E</kbd><span>Stroke eraser</span></div>
+            <div className="shortcut-card"><kbd>Q</kbd><span>Laser pointer</span></div>
+            <div className="shortcut-card"><kbd>1 – 8</kbd><span>Semantic relation type</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + K</kbd><span>AI Navigator</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + Shift + R</kbd><span>Reasoning Partner</span></div>
             <div className="shortcut-card"><kbd>Space + drag</kbd><span>Pan canvas</span></div>
             <div className="shortcut-card"><kbd>Ctrl + Z</kbd><span>Undo</span></div>
           </div>

@@ -649,7 +649,7 @@ body:has(.guide-page) {
 
 .shortcuts-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
   margin-top: 16px;
 }

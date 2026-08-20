@@ -1,0 +1,27 @@
+.free-ink-layer {
+  position: absolute;
+  top: -50000px;
+  left: -50000px;
+  width: 100000px;
+  height: 100000px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.free-ink-stroke {
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.free-ink-stroke--highlighter {
+  mix-blend-mode: screen;
+}
+
+[data-theme="light"] .free-ink-stroke--highlighter {
+  mix-blend-mode: multiply;
+}
+
+.free-ink-layer--eraser .free-ink-stroke--erasable:hover {
+  filter: url(#ink-eraser-glow);
+  opacity: 0.85 !important;
+  cursor: pointer;
+}

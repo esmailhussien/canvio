@@ -1,4 +1,4 @@
-import type { LivingNode, Relation, Viewport } from '../store/canvasStore';
+import type { LivingNode, Relation, Viewport, FreeInkStroke } from '../store/canvasStore';
 
 export const CANVIO_BACKUP_KIND = 'canvio.workspace.backup';
 export const CANVIO_BACKUP_SCHEMA_VERSION = 2;
@@ -21,15 +21,18 @@ export interface CanvioBackupDocument {
   counts: {
     nodes: number;
     relations: number;
+    inkStrokes?: number;
   };
   nodes: Record<string, LivingNode>;
   relations: Record<string, Relation>;
+  inkStrokes?: FreeInkStroke[];
 }
 
 export interface CanvioBackupImportResult {
   world: {
     nodes: Record<string, LivingNode>;
     relations: Record<string, Relation>;
+    inkStrokes?: FreeInkStroke[];
     viewport?: Viewport;
     appearance?: Appearance;
   };
@@ -51,6 +54,7 @@ export class CanvioBackupError extends Error {
 export function createCanvioBackupDocument(args: {
   nodes: Record<string, LivingNode>;
   relations: Record<string, Relation>;
+  inkStrokes?: FreeInkStroke[];
   worldId: string;
   viewport: Viewport;
   appearance: Appearance;
@@ -68,9 +72,11 @@ export function createCanvioBackupDocument(args: {
     counts: {
       nodes: Object.keys(args.nodes).length,
       relations: Object.keys(args.relations).length,
+      inkStrokes: args.inkStrokes ? args.inkStrokes.length : 0,
     },
     nodes: args.nodes,
     relations: args.relations,
+    inkStrokes: args.inkStrokes || [],
   };
 }
 
@@ -99,6 +105,8 @@ export function parseCanvioBackup(text: string): CanvioBackupImportResult {
     throw new CanvioBackupError('Import failed: backup does not contain a valid relations record.');
   }
 
+  const inkStrokes = normalizeInkStrokes(payload.inkStrokes);
+
   const { relations, removedRelations } = sanitizeRelations(relationsInput, nodes);
   const warnings = validateCounts(payload.counts, nodes, relationsInput);
   if (removedRelations > 0) {
@@ -109,6 +117,7 @@ export function parseCanvioBackup(text: string): CanvioBackupImportResult {
     world: {
       nodes,
       relations,
+      inkStrokes,
       viewport: isViewport(payload.viewport) ? {
         x: payload.viewport.x,
         y: payload.viewport.y,
@@ -196,6 +205,33 @@ function normalizeRelationRecord(value: unknown): Record<string, Relation> | nul
     };
   }
 
+  return result;
+}
+
+function normalizeInkStrokes(value: unknown): FreeInkStroke[] {
+  if (!Array.isArray(value)) return [];
+  const result: FreeInkStroke[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const stroke = raw as Partial<FreeInkStroke>;
+    if (typeof stroke.id !== 'string' || !Array.isArray(stroke.points) || stroke.points.length === 0) continue;
+    const cleanPoints: number[][] = [];
+    for (const pt of stroke.points) {
+      if (Array.isArray(pt) && pt.length >= 2 && Number.isFinite(pt[0]) && Number.isFinite(pt[1])) {
+        cleanPoints.push([Number(pt[0]), Number(pt[1]), Number.isFinite(pt[2]) ? Number(pt[2]) : 0.5]);
+      }
+    }
+    if (cleanPoints.length === 0) continue;
+    result.push({
+      id: stroke.id,
+      points: cleanPoints,
+      color: typeof stroke.color === 'string' ? stroke.color : '#f0f0f5',
+      width: Number.isFinite(stroke.width) ? Number(stroke.width) : 3,
+      opacity: Number.isFinite(stroke.opacity) ? Number(stroke.opacity) : undefined,
+      highlighter: Boolean(stroke.highlighter),
+      createdAt: Number.isFinite(stroke.createdAt) ? Number(stroke.createdAt) : Date.now(),
+    });
+  }
   return result;
 }
 

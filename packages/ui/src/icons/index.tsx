@@ -279,6 +279,18 @@ export const IconSparkles = (props: IconProps) => (
   </IconBase>
 );
 
+export const IconIdea = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="M9 18h6" />
+    <path d="M10 22h4" />
+    <path d="M12 2a7 7 0 0 0-7 7c0 2.6 1.4 4.8 3.5 6h7c2.1-1.2 3.5-3.4 3.5-6a7 7 0 0 0-7-7z" />
+    <line x1="12" y1="9" x2="12" y2="12" />
+    <line x1="10.5" y1="10.5" x2="13.5" y2="10.5" />
+  </IconBase>
+);
+
+export const IconLightbulb = IconIdea;
+
 export const IconMoreHorizontal = (props: IconProps) => (
   <IconBase {...props}>
     <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
@@ -349,3 +361,67 @@ export const IconHexagon = (props: IconProps) => (
     <polygon points="12 3 20.5 7.8 20.5 16.2 12 21 3.5 16.2 3.5 7.8" />
   </IconBase>
 );
+
+export const IconContradicts = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="M13 2L3 14h8l-1 8 11-12h-8l1-8z" />
+  </IconBase>
+);
+
+export const IconDependsOn = (props: IconProps) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="5" r="3" />
+    <line x1="12" y1="8" x2="12" y2="21" />
+    <path d="M5 12H2a10 10 0 0 0 20 0h-3" />
+    <line x1="9" y1="12" x2="15" y2="12" />
+  </IconBase>
+);
+
+export const IconEnables = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="m12 3 2.2 5.5L20 11l-5.8 2.5L12 19l-2.2-5.5L4 11l5.8-2.5L12 3z" />
+    <path d="M18 4v4M16 6h4" />
+  </IconBase>
+);
+
+export const IconBasedOn = (props: IconProps) => (
+  <IconBase {...props}>
+    <line x1="12" y1="17" x2="12" y2="22" />
+    <path d="M5 17h14" />
+    <path d="M7 17l1.5-8h7L17 17" />
+    <path d="M9 9V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v5" />
+  </IconBase>
+);
+
+export const IconPartOf = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="M18 6H9a5 5 0 0 0 0 10h9" />
+    <line x1="4" y1="20" x2="20" y2="20" />
+  </IconBase>
+);
+
+export const IconLeadsTo = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="M5 12h14" />
+    <path d="m13 6 6 6-6 6" />
+    <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+  </IconBase>
+);
+
+export const IconInspiredBy = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="M9 18h6" />
+    <path d="M10 22h4" />
+    <path d="M12 2a7 7 0 0 0-7 7c0 2.6 1.4 4.8 3.5 6h7c2.1-1.2 3.5-3.4 3.5-6a7 7 0 0 0-7-7z" />
+    <path d="m10 9 2 2 2-2" />
+  </IconBase>
+);
+
+export const IconRelatedTo = (props: IconProps) => (
+  <IconBase {...props}>
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="12" r="3" />
+    <line x1="9" y1="12" x2="15" y2="12" />
+  </IconBase>
+);
+

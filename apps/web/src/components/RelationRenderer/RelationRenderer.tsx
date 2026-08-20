@@ -54,6 +54,72 @@ function getNodeGeoCoords(node: LivingNode, portId?: string): [number, number] |
   return null;
 }
 
+function renderRelationIconPaths(relType?: string, color: string = 'currentColor') {
+  switch (relType) {
+    case 'contradicts':
+      return <path d="M13 2L3 14h8l-1 8 11-12h-8l1-8z" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />;
+    case 'depends_on':
+      return (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="5" r="3" />
+          <line x1="12" y1="8" x2="12" y2="21" />
+          <path d="M5 12H2a10 10 0 0 0 20 0h-3" />
+          <line x1="9" y1="12" x2="15" y2="12" />
+        </g>
+      );
+    case 'enables':
+      return (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m12 3 2.2 5.5L20 11l-5.8 2.5L12 19l-2.2-5.5L4 11l5.8-2.5L12 3z" />
+          <path d="M18 4v4M16 6h4" />
+        </g>
+      );
+    case 'based_on':
+      return (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="17" x2="12" y2="22" />
+          <path d="M5 17h14" />
+          <path d="M7 17l1.5-8h7L17 17" />
+          <path d="M9 9V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v5" />
+        </g>
+      );
+    case 'part_of':
+      return (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 6H9a5 5 0 0 0 0 10h9" />
+          <line x1="4" y1="20" x2="20" y2="20" />
+        </g>
+      );
+    case 'leads_to':
+      return (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14" />
+          <path d="m13 6 6 6-6 6" />
+          <circle cx="5" cy="12" r="1.5" fill={color} />
+        </g>
+      );
+    case 'inspired_by':
+      return (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 18h6" />
+          <path d="M10 22h4" />
+          <path d="M12 2a7 7 0 0 0-7 7c0 2.6 1.4 4.8 3.5 6h7c2.1-1.2 3.5-3.4 3.5-6a7 7 0 0 0-7-7z" />
+          <path d="m10 9 2 2 2-2" />
+        </g>
+      );
+    case 'related_to':
+      return (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="12" r="3" />
+          <line x1="9" y1="12" x2="15" y2="12" />
+        </g>
+      );
+    default:
+      return null;
+  }
+}
+
 export function RelationRenderer({ relations, nodes, presentationMode = false, focusNodeId = null }: Props) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const selectedRelationId = useCanvasStore((s) => s.selectedRelationId);
@@ -117,12 +183,38 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
         >
           <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--accent-primary)" />
         </marker>
+
+        <marker
+          id="dot-end"
+          viewBox="0 0 10 10"
+          refX="5"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+        >
+          <circle cx="5" cy="5" r="4" fill="currentColor" />
+        </marker>
+
+        <marker
+          id="diamond-end"
+          viewBox="0 0 10 10"
+          refX="5"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+        >
+          <path d="M 5 0 L 10 5 L 5 10 L 0 5 z" fill="currentColor" />
+        </marker>
       </defs>
 
       <style>{`
         @keyframes relationFlow {
           from { stroke-dashoffset: 28; }
           to { stroke-dashoffset: 0; }
+        }
+        @keyframes contradictionFlash {
+          0%, 100% { stroke-opacity: 0.85; filter: drop-shadow(0 0 2px #ef4444); }
+          50% { stroke-opacity: 1; filter: drop-shadow(0 0 8px #ef4444); }
         }
       `}</style>
 
@@ -156,9 +248,28 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
           : generateRelationPath(sourcePort, targetPort, style.type || 'straight');
 
         const isHovered = hoveredRelationId === rel.id;
+
+        // Visual Semantics per Relationship Type
+        const isContradiction = rel.relationship === 'contradicts';
+        const isDependency = rel.relationship === 'depends_on';
+        const isEnables = rel.relationship === 'enables';
+        const isBasedOn = rel.relationship === 'based_on';
+        const isPartOf = rel.relationship === 'part_of';
+        const isInspiredBy = rel.relationship === 'inspired_by';
+
+        let semanticColor = style.color || 'var(--relation-default)';
+        if (!style.color || style.color === 'var(--relation-default)') {
+          if (isContradiction) semanticColor = '#ef4444';
+          else if (isDependency) semanticColor = '#f59e0b';
+          else if (isEnables) semanticColor = '#10b981';
+          else if (isBasedOn) semanticColor = '#06b6d4';
+          else if (isPartOf) semanticColor = '#8b5cf6';
+          else if (isInspiredBy) semanticColor = '#ec4899';
+        }
+
         const lineColor = isSelected
           ? 'var(--accent-primary)'
-          : style.color || 'var(--relation-default)';
+          : semanticColor;
 
         const sourceCoords = getNodeGeoCoords(source, rel.sourcePort);
         const targetCoords = getNodeGeoCoords(target, rel.targetPort);
@@ -172,18 +283,73 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
           );
         }
 
+
+
         const baseLabel = rel.label || (rel.relationship && rel.relationship !== 'related_to' ? rel.relationship.replace('_', ' ') : '');
         const endpointLabel = source.type === 'map' || target.type === 'map'
           ? `${getRelationEndpointLabel(source, rel.sourcePort).slice(0, 36)} → ${getRelationEndpointLabel(target, rel.targetPort).slice(0, 36)}`
           : '';
-        const displayLabel = (endpointLabel
+        const rawDisplay = (endpointLabel
           ? (baseLabel ? `${baseLabel} • ${endpointLabel}` : endpointLabel)
           : baseLabel && distanceLabel
             ? `${baseLabel} • ${distanceLabel}`
             : baseLabel || distanceLabel)?.slice(0, 96);
 
-        const lineWidth = style.width || 2;
-        const shouldAnimate = style.animated || rel.relationship === 'leads_to';
+        const hasIcon = Boolean(rel.relationship && rel.relationship !== 'related_to');
+        const displayText = rawDisplay || (hasIcon ? rel.relationship?.replace('_', ' ') : '');
+
+        let badgeStroke = 'var(--border-strong)';
+        let badgeTint = 'rgba(148, 163, 184, 0.08)';
+        let textColor = 'var(--text-primary)';
+
+        if (isContradiction) {
+          badgeStroke = '#ef4444';
+          badgeTint = 'rgba(239, 68, 68, 0.14)';
+          textColor = '#ef4444';
+        } else if (isDependency) {
+          badgeStroke = '#f59e0b';
+          badgeTint = 'rgba(245, 158, 11, 0.14)';
+          textColor = '#f59e0b';
+        } else if (isEnables) {
+          badgeStroke = '#10b981';
+          badgeTint = 'rgba(16, 185, 129, 0.14)';
+          textColor = '#10b981';
+        } else if (isBasedOn) {
+          badgeStroke = '#06b6d4';
+          badgeTint = 'rgba(6, 182, 212, 0.14)';
+          textColor = '#06b6d4';
+        } else if (isPartOf) {
+          badgeStroke = '#8b5cf6';
+          badgeTint = 'rgba(139, 92, 246, 0.14)';
+          textColor = '#8b5cf6';
+        } else if (rel.relationship === 'leads_to') {
+          badgeStroke = '#3b82f6';
+          badgeTint = 'rgba(59, 130, 246, 0.14)';
+          textColor = '#3b82f6';
+        } else if (isInspiredBy) {
+          badgeStroke = '#ec4899';
+          badgeTint = 'rgba(236, 72, 153, 0.14)';
+          textColor = '#ec4899';
+        }
+
+        const charWidth = 6.8;
+        const iconSpace = hasIcon ? 18 : 0;
+        const textWidth = displayText ? displayText.length * charWidth : 0;
+        const pillWidth = Math.max(34, iconSpace + textWidth + 22);
+        const pillHeight = 24;
+        const pillRadius = 12;
+
+        const lineWidth = style.width || 2.5;
+        const shouldAnimate = style.animated || rel.relationship === 'leads_to' || isEnables;
+        const strokeDashArray = isContradiction
+          ? '6 4'
+          : isPartOf
+            ? '4 3'
+            : shouldAnimate
+              ? '8 6'
+              : style.dash
+                ? style.dash.join(' ')
+                : undefined;
 
         return (
           <g
@@ -192,7 +358,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
               pointerEvents: presentationMode ? 'none' : (isEraser || isSelectTool) ? 'auto' : 'none',
               cursor: presentationMode ? 'default' : isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
             }}
-            className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${recentRelationId === rel.id ? 'relation-group--new' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''}`}
+            className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${recentRelationId === rel.id ? 'relation-group--new' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''} ${isContradiction ? 'relation-group--contradiction' : ''}`}
             aria-label={`${getRelationEndpointLabel(source, rel.sourcePort)} ${rel.relationship || 'related to'} ${getRelationEndpointLabel(target, rel.targetPort)}`}
             onMouseEnter={() => setHoveredRelationId(rel.id)}
             onMouseLeave={() => setHoveredRelationId((id) => id === rel.id ? null : id)}
@@ -230,7 +396,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
                 className="relation-line-glow"
                 d={pathResult.pathD}
                 fill="none"
-                stroke="var(--accent-primary)"
+                stroke={isContradiction ? '#ef4444' : 'var(--accent-primary)'}
                 strokeWidth={lineWidth + (isSelected ? 8 : 6)}
                 strokeOpacity={isSelected ? 0.36 : 0.18}
                 strokeLinecap="round"
@@ -256,53 +422,77 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
               fill="none"
               stroke={lineColor}
               strokeWidth={lineWidth + 2}
-              strokeOpacity={isSelected || isHovered ? 0.22 : 0.12}
+              strokeOpacity={isSelected || isHovered ? 0.24 : 0.12}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
 
             {/* Visible Core Path */}
             <path
-              className={`relation-line-core ${shouldAnimate ? 'relation-animated' : ''}`}
+              className={`relation-line-core ${shouldAnimate ? 'relation-animated' : ''} ${isContradiction ? 'relation-contradiction' : ''}`}
               d={pathResult.pathD}
               fill="none"
               stroke={lineColor}
               strokeWidth={isSelected || isHovered ? lineWidth + 0.8 : lineWidth}
+              strokeDasharray={strokeDashArray}
               strokeLinecap="round"
               strokeLinejoin="round"
-              markerStart={style.startArrow === 'arrow' ? (isSelected ? 'url(#arrow-end-selected)' : 'url(#arrow-end)') : undefined}
-              markerEnd={style.endArrow === 'arrow' || rel.relationship === 'leads_to' ? (isSelected ? 'url(#arrow-end-selected)' : 'url(#arrow-end)') : undefined}
+              markerStart={style.startArrow === 'arrow' ? (isSelected ? 'url(#arrow-end-selected)' : 'url(#arrow-end)') : style.startArrow === 'diamond' ? 'url(#diamond-end)' : undefined}
+              markerEnd={style.endArrow === 'arrow' || rel.relationship === 'leads_to' || isDependency || isEnables ? (isSelected ? 'url(#arrow-end-selected)' : 'url(#arrow-end)') : style.endArrow === 'diamond' ? 'url(#diamond-end)' : undefined}
               style={{ color: lineColor }}
             />
 
             {/* Semantic Relationship Pill Label at Midpoint */}
-            {displayLabel && (
+            {(displayText || hasIcon) && (
               <g
                 transform={`translate(${pathResult.midPoint.x}, ${pathResult.midPoint.y})`}
                 style={{ pointerEvents: isSelectTool ? 'auto' : 'none' }}
               >
+                {/* 1. Solid opaque backdrop mask: completely blocks any underlying line/glow from showing through */}
                 <rect
-                  x={-(Math.max(displayLabel.length * 3.7, 16) + 12)}
-                  y={-12}
-                  width={Math.max(displayLabel.length * 7.4, 32) + 24}
-                  height={24}
-                  rx={12}
+                  x={-pillWidth / 2}
+                  y={-pillHeight / 2}
+                  width={pillWidth}
+                  height={pillHeight}
+                  rx={pillRadius}
                   fill="var(--relation-label-bg)"
-                  stroke={isSelected ? 'var(--accent-primary)' : 'var(--border-strong)'}
-                  strokeWidth={1}
                 />
-                <text
-                  x={0}
-                  y={1}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fill="var(--text-primary)"
-                  fontSize={11}
-                  fontWeight={600}
-                  fontFamily="var(--font-sans)"
-                >
-                  {displayLabel}
-                </text>
+
+                {/* 2. Semantic colored glass overlay with crisp outline */}
+                <rect
+                  x={-pillWidth / 2}
+                  y={-pillHeight / 2}
+                  width={pillWidth}
+                  height={pillHeight}
+                  rx={pillRadius}
+                  fill={badgeTint}
+                  stroke={isSelected ? 'var(--accent-primary)' : badgeStroke}
+                  strokeWidth={isSelected ? 1.8 : 1.2}
+                />
+
+                {/* 3. Creative Vector SVG Icon */}
+                {hasIcon && (
+                  <g transform={`translate(${displayText ? -pillWidth / 2 + 8 : -6.5}, -6.5) scale(0.55)`}>
+                    {renderRelationIconPaths(rel.relationship, badgeStroke)}
+                  </g>
+                )}
+
+                {/* 4. Crisp High-Contrast Label Text */}
+                {displayText && (
+                  <text
+                    x={hasIcon ? -pillWidth / 2 + 24 : 0}
+                    y={1}
+                    textAnchor={hasIcon ? 'start' : 'middle'}
+                    dominantBaseline="middle"
+                    fill={textColor}
+                    fontSize={11}
+                    fontWeight={650}
+                    letterSpacing="0.01em"
+                    fontFamily="var(--font-sans)"
+                  >
+                    {displayText}
+                  </text>
+                )}
               </g>
             )}
           </g>

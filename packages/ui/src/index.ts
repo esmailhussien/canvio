@@ -30,6 +30,8 @@ export {
   IconShape,
   IconFrame,
   IconSparkles,
+  IconIdea,
+  IconLightbulb,
   IconMoreHorizontal,
   IconPagePortrait,
   IconPageLandscape,
@@ -40,6 +42,14 @@ export {
   IconDiamond,
   IconTriangle,
   IconHexagon,
+  IconContradicts,
+  IconDependsOn,
+  IconEnables,
+  IconBasedOn,
+  IconPartOf,
+  IconLeadsTo,
+  IconInspiredBy,
+  IconRelatedTo,
   type IconProps
 } from './icons';
 export { Tooltip } from './components/Tooltip';

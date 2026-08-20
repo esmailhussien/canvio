@@ -625,10 +625,41 @@ export function exportAsJSON(nodes: Record<string, LivingNode>, relations: Recor
     viewport: store.viewport,
     nodes,
     relations,
+    inkStrokes: store.inkStrokes,
   });
 
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8' });
   downloadBlob(blob, `canvio-workspace-${safeName(worldId)}.json`);
+}
+
+function drawFreeInkStrokes(ctx: CanvasContext, inkStrokes: ReturnType<typeof useCanvasStore.getState>['inkStrokes'], minX: number, minY: number) {
+  if (!inkStrokes || inkStrokes.length === 0) return;
+  for (const stroke of inkStrokes) {
+    if (!stroke.points || stroke.points.length === 0) continue;
+    const isHighlighter = Boolean(stroke.highlighter);
+    const strokeWidth = stroke.width || (isHighlighter ? 18 : 3);
+    const adjustedPoints = stroke.points.map(([x, y, p]) => [x - minX, y - minY, p]);
+    const outline = getStroke(adjustedPoints, {
+      size: strokeWidth,
+      thinning: isHighlighter ? 0 : 0.45,
+      smoothing: 0.65,
+      streamline: 0.55,
+      simulatePressure: true,
+      last: true,
+    });
+    if (outline.length === 0) continue;
+    ctx.save();
+    ctx.fillStyle = stroke.color || '#f0f0f5';
+    ctx.globalAlpha = stroke.opacity !== undefined ? stroke.opacity : (isHighlighter ? 0.35 : 1);
+    ctx.beginPath();
+    ctx.moveTo(outline[0][0], outline[0][1]);
+    for (let i = 1; i < outline.length; i++) {
+      ctx.lineTo(outline[i][0], outline[i][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 /**
@@ -638,6 +669,7 @@ export async function exportAsPNG(worldId: string) {
   const store = useCanvasStore.getState();
   const nodes = store.nodes || {};
   const relations = store.relations || {};
+  const inkStrokes = store.inkStrokes || [];
   const allNodes = Object.values(nodes).sort((a, b) => a.zIndex - b.zIndex);
   const allRelations = Object.values(relations);
   const canvasBackground = store.canvasBackground || (store.theme === 'light' ? '#f5f5f7' : '#0a0a0f');
@@ -660,6 +692,17 @@ export async function exportAsPNG(worldId: string) {
     minY = Math.min(...allNodes.map(n => n.position.y)) - 90;
     maxX = Math.max(...allNodes.map(n => n.position.x + n.size.width)) + 90;
     maxY = Math.max(...allNodes.map(n => n.position.y + n.size.height)) + 90;
+  }
+
+  if (inkStrokes.length > 0) {
+    inkStrokes.forEach((st) => {
+      st.points?.forEach(([x, y]) => {
+        minX = Math.min(minX, x - 60);
+        minY = Math.min(minY, y - 60);
+        maxX = Math.max(maxX, x + 60);
+        maxY = Math.max(maxY, y + 60);
+      });
+    });
   }
 
   const exportWidth = Math.ceil(Math.max(800, maxX - minX));
@@ -689,6 +732,7 @@ export async function exportAsPNG(worldId: string) {
   }
 
   drawRelations(ctx, allRelations, nodes, minX, minY, casingColor, labelBg, textColor);
+  drawFreeInkStrokes(ctx, inkStrokes, minX, minY);
 
   for (const node of allNodes) {
     const x = node.position.x - minX;

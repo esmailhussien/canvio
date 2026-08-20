@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
-import { IconDraw, IconHighlighter, IconArrowTool, IconSparkles } from '@canvio/ui';
+import { IconDraw, IconHighlighter, IconArrowTool, IconSparkles, IconSticky } from '@canvio/ui';
 import './PenInspector.css';
 
 const PEN_COLORS = [
@@ -43,6 +43,8 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
   const setStrokeColor = useCanvasStore((s) => s.setStrokeColor);
   const setStrokeWidth = useCanvasStore((s) => s.setStrokeWidth);
   const theme = useCanvasStore((s) => s.theme);
+  const inkStrokes = useCanvasStore((s) => s.inkStrokes);
+  const convertInkToNode = useCanvasStore((s) => s.convertInkToNode);
 
   React.useEffect(() => {
     if (activeTool !== 'draw' && activeTool !== 'highlighter' && activeTool !== 'arrow') return;
@@ -126,6 +128,21 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
             <IconSparkles size={14} />
             <span>Ink-to-Shape {autoShapeEnabled ? 'ON' : 'OFF'}</span>
           </button>
+
+          {/* Ink-to-Sticky Note Conversion */}
+          {inkStrokes.length > 0 && (
+            <>
+              <div className="pen-inspector__divider" />
+              <button
+                className="pen-convert-btn"
+                onClick={() => convertInkToNode()}
+                title="Convert drawn ink into an editable sticky note"
+              >
+                <IconSticky size={14} />
+                <span>To Sticky ({inkStrokes.length})</span>
+              </button>
+            </>
+          )}
         </>
       )}
     </div>

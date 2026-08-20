@@ -35,7 +35,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   const removeNode = useCanvasStore(s => s.removeNode);
 
   const isRelationSource = relationSourceId === node.id;
-  const isRelationTarget = activeTool === 'relation' &&
+  const isRelationTarget =
     relationTargetId === node.id &&
     (relationSourceId !== node.id || relationTargetPort !== relationSourcePort);
   const isFocusDimmed = Boolean(focusNodeId && focusNodeId !== node.id);
@@ -502,11 +502,137 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   const handlePortStart = (portPos: 'top' | 'right' | 'bottom' | 'left') => (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!relationSourceId) {
-      setRelationSource(node.id, portPos);
-    } else {
+
+    // If already aiming a relation and clicking another node's port, complete it
+    if (relationSourceId && relationSourceId !== node.id) {
       completeRelationTo(portPos);
+      return;
     }
+
+    setRelationSource(node.id, portPos);
+
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    let hasMoved = false;
+
+    const handleWindowPointerMove = (moveEv: PointerEvent) => {
+      const dist = Math.hypot(moveEv.clientX - startClientX, moveEv.clientY - startClientY);
+      if (dist > 4) {
+        hasMoved = true;
+      }
+
+      // Hit-test element under pointer for snap target
+      const elementsUnderPointer = document.elementsFromPoint(moveEv.clientX, moveEv.clientY);
+      let targetNodeEl: HTMLElement | null = null;
+
+      for (const el of elementsUnderPointer) {
+        const found = (el as HTMLElement).closest('[data-node-id]') as HTMLElement | null;
+        if (found && found.getAttribute('data-node-id') !== node.id) {
+          targetNodeEl = found;
+          break;
+        }
+      }
+
+      if (targetNodeEl) {
+        const targetId = targetNodeEl.getAttribute('data-node-id');
+        if (targetId) {
+          const rect = targetNodeEl.getBoundingClientRect();
+          const distances = [
+            { port: 'top' as const, value: Math.abs(moveEv.clientY - rect.top) },
+            { port: 'right' as const, value: Math.abs(rect.right - moveEv.clientX) },
+            { port: 'bottom' as const, value: Math.abs(rect.bottom - moveEv.clientY) },
+            { port: 'left' as const, value: Math.abs(moveEv.clientX - rect.left) },
+          ];
+          distances.sort((a, b) => a.value - b.value);
+          setRelationTarget(targetId, distances[0].port);
+        }
+      } else {
+        setRelationTarget(null);
+      }
+    };
+
+    const handleWindowPointerUp = (upEv: PointerEvent) => {
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerUp);
+
+      const state = useCanvasStore.getState();
+      const currentTargetId = state.relationTargetId;
+      const currentTargetPort = state.relationTargetPort;
+
+      if (currentTargetId && currentTargetId !== node.id) {
+        // Complete the relation!
+        const newRelId = nanoid(10);
+        state.addRelation({
+          id: newRelId,
+          sourceId: node.id,
+          sourcePort: portPos,
+          targetId: currentTargetId,
+          targetPort: currentTargetPort || undefined,
+          relationship: 'related_to',
+          style: {
+            color: 'var(--relation-default)',
+            width: 2,
+            type: 'orthogonal',
+            startArrow: 'none',
+            endArrow: 'arrow',
+          },
+        });
+        state.selectRelation(newRelId);
+      } else if (hasMoved) {
+        // Dropped onto empty space: if dragged > 50px, spawn a connected sticky note!
+        const canvasEl = document.querySelector('.canvas') as HTMLElement | null;
+        const rect = canvasEl?.getBoundingClientRect() || { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+        const viewport = state.viewport;
+        const dropWorldX = (upEv.clientX - rect.left - rect.width / 2) / viewport.zoom - viewport.x;
+        const dropWorldY = (upEv.clientY - rect.top - rect.height / 2) / viewport.zoom - viewport.y;
+
+        const distFromSource = Math.hypot(dropWorldX - node.position.x, dropWorldY - node.position.y);
+        if (distFromSource > 60) {
+          const newStickyId = nanoid(10);
+          const newRelId = nanoid(10);
+          const zIndex = state.nextZIndex();
+
+          state.addNode({
+            id: newStickyId,
+            type: 'sticky',
+            position: { x: dropWorldX - 100, y: dropWorldY - 70 },
+            size: { width: 200, height: 140 },
+            rotation: 0,
+            zIndex,
+            locked: false,
+            data: { text: '', color: state.stickyColor || 'yellow' },
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+
+          // Determine nearest edge port on the new sticky
+          state.addRelation({
+            id: newRelId,
+            sourceId: node.id,
+            sourcePort: portPos,
+            targetId: newStickyId,
+            targetPort: portPos === 'right' ? 'left' : portPos === 'left' ? 'right' : portPos === 'bottom' ? 'top' : 'bottom',
+            relationship: 'leads_to',
+            style: {
+              color: 'var(--relation-default)',
+              width: 2,
+              type: 'orthogonal',
+              startArrow: 'none',
+              endArrow: 'arrow',
+            },
+          });
+
+          state.selectNodes([newStickyId]);
+        }
+      }
+
+      state.setRelationSourceId(null);
+    };
+
+    window.addEventListener('pointermove', handleWindowPointerMove);
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerUp);
   };
 
   const handleNodeEnter = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -515,7 +641,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   };
 
   const updateRelationTargetForNode = (e?: React.MouseEvent<HTMLDivElement>) => {
-    if (activeTool === 'relation' && relationSourceId && relationSourceId !== node.id) {
+    if (relationSourceId && relationSourceId !== node.id) {
       setRelationTarget(node.id, e ? getNearestEdgePort(e.clientX, e.clientY) : undefined);
     }
   };
@@ -528,7 +654,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   };
 
   const handlePortEnter = (portPos: 'top' | 'right' | 'bottom' | 'left') => () => {
-    if (activeTool === 'relation' && relationSourceId && relationSourceId !== node.id) {
+    if (relationSourceId && relationSourceId !== node.id) {
       setRelationTarget(node.id, portPos);
     }
   };

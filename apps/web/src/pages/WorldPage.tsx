@@ -12,12 +12,13 @@ import { Minimap } from '../components/Minimap/Minimap';
 import { applyTemplate } from '../utils/templates';
 import { useCanvasStore } from '../store/canvasStore';
 import { useCollaboration } from '../hooks/useCollaboration';
-import { createBoard, touchBoard, updateBoardAppearance } from '../utils/api';
 import { RelationInspector } from '../components/RelationInspector/RelationInspector';
 import { PenInspector } from '../components/PenInspector/PenInspector';
+import { GraphIntelligence } from '../components/GraphIntelligence/GraphIntelligence';
 import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
 import { getPlugin } from '@canvio/objects';
 import { fitViewportToNodes } from '../utils/viewportFit';
+import { createBoard, forkBoard, touchBoard, updateBoardAppearance, BoardRecord } from '../utils/api';
 import './WorldPage.css';
 
 const TOOL_GUIDANCE: Record<string, { label: string; detail: string }> = {
@@ -38,14 +39,7 @@ const TOOL_GUIDANCE: Record<string, { label: string; detail: string }> = {
   code: { label: 'Code', detail: 'Click anywhere to place a code block.' },
 };
 
-function AISparkleIcon({ size = 19 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block', flexShrink: 0 }}>
-      <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-      <path d="M19 2.5C19 4.5 20.5 6 22.5 6C20.5 6 19 7.5 19 9.5C19 7.5 17.5 6 15.5 6C17.5 6 19 4.5 19 2.5Z" opacity="0.8" />
-    </svg>
-  );
-}
+
 
 const BACKGROUND_SWATCHES = [
   { value: null, label: 'Use theme background', preview: 'linear-gradient(135deg, #0a0a0f 0 50%, #f5f5f7 50% 100%)', grid: null },
@@ -79,9 +73,13 @@ export function WorldPage() {
   const replaceWorld = useCanvasStore((s) => s.replaceWorld);
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
   const branchSelectionAsExperiment = useCanvasStore((s) => s.branchSelectionAsExperiment);
+
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
   const isAIOpen = useCanvasStore((s) => s.isAIAssistantOpen);
   const setIsAIOpen = useCanvasStore((s) => s.setAIAssistantOpen);
+  const [isReasoningOpen, setIsReasoningOpen] = useState(false);
+  const [boardRecord, setBoardRecord] = useState<BoardRecord | null>(null);
+  const [isForking, setIsForking] = useState(false);
   const [isCanvioMenuOpen, setIsCanvioMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isStarterDismissed, setIsStarterDismissed] = useState(false);
@@ -263,6 +261,22 @@ export function WorldPage() {
     };
   }, [worldId, theme, canvasBackground]);
 
+  const handleForkWorld = async () => {
+    if (!worldId || isForking) return;
+    setIsForking(true);
+    try {
+      const forked = await forkBoard(worldId);
+      if (forked?.url) {
+        navigate(forked.url);
+      }
+    } catch (err) {
+      console.error('Failed to fork world:', err);
+      window.alert('Unable to remix board. Please try again.');
+    } finally {
+      setIsForking(false);
+    }
+  };
+
   // Close menus when clicking anywhere outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | PointerEvent) => {
@@ -280,12 +294,16 @@ export function WorldPage() {
     return () => window.removeEventListener('pointerdown', handleClickOutside);
   }, [isCanvioMenuOpen, isExportMenuOpen]);
 
-  // Ctrl+K shortcut for Spatial AI Navigator
+  // Ctrl+K shortcut for Spatial AI Navigator, Ctrl+Shift+R for Reasoning Partner
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         setIsAIOpen(!useCanvasStore.getState().isAIAssistantOpen);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        setIsReasoningOpen((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -450,8 +468,8 @@ export function WorldPage() {
                   setIsStarterDismissed(true);
                 }}
               >
-                <AISparkleIcon size={22} />
-                <span>Ask Spatial AI</span>
+                <span className="material-symbols-outlined text-xl">auto_awesome</span>
+                <span>Generate with AI</span>
               </button>
             </div>
           </div>
@@ -799,12 +817,25 @@ export function WorldPage() {
           </button>
 
           <button
+            className={`header-ai-btn ${isReasoningOpen ? 'active' : ''}`}
+            onClick={() => setIsReasoningOpen((prev) => !prev)}
+            aria-label="Visual Reasoning Partner & Graph Health"
+            title="Visual Reasoning Partner & Graph Health (Ctrl+Shift+R)"
+            style={{
+              background: isReasoningOpen ? 'rgba(99, 102, 241, 0.25)' : undefined,
+              color: isReasoningOpen ? '#c0c1ff' : undefined,
+            }}
+          >
+            <span className="material-symbols-outlined text-base">psychology</span>
+          </button>
+
+          <button
             className="header-ai-btn"
             onClick={() => setIsAIOpen(true)}
-            aria-label="Spatial AI Assistant"
-            title="Open Spatial AI Assistant"
+            aria-label="AI Assistant"
+            title="AI Assistant (Ctrl+K)"
           >
-            <AISparkleIcon size={19} />
+            <span className="material-symbols-outlined text-base">auto_awesome</span>
           </button>
 
           <ShareButton worldId={worldId || ''} />
@@ -873,6 +904,13 @@ export function WorldPage() {
       />
 
       <AIAssistantModal isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
+
+      <GraphIntelligence
+        isOpen={isReasoningOpen}
+        onClose={() => setIsReasoningOpen(false)}
+        onFocusNode={setFocusNodeId}
+      />
+
       {!isPresenting && Object.keys(nodes).length > 0 && <Minimap />}
     </div>
   );

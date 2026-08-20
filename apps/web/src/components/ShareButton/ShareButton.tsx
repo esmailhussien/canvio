@@ -18,20 +18,22 @@ export function ShareButton({ worldId }: { worldId: string }) {
   const [status, setStatus] = useState<ShareStatus>('idle');
   const [shareUrl, setShareUrl] = useState('');
   const [name, setName] = useState(getSavedName);
+  const [isPublic, setIsPublic] = useState(false);
   const [errorText, setErrorText] = useState('Unable to create a share link.');
 
-  const openShare = async () => {
+  const openShare = async (forcePublic = isPublic) => {
     setIsOpen(true);
     setStatus('loading');
     setShareUrl('');
     setErrorText('Unable to create a share link.');
 
     try {
-      const shareResult = worldId ? await createBoardShareLink(worldId) : null;
+      const shareResult = worldId ? await createBoardShareLink(worldId, forcePublic) : null;
       const nextUrl = shareResult?.url
         ? new URL(shareResult.url, window.location.origin).href
         : window.location.href;
       setShareUrl(nextUrl);
+      setIsPublic(Boolean(shareResult?.isPublic));
       setStatus('ready');
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 429) {
@@ -43,6 +45,12 @@ export function ShareButton({ worldId }: { worldId: string }) {
       }
       setStatus('error');
     }
+  };
+
+  const handleTogglePublic = async () => {
+    const nextPublic = !isPublic;
+    setIsPublic(nextPublic);
+    await openShare(nextPublic);
   };
 
   useEffect(() => {
@@ -112,7 +120,7 @@ export function ShareButton({ worldId }: { worldId: string }) {
 
   return (
     <>
-      <button className="share-btn" onClick={openShare} title="Share this board" aria-label="Share this board">
+      <button className="share-btn" onClick={() => openShare(isPublic)} title="Share this board" aria-label="Share this board">
         <IconShare size={16} />
         <span>Share</span>
       </button>
@@ -128,8 +136,8 @@ export function ShareButton({ worldId }: { worldId: string }) {
           >
             <header className="share-dialog__header">
               <div>
-                <p className="share-dialog__eyebrow">Live collaboration</p>
-                <h2 id="share-dialog-title">Invite people to this board</h2>
+                <p className="share-dialog__eyebrow">Live collaboration & Remixing</p>
+                <h2 id="share-dialog-title">Invite & Share this World</h2>
               </div>
               <button className="share-dialog__close" onClick={() => setIsOpen(false)} aria-label="Close share dialog" title="Close">
                 <IconX size={20} />
@@ -147,13 +155,13 @@ export function ShareButton({ worldId }: { worldId: string }) {
             </label>
 
             {status === 'loading' && (
-              <div className="share-dialog__loading" role="status">Creating a private collaboration link...</div>
+              <div className="share-dialog__loading" role="status">Configuring sharing link...</div>
             )}
 
             {status === 'error' && (
               <div className="share-dialog__error" role="alert">
                 <span>{errorText}</span>
-                <button type="button" onClick={openShare}>Try again</button>
+                <button type="button" onClick={() => openShare(isPublic)}>Try again</button>
               </div>
             )}
 
@@ -173,16 +181,29 @@ export function ShareButton({ worldId }: { worldId: string }) {
                   </div>
                 </div>
 
+                <div className="share-dialog__field" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>Public World & Remixing</span>
+                    <p style={{ margin: '2px 0 0 0', fontSize: 11, color: 'var(--text-secondary)' }}>Allow anyone to view and fork a clone into their own workspace.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={handleTogglePublic}
+                    style={{ width: 18, height: 18, cursor: 'pointer' }}
+                  />
+                </div>
+
                 <div className="share-dialog__qr-wrap">
                   <img src={qrUrl} alt="QR code for the Canvio collaboration link" />
                 </div>
 
                 <div className="share-dialog__privacy">
                   <strong>
-                    <span className="material-symbols-outlined" aria-hidden="true">lock</span>
-                    Private board link
+                    <span className="material-symbols-outlined" aria-hidden="true">{isPublic ? 'public' : 'lock'}</span>
+                    {isPublic ? 'Public & Forkable World' : 'Private link with live sync'}
                   </strong>
-                  <p>Only people with this link can join. Board content is not added to public search.</p>
+                  <p>{isPublic ? 'Anyone with the link can view and fork this world to build upon your mental model.' : 'Only people with this link can join. Board content is not listed publicly.'}</p>
                 </div>
               </>
             )}

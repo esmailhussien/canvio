@@ -65,8 +65,61 @@ export interface NodePlugin<T extends Record<string, unknown> = Record<string, u
   getSummary?(node: LivingNode): string;
 }
 
+// Free Ink Stroke — for freehand canvas sketching without node encapsulation
+export interface FreeInkStroke {
+  id: string;
+  points: number[][]; // [x, y, pressure]
+  color: string;
+  width: number;
+  opacity?: number;
+  highlighter?: boolean;
+  createdAt: number;
+}
+
+// Graph Reasoning Insights
+export type GraphInsightType =
+  | 'contradiction'
+  | 'orphan'
+  | 'dependency_chain'
+  | 'missing_evidence'
+  | 'cycle'
+  | 'unanchored_claim'
+  | 'suggestion';
+
+export interface GraphInsight {
+  id: string;
+  type: GraphInsightType;
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  description: string;
+  nodeIds: string[];
+  relationIds?: string[];
+  suggestedAction?: {
+    label: string;
+    type: 'add_relation' | 'resolve_contradiction' | 'focus_nodes' | 'add_evidence' | 'break_cycle';
+    payload?: Record<string, unknown>;
+  };
+}
+
 // Tool mode
-export type ToolMode = 'select' | 'pan' | 'draw' | 'highlighter' | 'laser' | 'arrow' | 'text' | 'sticky' | 'map' | 'relation' | 'eraser' | 'image' | 'shape' | 'frame' | 'code';
+export type ToolMode =
+  | 'select'
+  | 'pan'
+  | 'draw'
+  | 'highlighter'
+  | 'laser'
+  | 'arrow'
+  | 'text'
+  | 'sticky'
+  | 'map'
+  | 'relation'
+  | 'eraser'
+  | 'image'
+  | 'shape'
+  | 'frame'
+  | 'code'
+  | 'ink'
+  | 'lasso';
 
 // User presence
 export interface UserPresence {
@@ -85,6 +138,8 @@ export interface CanvasState {
   nodes: Map<string, LivingNode>;
   // Relations
   relations: Map<string, Relation>;
+  // Free ink strokes
+  inkStrokes?: FreeInkStroke[];
   // Selection
   selectedNodeIds: Set<string>;
   // Tool

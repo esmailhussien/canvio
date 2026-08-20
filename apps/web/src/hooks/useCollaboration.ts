@@ -176,6 +176,9 @@ export function useCollaboration(worldId: string) {
           if (parsed.relations) {
             Object.values(parsed.relations).forEach((rel: any) => upsertRelationRemote(rel));
           }
+          if (parsed.inkStrokes && Array.isArray(parsed.inkStrokes)) {
+            useCanvasStore.getState().replaceInkStrokes(parsed.inkStrokes);
+          }
           if (isStoredViewport(parsed.viewport)) {
             useCanvasStore.getState().setViewport({
               x: parsed.viewport.x,
@@ -469,6 +472,7 @@ export function useCollaboration(worldId: string) {
         setStorageItem(storageKey, {
           nodes: store.nodes,
           relations: store.relations,
+          inkStrokes: store.inkStrokes,
           viewport: store.viewport,
           savedAt: Date.now(),
         }).then(() => {

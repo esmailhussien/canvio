@@ -3,12 +3,24 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { nanoid } from 'nanoid';
 import type {
   Point, Size, Viewport, LivingNode, Relation, RelationStyle,
-  RelationshipType, ToolMode
+  RelationshipType, ToolMode, FreeInkStroke
 } from '@canvio/core';
 
 // Re-export types for backward compatibility — other files import types from here
-export type { Point, Size, Viewport, LivingNode, Relation, RelationStyle, RelationshipType, ToolMode };
+export type { Point, Size, Viewport, LivingNode, Relation, RelationStyle, RelationshipType, ToolMode, FreeInkStroke };
 export type ThemePreference = 'system' | 'dark' | 'light';
+
+function pointToSegmentDistance(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+  return Math.hypot(px - projX, py - projY);
+}
 
 interface CanvasStore {
   // Viewport
@@ -44,6 +56,15 @@ interface CanvasStore {
   updateRelation: (id: string, updates: Partial<Relation>) => void;
   removeRelation: (id: string) => void;
   removeRelationRemote: (id: string) => void;
+
+  // Free Ink Layer (Drawing without node encapsulation)
+  inkStrokes: FreeInkStroke[];
+  addInkStroke: (stroke: FreeInkStroke) => void;
+  removeInkStroke: (id: string) => void;
+  eraseInkAt: (point: { x: number; y: number }, radius?: number) => boolean;
+  clearAllInk: () => void;
+  replaceInkStrokes: (strokes: FreeInkStroke[]) => void;
+  convertInkToNode: (strokeIds?: string[], targetType?: 'sticky' | 'text' | 'shape') => LivingNode | null;
 
   // Selection
   selectedNodeIds: string[];
@@ -90,8 +111,16 @@ interface CanvasStore {
   setAppearance: (appearance: { theme?: 'dark' | 'light'; canvasBackground?: string | null }) => void;
 
   // Undo / Redo
-  past: Array<{ nodes: Record<string, LivingNode>; relations: Record<string, Relation> }>;
-  future: Array<{ nodes: Record<string, LivingNode>; relations: Record<string, Relation> }>;
+  past: Array<{
+    nodes: Record<string, LivingNode>;
+    relations: Record<string, Relation>;
+    inkStrokes: FreeInkStroke[];
+  }>;
+  future: Array<{
+    nodes: Record<string, LivingNode>;
+    relations: Record<string, Relation>;
+    inkStrokes: FreeInkStroke[];
+  }>;
   undo: () => void;
   redo: () => void;
   snapshot: () => void;
@@ -112,6 +141,7 @@ interface CanvasStore {
   replaceWorld: (world: {
     nodes: Record<string, LivingNode>;
     relations: Record<string, Relation>;
+    inkStrokes?: FreeInkStroke[];
     viewport?: Viewport;
     appearance?: { theme?: 'dark' | 'light'; canvasBackground?: string | null };
   }) => void;
@@ -132,6 +162,12 @@ const getInitialTheme = (): 'dark' | 'light' => {
   if (typeof window === 'undefined') return 'dark';
   const preference = getInitialThemePreference();
   return preference === 'system' ? getSystemTheme() : preference;
+};
+
+const getInitialStrokeColor = (): string => {
+  if (typeof window === 'undefined') return '#f0f0f5';
+  const theme = getInitialTheme();
+  return theme === 'light' ? '#0f172a' : '#f0f0f5';
 };
 
 const getInitialCanvasBackground = (): string | null => {
@@ -182,7 +218,7 @@ export const useCanvasStore = create(
   // Nodes
   nodes: {},
   addNode: (node) => set((s) => ({
-    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
     future: [],
     nodes: { ...s.nodes, [node.id]: node }
   })),
@@ -229,7 +265,7 @@ export const useCanvasStore = create(
       }
     });
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       nodes: rest,
       relations: cleanRelations,
@@ -246,7 +282,7 @@ export const useCanvasStore = create(
       }
     });
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       nodes: newNodes,
       relations: cleanRelations,
@@ -281,7 +317,7 @@ export const useCanvasStore = create(
       updatedAt: Date.now(),
     };
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       nodes: { ...s.nodes, [newId]: duplicated },
       selectedNodeIds: [newId]
@@ -332,7 +368,7 @@ export const useCanvasStore = create(
     });
 
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       nodes: { ...s.nodes, ...newNodes },
       relations: { ...s.relations, ...newRelations },
@@ -377,7 +413,7 @@ export const useCanvasStore = create(
   // Relations
   relations: {},
   addRelation: (relation) => set((s) => ({
-    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
     future: [],
     relations: { ...s.relations, [relation.id]: relation }
   })),
@@ -390,7 +426,7 @@ export const useCanvasStore = create(
   removeRelation: (id) => set((s) => {
     const { [id]: _, ...rest } = s.relations;
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       relations: rest
     };
@@ -399,6 +435,117 @@ export const useCanvasStore = create(
     const { [id]: _, ...rest } = s.relations;
     return { relations: rest };
   }),
+
+  // Free Ink Layer (Drawing without node encapsulation)
+  inkStrokes: [],
+  addInkStroke: (stroke) => set((s) => ({
+    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
+    future: [],
+    inkStrokes: [...s.inkStrokes, stroke],
+  })),
+  removeInkStroke: (id) => set((s) => ({
+    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
+    future: [],
+    inkStrokes: s.inkStrokes.filter((st) => st.id !== id),
+  })),
+  eraseInkAt: (point, radius = 18) => {
+    const s = get();
+    if (s.inkStrokes.length === 0) return false;
+    let hit = false;
+    const remainingStrokes = s.inkStrokes.filter((stroke) => {
+      const pts = stroke.points;
+      if (!pts || pts.length === 0) return true;
+      const strokeRadius = Math.max(radius, (stroke.width || 3) / 2 + 8);
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        if (Math.hypot(p1[0] - point.x, p1[1] - point.y) <= strokeRadius) {
+          hit = true;
+          return false;
+        }
+        if (i < pts.length - 1) {
+          const p2 = pts[i + 1];
+          const dist = pointToSegmentDistance(point.x, point.y, p1[0], p1[1], p2[0], p2[1]);
+          if (dist <= strokeRadius) {
+            hit = true;
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+
+    if (hit) {
+      set({
+        past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
+        future: [],
+        inkStrokes: remainingStrokes,
+      });
+      return true;
+    }
+    return false;
+  },
+  clearAllInk: () => set((s) => ({
+    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
+    future: [],
+    inkStrokes: [],
+  })),
+  replaceInkStrokes: (inkStrokes) => set({ inkStrokes }),
+  convertInkToNode: (strokeIds, targetType = 'sticky') => {
+    const s = get();
+    const targetStrokes = strokeIds && strokeIds.length > 0
+      ? s.inkStrokes.filter((st) => strokeIds.includes(st.id))
+      : s.inkStrokes;
+
+    if (targetStrokes.length === 0) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    targetStrokes.forEach((st) => {
+      st.points.forEach(([x, y]) => {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      });
+    });
+
+    if (!Number.isFinite(minX)) return null;
+
+    const width = Math.max(220, maxX - minX + 50);
+    const height = Math.max(160, maxY - minY + 50);
+    const id = nanoid(10);
+    const zIndex = s.nextZIndex();
+
+    const newNode: LivingNode = {
+      id,
+      type: targetType,
+      position: { x: minX - 25, y: minY - 25 },
+      size: { width, height },
+      rotation: 0,
+      zIndex,
+      locked: false,
+      data: targetType === 'sticky' ? { text: '', color: s.stickyColor || 'yellow' } : { text: '' },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const targetStrokeIdSet = new Set(targetStrokes.map((st) => st.id));
+    const remainingStrokes = s.inkStrokes.filter((st) => !targetStrokeIdSet.has(st.id));
+
+    set({
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
+      future: [],
+      nodes: { ...s.nodes, [id]: newNode },
+      inkStrokes: remainingStrokes,
+      selectedNodeIds: [id],
+      selectedRelationId: null,
+    });
+
+    return newNode;
+  },
 
   // Selection
   selectedNodeIds: [],
@@ -451,7 +598,7 @@ export const useCanvasStore = create(
     });
 
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       nodes: newNodes
     };
@@ -487,7 +634,7 @@ export const useCanvasStore = create(
     });
 
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       nodes: newNodes
     };
@@ -512,11 +659,10 @@ export const useCanvasStore = create(
   setSnapLines: (snap) => set({ snapLines: snap }),
 
   // Drawing settings
-  strokeColor: '#f0f0f5',
+  strokeColor: getInitialStrokeColor(),
   strokeWidth: 3,
   setStrokeColor: (color) => set({ strokeColor: color }),
   setStrokeWidth: (width) => set({ strokeWidth: width }),
-
 
   // Sticky
   stickyColor: 'yellow',
@@ -574,28 +720,30 @@ export const useCanvasStore = create(
     if (s.past.length === 0) return s;
     const previous = s.past[s.past.length - 1];
     const newPast = s.past.slice(0, s.past.length - 1);
-    const current = { nodes: s.nodes, relations: s.relations };
+    const current = { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes };
     return {
       past: newPast,
       future: [current, ...s.future],
       nodes: previous.nodes,
       relations: previous.relations,
+      inkStrokes: previous.inkStrokes || [],
     };
   }),
   redo: () => set((s) => {
     if (s.future.length === 0) return s;
     const next = s.future[0];
     const newFuture = s.future.slice(1);
-    const current = { nodes: s.nodes, relations: s.relations };
+    const current = { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes };
     return {
       past: [...s.past, current],
       future: newFuture,
       nodes: next.nodes,
       relations: next.relations,
+      inkStrokes: next.inkStrokes || [],
     };
   }),
   snapshot: () => set((s) => ({
-    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+    past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
     future: [],
   })),
 
@@ -615,7 +763,7 @@ export const useCanvasStore = create(
     return maxZ + 1;
   },
 
-  replaceWorld: ({ nodes, relations, viewport, appearance }) => set((s) => {
+  replaceWorld: ({ nodes, relations, inkStrokes, viewport, appearance }) => set((s) => {
     const theme = s.themePreference === 'system' ? getSystemTheme() : s.themePreference;
     const canvasBackground = appearance?.canvasBackground === undefined ? s.canvasBackground : appearance.canvasBackground;
     document.documentElement.setAttribute('data-theme', theme);
@@ -626,10 +774,11 @@ export const useCanvasStore = create(
     }
 
     return {
-      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations }],
+      past: [...s.past.slice(-39), { nodes: s.nodes, relations: s.relations, inkStrokes: s.inkStrokes }],
       future: [],
       nodes,
       relations,
+      inkStrokes: inkStrokes || [],
       viewport: viewport || s.viewport,
       theme,
       canvasBackground,

@@ -5,18 +5,18 @@
   border: 1px solid var(--toolbar-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--toolbar-shadow);
-  padding: 12px;
-  width: 280px;
+  padding: 14px;
+  width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   user-select: none;
 }
 
 [data-theme="light"] .relation-inspector {
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.97);
   border-color: rgba(15, 23, 42, 0.12);
-  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
 }
 
 .relation-inspector__header {
@@ -35,10 +35,10 @@
 
 .relation-inspector__title {
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
 }
 
 .relation-inspector__close {
@@ -50,7 +50,8 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
-  padding: 2px;
+  padding: 4px;
+  transition: all var(--transition-fast);
 }
 
 .relation-inspector__close:hover {
@@ -67,7 +68,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 9px;
+  padding: 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
@@ -76,15 +77,33 @@
 .relation-inspector__section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+}
+
+.relation-inspector__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.relation-inspector__label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.relation-inspector__hint {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-weight: 500;
 }
 
 .relation-inspector__endpoints {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
-  padding: 8px;
+  gap: 8px;
+  padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-surface) 74%, transparent);
@@ -119,60 +138,108 @@
 
 .relation-inspector__endpoint-arrow {
   color: var(--relation-active, var(--accent-primary));
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
 }
 
-.relation-inspector__label {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  font-weight: 500;
-}
-
-.relation-inspector__pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  max-height: 80px;
-  overflow-y: auto;
+/* Grid Pills with Hotkeys */
+.relation-inspector__pills--grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  max-height: none;
 }
 
 .relation-inspector__pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
+  text-align: left;
 }
 
 .relation-inspector__pill:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .relation-inspector__pill.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #fff;
+  background: color-mix(in srgb, var(--bg-active) 80%, transparent);
+  color: var(--text-primary);
+  font-weight: 650;
 }
 
+.relation-inspector__pill-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.relation-inspector__pill-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relation-inspector__pill-key {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+}
+
+/* Input & Autocomplete Suggestions */
 .relation-inspector__input {
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
   font-size: var(--text-xs);
   color: var(--text-primary);
   outline: none;
+  transition: border-color var(--transition-fast);
 }
 
 .relation-inspector__input:focus {
   border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-soft);
 }
 
+.relation-inspector__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.relation-inspector__suggestion-chip {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-surface) 60%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.relation-inspector__suggestion-chip:hover {
+  background: var(--accent-primary-soft);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+/* Button groups & Advanced */
 .relation-inspector__button-group {
   display: flex;
   background: var(--bg-surface);
@@ -187,7 +254,7 @@
   border: none;
   color: var(--text-secondary);
   font-size: 11px;
-  padding: 4px 6px;
+  padding: 5px 6px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -203,59 +270,41 @@
   font-weight: 600;
 }
 
-.relation-inspector__row {
-  flex-direction: row;
-  gap: 6px;
-}
-
-.relation-inspector__toggle {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 5px;
-  font-size: 11px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.relation-inspector__toggle:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.relation-inspector__toggle.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #fff;
-}
-
 .relation-inspector__colors {
   display: flex;
   gap: 6px;
 }
 
-.relation-inspector__color-btn {
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-full);
+.relation-inspector__color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
   transition: transform var(--transition-fast);
 }
 
-.relation-inspector__color-btn:hover {
+.relation-inspector__color-swatch:hover {
   transform: scale(1.15);
 }
 
-.relation-inspector__color-btn.selected {
+.relation-inspector__color-swatch.selected {
   border-color: var(--text-primary);
-  box-shadow: 0 0 0 2px var(--bg-surface), var(--shadow-sm);
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
+.relation-inspector__range {
+  width: 100%;
+  accent-color: var(--accent-primary);
+}
+
+.relation-inspector__checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
 .relation-inspector__footer {
@@ -269,69 +318,18 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: var(--accent-danger);
-  padding: 6px;
+  padding: 6px 10px;
   border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--accent-danger, #ef4444) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-danger, #ef4444) 8%, transparent);
+  color: var(--accent-danger, #ef4444);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .relation-inspector__delete-btn:hover {
-  background: rgba(239, 68, 68, 0.25);
-}
-
-@media (pointer: coarse) {
-  .relation-inspector {
-    width: min(320px, calc(100vw - 16px));
-    padding: 14px;
-    gap: 12px;
-  }
-
-  .relation-inspector__close,
-  .relation-inspector__pill,
-  .relation-inspector__btn,
-  .relation-inspector__toggle,
-  .relation-inspector__delete-btn {
-    min-height: 40px;
-    touch-action: manipulation;
-  }
-
-  .relation-inspector__color-btn {
-    width: 30px;
-    height: 30px;
-  }
-
-  .relation-inspector__input {
-    min-height: 40px;
-    font-size: 16px;
-  }
-}
-
-@media (max-width: 520px) {
-  .relation-inspector {
-    width: min(320px, calc(100vw - 16px));
-  }
-
-  .relation-inspector__close,
-  .relation-inspector__pill,
-  .relation-inspector__btn,
-  .relation-inspector__toggle,
-  .relation-inspector__delete-btn {
-    min-height: 40px;
-    touch-action: manipulation;
-  }
-
-  .relation-inspector__input {
-    min-height: 40px;
-    font-size: 16px;
-  }
-
-  .relation-inspector__color-btn {
-    width: 30px;
-    height: 30px;
-  }
+  background: color-mix(in srgb, var(--accent-danger, #ef4444) 18%, transparent);
+  border-color: var(--accent-danger, #ef4444);
 }
