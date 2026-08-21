@@ -120,6 +120,19 @@ const {
 } = await import('../../apps/web/src/utils/spatialAIEngine');
 const { ApiRequestError } = await import('../../apps/web/src/utils/api');
 const { classifyAIError } = await import('../../apps/server/src/routes/ai');
+const {
+  CANVIO_BACKUP_SCHEMA_VERSION,
+  CanvioBackupError,
+  createCanvioBackupDocument,
+  parseCanvioBackup,
+} = await import('../../apps/web/src/utils/backupSchema');
+const { analyzeGraphStructure } = await import('../../apps/web/src/utils/graphQueries');
+const {
+  canOwnerAccessBoard,
+  createRateLimitHook,
+  getOwnerIdFromHeaders,
+} = await import('../../apps/server/src/security');
+const { isSafeBoardId, safeId } = await import('../../apps/server/src/storage/paths');
 const Y = await import('yjs');
 
 function resetStore(): void {
@@ -509,6 +522,171 @@ test('AI client paths use editable local fallbacks for provider failures', async
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('backup document round-trips nodes, relations, and ink', () => {
+  const nodeA = makeNode('a');
+  const nodeB = makeNode('b', { position: { x: 300, y: 120 } });
+  const relation = makeRelation('r1', 'a', 'b');
+  const doc = createCanvioBackupDocument({
+    nodes: { a: nodeA, b: nodeB },
+    relations: { r1: relation },
+    inkStrokes: [{ id: 's1', points: [[0, 0, 0.5]], color: '#fff', width: 3, createdAt: 1 }],
+    worldId: 'world-1',
+    viewport: { x: 5, y: 6, zoom: 2 },
+    appearance: { theme: 'dark', canvasBackground: '#101014' },
+  });
+
+  assert.equal(doc.schemaVersion, CANVIO_BACKUP_SCHEMA_VERSION);
+  assert.equal(doc.counts.nodes, 2);
+  assert.equal(doc.counts.relations, 1);
+
+  const result = parseCanvioBackup(JSON.stringify(doc));
+  assert.equal(result.meta.warnings.length, 0);
+  assert.equal(result.meta.removedRelations, 0);
+  assert.deepEqual(Object.keys(result.world.nodes).sort(), ['a', 'b']);
+  assert.equal(result.world.relations.r1.relationship, 'related_to');
+  assert.equal(result.world.inkStrokes?.length, 1);
+  assert.deepEqual(result.world.viewport, { x: 5, y: 6, zoom: 2 });
+});
+
+test('backup import prunes orphan relations and strips ephemeral marker anchors', () => {
+  const nodeA = makeNode('a');
+  const ghostRelation = makeRelation('ghost', 'a', 'missing-node');
+  const mapNode = makeNode('map1', {
+    type: 'map',
+    data: { center: [0, 0], zoom: 3, markers: [], markerAnchors: { m1: { x: 12, y: 34 } } },
+  });
+  const doc = createCanvioBackupDocument({
+    nodes: { a: nodeA, map1: mapNode },
+    relations: { ghost: ghostRelation },
+    worldId: 'w',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    appearance: {},
+  });
+
+  const result = parseCanvioBackup(JSON.stringify(doc));
+  assert.equal(result.world.relations['ghost'], undefined);
+  assert.equal(result.meta.removedRelations, 1);
+  assert.ok(result.meta.warnings.length > 0);
+  // Viewport-derived anchor state must not survive a backup round-trip.
+  assert.equal(result.world.nodes.map1.data.markerAnchors, undefined);
+});
+
+test('backup import rejects newer schema versions', () => {
+  const doc = createCanvioBackupDocument({
+    nodes: {},
+    relations: {},
+    worldId: 'w',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    appearance: {},
+  });
+  doc.schemaVersion = CANVIO_BACKUP_SCHEMA_VERSION + 1;
+
+  assert.throws(
+    () => parseCanvioBackup(JSON.stringify(doc)),
+    (error: unknown) => error instanceof CanvioBackupError
+  );
+});
+
+test('board ids that only survive sanitization by mutation are rejected', () => {
+  for (const id of ['abc-DEF_123', 'a'.repeat(64)]) {
+    assert.equal(isSafeBoardId(id), true, id);
+  }
+  for (const id of ['a/b', 'a:b', 'a b', '../etc', '', 'x'.repeat(65)]) {
+    assert.equal(isSafeBoardId(id), false, id);
+  }
+
+  // Distinct unsafe ids must never collapse onto the same file name.
+  assert.notEqual(safeId('a/b'), safeId('a:b'));
+  assert.notEqual(safeId('a/b'), safeId('a b'));
+});
+
+test('board access honors ownership and share tokens', () => {
+  // Ownerless boards stay world-accessible (anonymous product model).
+  assert.equal(canOwnerAccessBoard(undefined, 'anon:x'), true);
+  assert.equal(canOwnerAccessBoard('owner-1', 'owner-1'), true);
+  assert.equal(canOwnerAccessBoard('owner-1', 'owner-2'), false);
+  assert.equal(canOwnerAccessBoard('owner-1', 'owner-2', 'tokenA', 'tokenB'), false);
+  assert.equal(canOwnerAccessBoard('owner-1', 'owner-2', 'tokenA', 'tokenA'), true);
+});
+
+test('rate limiting ignores client-supplied identity rotation', async () => {
+  const namespace = `test-${Math.random().toString(36).slice(2)}`;
+  const hook = createRateLimitHook({ namespace, windowMs: 60_000, max: 2 });
+
+  const makeRequest = (clientId: string) => ({
+    ip: '203.0.113.7',
+    url: '/api/ai/generate',
+    headers: { 'x-canvio-client-id': clientId } as Record<string, string>,
+  });
+  const makeReply = () => {
+    const reply = {
+      statusCode: 0,
+      header: () => reply,
+      code: (code: number) => { reply.statusCode = code; return reply; },
+      send: () => reply,
+    };
+    return reply;
+  };
+
+  // Same IP rotating client ids per request must still share one bucket.
+  await hook(makeRequest('rotating-id-1') as never, makeReply() as never);
+  await hook(makeRequest('rotating-id-2') as never, makeReply() as never);
+  const thirdReply = makeReply();
+  await hook(makeRequest('rotating-id-3') as never, thirdReply as never);
+  assert.equal(thirdReply.statusCode, 429, 'rotated client ids must not evade the bucket');
+
+  // A different IP gets its own bucket.
+  const otherIpReply = makeReply();
+  await hook({ ip: '198.51.100.9', url: '/api/ai/generate', headers: {} } as never, otherIpReply as never);
+  assert.equal(otherIpReply.statusCode, 0);
+
+  // A configured bearer token is keyed separately from the anonymous IP.
+  const previousTokens = process.env.CANVIO_API_TOKENS;
+  process.env.CANVIO_API_TOKENS = 'unit-test-token';
+  try {
+    const tokenReply = makeReply();
+    await hook({
+      ip: '203.0.113.7',
+      url: '/api/ai/generate',
+      headers: { authorization: 'Bearer unit-test-token' },
+    } as never, tokenReply as never);
+    assert.equal(tokenReply.statusCode, 0, 'valid token should have its own bucket');
+
+    // Ownership identity still accepts the declared client id for board records.
+    const ownerId = getOwnerIdFromHeaders({ 'x-canvio-client-id': 'device-42' }, '203.0.113.7');
+    assert.match(ownerId, /^anon:/);
+    assert.equal(getOwnerIdFromHeaders({ 'x-canvio-client-id': 'device-42' }, '203.0.113.7'),
+      getOwnerIdFromHeaders({ 'x-canvio-client-id': 'device-42' }, '198.51.100.9'));
+  } finally {
+    if (previousTokens === undefined) delete process.env.CANVIO_API_TOKENS;
+    else process.env.CANVIO_API_TOKENS = previousTokens;
+  }
+});
+
+test('graph analysis detects orphans, contradictions, and bounds the health score', () => {
+  resetStore();
+  const connected = makeNode('hub');
+  const evidence = makeNode('data');
+  const claimA = makeNode('claim-a');
+  const claimB = makeNode('claim-b');
+  const lonely = makeNode('lonely');
+  useCanvasStore.setState({
+    nodes: { hub: connected, data: evidence, 'claim-a': claimA, 'claim-b': claimB, lonely },
+    relations: {
+      rel1: makeRelation('rel1', 'hub', 'data', { relationship: 'based_on' }),
+      rel2: makeRelation('rel2', 'claim-a', 'claim-b', { relationship: 'contradicts' }),
+    },
+  });
+
+  const analysis = analyzeGraphStructure(useCanvasStore.getState().nodes, useCanvasStore.getState().relations);
+  assert.equal(analysis.metrics.totalNodes, 5);
+  assert.equal(analysis.metrics.orphanCount, 1);
+  assert.deepEqual(analysis.orphans.map((node) => node.id), ['lonely']);
+  assert.equal(analysis.contradictions.length, 1);
+  assert.equal(analysis.contradictions[0].relationId, 'rel2');
+  assert.ok(analysis.metrics.reasoningHealthScore >= 0 && analysis.metrics.reasoningHealthScore <= 100);
 });
 
 let passed = 0;

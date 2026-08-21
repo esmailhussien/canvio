@@ -56,6 +56,7 @@ export interface CanvasStore {
   addNode: (node: LivingNode) => void;
   upsertNodeRemote: (node: LivingNode) => void;
   updateNode: (id: string, updates: Partial<LivingNode>) => void;
+  updateNodePositions: (updates: Array<{ id: string; position: { x: number; y: number } }>) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;

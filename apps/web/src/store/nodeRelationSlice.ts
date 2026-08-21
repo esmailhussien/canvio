@@ -9,6 +9,7 @@ type NodeRelationSlice = Pick<
   | 'addNode'
   | 'upsertNodeRemote'
   | 'updateNode'
+  | 'updateNodePositions'
   | 'updateNodeData'
   | 'removeNode'
   | 'removeNodes'
@@ -89,6 +90,28 @@ export function createNodeRelationSlice(set: StoreSet, get: StoreGet): NodeRelat
           },
         },
       };
+    }),
+    // Applies many position updates in ONE store transaction. Dragging a
+    // populated frame used to dispatch one update per child per frame —
+    // N store notifications, N collaboration diffs, N subscriber cascades.
+    updateNodePositions: (updates) => set((state) => {
+      let nextNodes = state.nodes;
+      let changed = false;
+      for (const { id, position } of updates) {
+        const existing = nextNodes[id];
+        if (!existing) continue;
+        if (existing.position.x === position.x && existing.position.y === position.y) continue;
+        if (!changed) {
+          nextNodes = { ...nextNodes };
+          changed = true;
+        }
+        nextNodes[id] = {
+          ...existing,
+          position,
+          updatedAt: Date.now(),
+        };
+      }
+      return changed ? { nodes: nextNodes } : state;
     }),
     removeNode: (id) => set((state) => {
       const { [id]: _, ...rest } = state.nodes;

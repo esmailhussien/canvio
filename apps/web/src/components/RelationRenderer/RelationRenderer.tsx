@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Relation, LivingNode, useCanvasStore } from '../../store/canvasStore';
-import { generateRelationPath, generateSmartRelationPath, getRelationEndpointLabel, NodeBounds, resolveRelationPorts } from './relationUtils';
+import { generateRelationPath, generateSmartRelationPath, getRelationEndpointLabel, NodeBounds, PathResult, PortPoint, resolveRelationPorts } from './relationUtils';
 import './RelationRenderer.css';
 
 interface Props {
@@ -129,6 +129,58 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
   const [recentRelationId, setRecentRelationId] = useState<string | null>(null);
   const previousRelationIdsRef = useRef<Set<string>>(new Set(Object.keys(relations)));
 
+  // Obstacle bounds are shared by every relation: build them once per node
+  // change instead of once per relation per render (was O(R×N)).
+  const { allBounds, boundsById } = useMemo(() => {
+    const bounds: NodeBounds[] = [];
+    const byId = new Map<string, NodeBounds>();
+    for (const node of Object.values(nodes)) {
+      if (node.type === 'frame') continue;
+      const bound: NodeBounds = {
+        id: node.id,
+        x: node.position.x,
+        y: node.position.y,
+        width: node.size.width,
+        height: node.size.height,
+      };
+      bounds.push(bound);
+      byId.set(node.id, bound);
+    }
+    return { allBounds: bounds, boundsById: byId };
+  }, [nodes]);
+
+  // Routing is expensive; cache per-relation results and invalidate only when
+  // the nodes record changes. Hover/selection/recent-pulse re-renders then
+  // reuse computed geometry instead of re-routing every path.
+  const pathCacheRef = useRef<{ nodesKey: unknown; paths: Map<string, PathResult> }>({
+    nodesKey: null,
+    paths: new Map(),
+  });
+  if (pathCacheRef.current.nodesKey !== nodes) {
+    pathCacheRef.current = { nodesKey: nodes, paths: new Map() };
+  }
+  const pathCache = pathCacheRef.current.paths;
+
+  const routeRelation = (
+    rel: Relation,
+    sourcePort: PortPoint,
+    targetPort: PortPoint,
+    styleType: string | undefined
+  ): PathResult => {
+    const cacheKey = `${rel.id}|${sourcePort.x},${sourcePort.y}|${targetPort.x},${targetPort.y}|${styleType || 'straight'}`;
+    const cached = pathCache.get(cacheKey);
+    if (cached) return cached;
+
+    const sourceBounds = boundsById.get(rel.sourceId);
+    const targetBounds = boundsById.get(rel.targetId);
+    const result = sourceBounds && targetBounds && styleType !== 'curved'
+      ? generateSmartRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds)
+      : generateRelationPath(sourcePort, targetPort, (styleType as 'straight' | 'curved' | 'orthogonal') || 'straight');
+
+    pathCache.set(cacheKey, result);
+    return result;
+  };
+
   useEffect(() => {
     const currentIds = new Set(Object.keys(relations));
     const addedId = [...currentIds].find((id) => !previousRelationIdsRef.current.has(id));
@@ -231,20 +283,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
         const { sourcePort, targetPort } = resolveRelationPorts(source, target, rel.sourcePort, rel.targetPort);
 
         const style = rel.style || { type: 'straight', color: 'var(--relation-default)', width: 2 };
-        const allBounds: NodeBounds[] = Object.values(nodes)
-          .filter((node) => node.type !== 'frame')
-          .map((node) => ({
-            id: node.id,
-            x: node.position.x,
-            y: node.position.y,
-            width: node.size.width,
-            height: node.size.height,
-          }));
-        const sourceBounds = allBounds.find((bound) => bound.id === source.id);
-        const targetBounds = allBounds.find((bound) => bound.id === target.id);
-        const pathResult = sourceBounds && targetBounds && style.type !== 'curved'
-          ? generateSmartRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds)
-          : generateRelationPath(sourcePort, targetPort, style.type || 'straight');
+        const pathResult = routeRelation(rel, sourcePort, targetPort, style.type);
 
         const isHovered = hoveredRelationId === rel.id;
 

@@ -2,8 +2,12 @@ services:
   - type: web
     name: canvio-ws-server
     env: node
+    # NOTE: the free plan has an EPHEMERAL disk — everything under data/
+    # (board records + Yjs snapshots) is wiped on every deploy and restart.
+    # A persistent disk requires at least the "starter" plan. Set
+    # CANVIO_DATA_DIR to the mount path below when enabling it.
     plan: free
-    buildCommand: npm install && npm -w @canvio/server run build
+    buildCommand: npm ci && npm -w @canvio/server run build
     startCommand: npm -w @canvio/server run start:ws
     healthCheckPath: /health
     envVars:
@@ -11,3 +15,12 @@ services:
         value: 20.18.0
       - key: NODE_ENV
         value: production
+    # When upgrading to starter+ and enabling the disk below, also add:
+    # - key: CANVIO_DATA_DIR
+    #   value: /var/data/canvio
+    # Uncomment when the service plan is starter or higher — disks are not
+    # available on the free tier:
+    # disk:
+    #   name: canvio-data
+    #   mountPath: /var/data/canvio
+    #   sizeGB: 5

@@ -15,6 +15,7 @@ interface Props {
 
 function NodeRendererComponent({ node, presentationMode = false, focusNodeId = null }: Props) {
   const updateNode = useCanvasStore(s => s.updateNode);
+  const updateNodePositions = useCanvasStore(s => s.updateNodePositions);
   const snapshot = useCanvasStore(s => s.snapshot);
   const isSelected = useCanvasStore(useCallback(s => s.selectedNodeIds.includes(node.id), [node.id]));
   const isOnlySelected = useCanvasStore(useCallback(s => s.selectedNodeIds.length === 1 && s.selectedNodeIds.includes(node.id), [node.id]));
@@ -342,20 +343,22 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
           const dx = targetX - node.position.x;
           const dy = targetY - node.position.y;
 
-          updateNode(node.id, {
-            position: { x: targetX, y: targetY }
-          });
-
+          // One transaction for the frame and all contained children.
+          const moves: Array<{ id: string; position: { x: number; y: number } }> = [
+            { id: node.id, position: { x: targetX, y: targetY } },
+          ];
           Object.values(allNodes).forEach((child) => {
             if (child.id === node.id || child.type === 'frame') return;
             const cx = child.position.x + child.size.width / 2;
             const cy = child.position.y + child.size.height / 2;
             if (cx >= fx1 && cx <= fx2 && cy >= fy1 && cy <= fy2) {
-              updateNode(child.id, {
-                position: { x: child.position.x + dx, y: child.position.y + dy }
+              moves.push({
+                id: child.id,
+                position: { x: child.position.x + dx, y: child.position.y + dy },
               });
             }
           });
+          updateNodePositions(moves);
         } else {
           updateNode(node.id, {
             position: { x: targetX, y: targetY }
@@ -363,7 +366,7 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
         }
       });
     }
-  }, [isDragging, node.id, node.size.width, node.size.height, node.type, node.position.x, node.position.y, updateNode]);
+  }, [isDragging, node.id, node.size.width, node.size.height, node.type, node.position.x, node.position.y, updateNode, updateNodePositions]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
