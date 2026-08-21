@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
-import { IconDraw, IconHighlighter, IconArrowTool, IconSparkles, IconSticky } from '@canvio/ui';
+import { IconDraw, IconHighlighter, IconArrowTool, IconIdea, IconSticky } from '@canvio/ui';
 import './PenInspector.css';
 
 const PEN_COLORS = [
@@ -123,10 +123,12 @@ export const PenInspector: React.FC<PenInspectorProps> = ({ autoShapeEnabled, on
           <button
             className={`pen-shape-toggle ${autoShapeEnabled ? 'active' : ''}`}
             onClick={onToggleAutoShape}
-            title="Auto-convert hand-drawn shapes into clean vector shapes"
+            title="Shape Assist cleans hand-drawn shapes into editable vector shapes"
+            aria-label={`Shape Assist ${autoShapeEnabled ? 'enabled' : 'disabled'}`}
+            aria-pressed={autoShapeEnabled}
           >
-            <IconSparkles size={14} />
-            <span>Ink-to-Shape {autoShapeEnabled ? 'ON' : 'OFF'}</span>
+            <IconIdea size={14} />
+            <span>Shape Assist {autoShapeEnabled ? 'ON' : 'OFF'}</span>
           </button>
 
           {/* Ink-to-Sticky Note Conversion */}

@@ -1,56 +1,53 @@
 [
   {
     "slug": "visual-reasoning-and-ai-thinking-partner",
-    "title": "Quick-Connect, Semantic Relations & Free Ink",
-    "excerpt": "Three changes that make it faster to connect ideas, assign meaning to connections, and sketch freely without losing work.",
+    "title": "Visual Reasoning Partner: Score, Explain, Act",
+    "excerpt": "A clearer reasoning score now explains what it measures and recommends the best next move for the board.",
     "category": "Release",
-    "datePublished": "2026-08-20",
+    "datePublished": "2026-08-21",
     "readTime": "4 min read",
-    "icon": "lightbulb",
+    "icon": "psychology_alt",
     "accent": "#818cf8",
     "takeaways": [
-      "Drag from any node edge to connect two ideas in one gesture, or drop on empty space to create a new note already connected.",
-      "Press 1–8 while a connection is selected to assign a relationship type like Contradicts, Depends on, or Enables.",
-      "Freehand ink stays separate from structured notes. When ready, convert a sketch into an editable sticky note with one click.",
-      "A graph health panel shows how well-connected your board is and highlights contradictions or orphan ideas.",
-      "The AI assistant icon has been replaced with a cleaner Ideas icon to better reflect what the tool does."
+      "The score is now based on five visible factors: connectedness, relation clarity, evidence grounding, logic safety, and reasoning depth.",
+      "A Best next move card turns the weakest factor into a focused action such as connecting loose ideas, labeling unclear links, or grounding unsupported claims.",
+      "AI audit, Challenge, and Socratic modes read the board graph instead of starting from a blank chat context.",
+      "Quick-Connect and semantic relation labels still keep the reasoning visible directly on the canvas."
     ],
     "sections": [
       {
-        "heading": "Connecting ideas used to take too many clicks",
+        "heading": "A score needs to explain itself",
         "paragraphs": [
-          "Before this update, creating a connection between two notes required switching to the Relation tool, clicking a source, then clicking a target. It worked, but it interrupted the flow of placing ideas.",
-          "Now every node has small connection ports on its edges. Drag from a port to another node and the connection is created immediately. If you drag onto empty canvas instead, a new sticky note appears at the drop point, already connected. This makes it practical to build chains of reasoning without leaving the Select tool."
+          "A single health number is only useful when people can understand why it changed. The Reasoning Partner now breaks the board score into five factors: connectedness, relation clarity, evidence grounding, logic safety, and reasoning depth.",
+          "This makes the score easier to trust. A low score no longer feels like a vague warning. It shows whether the board needs more links, clearer relation labels, stronger evidence, safer logic, or deeper structure."
         ]
       },
       {
-        "heading": "Connections now carry meaning",
+        "heading": "Best next move turns diagnosis into action",
         "paragraphs": [
-          "A plain line between two notes does not say much. It could mean 'these are related' or 'this causes that' or 'this contradicts that'. The difference matters when you review a board later or share it with someone else.",
-          "Canvio now supports 8 relationship types: Contradicts, Depends on, Enables, Based on, Part of, Leads to, Inspired by, and Related to. Each type has a distinct color and icon so you can read the meaning at a glance.",
-          "When a connection is selected, pressing a number key (1 through 8) assigns the type instantly. There is also a label field with suggestion chips for common assertions like 'blocks', 'validates', or 'critical dependency'."
+          "After the score is calculated, Canvio looks at the weakest factor and suggests one practical next step. If ideas are floating alone, it recommends connecting them. If links are unlabeled, it recommends clarifying relation meaning. If claims lack support, it recommends adding evidence.",
+          "The goal is not to grade the person using the board. The goal is to make a messy canvas easier to improve without forcing people to guess what to do next."
         ]
       },
       {
-        "heading": "Freehand ink is now a separate layer",
+        "heading": "AI reads the board graph",
         "paragraphs": [
-          "Drawing with a pen or stylus used to create drawing nodes. That was fine for diagrams, but awkward for quick annotations or margin sketches that you did not want treated as structured objects.",
-          "Ink strokes now live in their own layer. They do not appear in the graph, do not affect the health score, and do not get picked up by the AI assistant. The eraser removes individual strokes by dragging across them.",
-          "When a sketch does need to become a real note, the Pen Inspector shows a 'To Sticky' button. Clicking it measures the bounding box of your strokes, creates a sticky note in that position, and removes the raw ink. The result is an editable, connectable node."
+          "The reasoning tools now pass a compact board summary to the assistant: visible nodes, relation labels, relation types, and map pin context where it exists. That helps the AI respond to the work on the board instead of giving a generic answer.",
+          "Challenge mode can look for weak assumptions. Socratic mode can ask better follow-up questions. Summary and article actions can use the current structure as source material."
         ]
       },
       {
-        "heading": "Graph health gives you a quick read on your board",
+        "heading": "Relations stay part of the canvas language",
         "paragraphs": [
-          "The Reasoning Partner panel (Ctrl+Shift+R) now runs local graph queries on your board. It counts nodes, connections, orphans, and contradiction pairs, then produces a simple health score from 0 to 100.",
-          "This is not a judgment of your ideas. It is a structural check: are there notes floating alone that might need connections? Are there circular dependencies? The panel also offers a Challenge mode that suggests counter-arguments and a Socratic mode that asks follow-up questions."
+          "The board still uses the same direct interactions: quick-drag ports, typed labels, relation styles, and semantic relation types. The reasoning partner does not replace the canvas. It reads what people already built and helps them make it clearer.",
+          "This is important for everyday use. Students, teachers, researchers, and developers can keep thinking spatially while still getting useful feedback from the system."
         ]
       },
       {
-        "heading": "Smaller changes",
+        "heading": "Why this matters",
         "paragraphs": [
-          "The AI sparkle icon in the header and empty canvas has been replaced with a simple lightbulb Ideas icon. The modal title now reads 'Ideas & AI Generator' instead of 'Canvio AI'. This better describes what the tool does: help you start and expand ideas, not act as a general-purpose AI chat.",
-          "The updates page article you are reading right now also reflects this shift: less marketing language, more explanation of what changed and why."
+          "Canvio is not trying to be another blank drawing surface. The larger idea is a visual knowledge workspace where objects, places, relations, and AI support the same thinking process.",
+          "A transparent score and a concrete next move bring that vision closer: the board can now help people understand their own structure, not only store it."
         ]
       }
     ]
@@ -94,8 +91,8 @@
   },
   {
     "slug": "ai-navigator-editable-boards",
-    "title": "AI Navigator: From a Prompt to an Editable Board",
-    "excerpt": "Why Canvio turns an AI answer into movable, connected objects instead of a block of text.",
+    "title": "AI Navigator: Create, Study, Summarize, Article, and Tidy",
+    "excerpt": "Why Canvio turns AI into board-aware actions instead of a generic chat window.",
     "category": "Feature",
     "datePublished": "2026-08-09",
     "readTime": "4 min read",
@@ -103,28 +100,37 @@
     "accent": "#a855f7",
     "takeaways": [
       "AI drafts become normal, editable Canvio objects.",
-      "Generated boards use frames, shapes, notes, and relations together.",
-      "The first draft is fitted into view so people can start editing immediately."
+      "Five modes make the assistant easier to use: Create, Study, Summary, Article, and Tidy.",
+      "When a board already has content, AI uses notes, relation labels, relation types, and map pins as context.",
+      "Generated boards are fitted into view so people can start editing immediately."
     ],
     "sections": [
       {
-        "heading": "The problem with AI answers",
+        "heading": "The problem with generic AI answers",
         "paragraphs": [
           "A useful idea can become difficult to use when it arrives as one long response. People need to compare parts, move them around, add evidence, and change the structure as they learn more.",
-          "Canvio treats AI as a starting partner for spatial thinking. The result is not a finished poster. It is a first board that people can question and reshape."
+          "Canvio treats AI as a starting partner for spatial thinking. The result is not a finished poster or a hidden chat answer. It is a first board, summary, article, or cleanup suggestion that people can question and reshape."
         ]
       },
       {
-        "heading": "What Canvio creates",
+        "heading": "Five clearer ways to ask",
         "paragraphs": [
-          "A prompt can become a frame, a central shape, supporting notes, and labeled relations. The generated elements remain normal Canvio objects, so they can be edited, connected, presented, exported, or deleted like anything else on the canvas.",
+          "The AI Navigator now starts with intent. Create helps turn a prompt into a board. Study helps explain and review a topic. Summary and Article use the current board as source material. Tidy focuses on improving structure.",
+          "This is easier than a blank prompt box because the user can choose the job before typing. It also keeps the assistant aligned with the main product idea: a visual board, not a separate chat experience."
+        ]
+      },
+      {
+        "heading": "The board becomes context",
+        "paragraphs": [
+          "When a board already has content, Canvio sends the assistant a compact digest of the visible structure: notes, text, relation labels, relation types, and map pin labels. This helps AI respond to what is actually on the canvas.",
+          "A prompt can still create a frame, a central shape, supporting notes, and labeled relations. Those generated elements remain normal Canvio objects, so they can be edited, connected, presented, exported, or deleted like anything else on the canvas.",
           "The AI flow also fits the created structure into view. That small step matters: a useful first draft should be visible immediately, not left somewhere off-screen."
         ]
       },
       {
         "heading": "The design principle",
         "paragraphs": [
-          "AI should reduce the blank-page problem without taking ownership away from the person thinking. Canvio keeps every generated choice visible and editable."
+          "AI should reduce the blank-page problem without taking ownership away from the person thinking. Canvio keeps generated choices visible, editable, and connected to the board."
         ]
       }
     ]
@@ -176,6 +182,7 @@
     "accent": "#22c55e",
     "takeaways": [
       "Maps appear when location matters, without defining the whole product.",
+      "Relations can attach to exact pins, not only to the whole map object.",
       "Pins can sit beside evidence, decisions, and notes on the same board.",
       "People can move between a world view and a focused site view."
     ],
@@ -189,7 +196,8 @@
       {
         "heading": "Place can become evidence",
         "paragraphs": [
-          "When a map is useful, pins can sit alongside notes, images, relations, and decisions. A location becomes part of the reasoning instead of a separate screen that people have to leave the board to inspect."
+          "When a map is useful, pins can sit alongside notes, images, relations, and decisions. A location becomes part of the reasoning instead of a separate screen that people have to leave the board to inspect.",
+          "Relations can now point to individual pins, so a note can connect to a specific site visit, address, classroom example, or research location. That makes place feel native to the board without making every board a map board."
         ]
       },
       {

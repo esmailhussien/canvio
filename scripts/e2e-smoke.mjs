@@ -51,6 +51,7 @@ async function assertState(page, label, predicate) {
 
 async function clickUnique(page, role, name) {
   const locator = page.getByRole(role, { name });
+  await locator.first().waitFor({ state: 'visible', timeout: 10000 });
   const count = await locator.count();
   if (count !== 1) throw new Error(`Expected one ${role} "${name}", found ${count}`);
   await locator.click();
@@ -86,6 +87,7 @@ async function main() {
 
   const tempDir = await mkdtemp(join(tmpdir(), 'canvio-e2e-'));
   const backupPath = join(tempDir, 'restore-backup.json');
+  const frameRelationBackupPath = join(tempDir, 'frame-relation-backup.json');
 
   let browser;
   let context;
@@ -99,7 +101,7 @@ async function main() {
     await page.waitForLoadState('domcontentloaded');
 
     console.log('E2E: inserting field operations template');
-    await clickUnique(page, 'button', 'Presets & Layout');
+    await clickUnique(page, 'button', 'Browse all templates');
     await page.locator('.template-card').filter({ hasText: 'Field Operations Map' }).click();
     await page.waitForFunction(() => document.querySelectorAll('.node-renderer').length >= 5);
 
@@ -149,6 +151,85 @@ async function main() {
     const afterFit = await page.locator('.canvas__world').evaluate((el) => getComputedStyle(el).transform);
     if (beforePan === afterPan) fail('pan did not change the viewport transform');
     if (afterFit === afterPan) fail('fit to world did not reframe the viewport');
+
+
+    console.log('E2E: checking relation selection inside a frame');
+    const now = Date.now();
+    await writeFile(frameRelationBackupPath, JSON.stringify({
+      version: '1.0',
+      worldId: 'e2e-frame-relation',
+      exportedAt: new Date(now).toISOString(),
+      appearance: { theme: 'dark', canvasBackground: null },
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: {
+        'frame-relation-frame': {
+          id: 'frame-relation-frame',
+          type: 'frame',
+          position: { x: -500, y: -260 },
+          size: { width: 1000, height: 520 },
+          rotation: 0,
+          zIndex: 0,
+          locked: false,
+          data: { title: 'Frame Relation QA', color: '#6366f1' },
+          createdAt: now,
+          updatedAt: now,
+        },
+        'frame-relation-source': {
+          id: 'frame-relation-source',
+          type: 'sticky',
+          position: { x: -360, y: -60 },
+          size: { width: 220, height: 140 },
+          rotation: 0,
+          zIndex: 2,
+          locked: false,
+          data: { color: 'yellow', text: 'Source inside frame' },
+          createdAt: now,
+          updatedAt: now,
+        },
+        'frame-relation-target': {
+          id: 'frame-relation-target',
+          type: 'sticky',
+          position: { x: 140, y: -60 },
+          size: { width: 220, height: 140 },
+          rotation: 0,
+          zIndex: 3,
+          locked: false,
+          data: { color: 'blue', text: 'Target inside frame' },
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+      relations: {
+        'frame-relation-link': {
+          id: 'frame-relation-link',
+          sourceId: 'frame-relation-source',
+          targetId: 'frame-relation-target',
+          relationship: 'relates_to',
+          label: 'inside frame',
+          style: { type: 'orthogonal', color: '#6366f1', width: 2, endArrow: 'arrow' },
+        },
+      },
+    }, null, 2));
+
+    await clickUnique(page, 'button', 'Export');
+    await page.locator('input[type="file"].export-menu__file-input').setInputFiles(frameRelationBackupPath);
+    await page.waitForFunction(() => document.body.textContent?.includes('Source inside frame'));
+    await clickUnique(page, 'button', 'Export');
+    await clickUnique(page, 'button', 'Select');
+    await page.waitForFunction(() => document.querySelectorAll('.node-renderer.selected, .relation-group--selected').length === 0);
+
+    const relationBox = await page.locator('.relation-group').first().boundingBox();
+    if (!relationBox) throw new Error('Could not locate frame relation');
+    await page.mouse.click(relationBox.x + relationBox.width / 2, relationBox.y + relationBox.height / 2);
+    await assertState(page, 'relation inside frame selectable', () => {
+      const selectedRelations = document.querySelectorAll('.relation-group--selected').length;
+      const selectedFrames = document.querySelectorAll('.node-renderer.node-type-frame.selected').length;
+      const inspector = document.querySelector('.relation-inspector');
+      return {
+        ok: selectedRelations === 1 && selectedFrames === 0 && Boolean(inspector),
+        message: `expected relation inspector without selected frame, got ${selectedRelations} selected relation(s), ${selectedFrames} selected frame(s), inspector=${Boolean(inspector)}`,
+      };
+    });
 
     console.log('E2E: checking JSON and PNG exports');
     await clickUnique(page, 'button', 'Export');

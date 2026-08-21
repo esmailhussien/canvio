@@ -23,6 +23,16 @@ export interface GraphCluster {
   dominantType: string;
 }
 
+export interface ReasoningScoreFactor {
+  id: 'connectedness' | 'relation_clarity' | 'grounding' | 'logic_safety' | 'depth';
+  label: string;
+  score: number;
+  weight: number;
+  description: string;
+  focusNodeIds?: string[];
+  focusRelationIds?: string[];
+}
+
 export interface GraphAnalysisResult {
   metrics: {
     totalNodes: number;
@@ -32,6 +42,7 @@ export interface GraphAnalysisResult {
     contradictionCount: number;
     maxDependencyDepth: number;
     reasoningHealthScore: number; // 0 - 100
+    scoreBreakdown: ReasoningScoreFactor[];
   };
   contradictions: ContradictionPair[];
   criticalPaths: DependencyChain[];
@@ -232,34 +243,93 @@ export function analyzeGraphStructure(
   // 8. Calculate Reasoning Health Score (0 - 100)
   const nodeCount = nodes.length;
   const relCount = relations.length;
-  let healthScore = 100;
-
-  if (nodeCount === 0) {
-    healthScore = 100;
-  } else {
-    // Penalize high percentage of isolated/orphan nodes
-    const orphanRatio = orphans.length / nodeCount;
-    healthScore -= Math.round(orphanRatio * 35);
-
-    // Contradictions flag needed resolution (-10 per contradiction)
-    healthScore -= Math.min(30, contradictions.length * 10);
-
-    // Cycles create deadlocks (-15 per cycle)
-    healthScore -= Math.min(30, cycles.length * 15);
-
-    // Unanchored claims ratio
-    if (unanchoredClaims.length > 0 && evidenceNodes.length === 0) {
-      healthScore -= 10;
-    }
-
-    // Boost if healthy connectivity
-    if (relCount >= nodeCount * 0.8 && nodeCount > 2) {
-      healthScore += 5;
-    }
-  }
-
-  healthScore = Math.max(10, Math.min(100, healthScore));
   const density = nodeCount > 1 ? Number((relCount / ((nodeCount * (nodeCount - 1)) / 2)).toFixed(3)) : 0;
+  const orphanRatio = nodeCount > 0 ? orphans.length / nodeCount : 1;
+  const relationCoverage = nodeCount > 1 ? Math.min(1, relCount / Math.max(1, nodeCount - 1)) : 0;
+  const connectednessScore = nodeCount === 0
+    ? 0
+    : clampScore(Math.round((1 - orphanRatio) * 45 + relationCoverage * 55));
+
+  const meaningfulRelations = relations.filter((rel) => {
+    const label = rel.label?.trim();
+    return rel.relationship !== 'related_to' || Boolean(label && label.length >= 3);
+  });
+  const relationClarityScore = relCount === 0 ? 0 : clampScore(Math.round((meaningfulRelations.length / relCount) * 100));
+
+  const evidenceLinkCount = relations.filter((rel) => rel.relationship === 'based_on' || rel.relationship === 'inspired_by').length + evidenceNodes.length;
+  const groundingScore = nodeCount === 0
+    ? 0
+    : clampScore(
+      evidenceLinkCount === 0
+        ? (unanchoredClaims.length > 0 ? 42 : 64)
+        : 100 - Math.round((unanchoredClaims.length / Math.max(1, nodeCount)) * 70)
+    );
+
+  const logicSafetyScore = nodeCount === 0
+    ? 0
+    : clampScore(100 - Math.min(45, contradictions.length * 24) - Math.min(45, cycles.length * 28));
+
+  const depthScore = nodeCount === 0
+    ? 0
+    : maxDependencyDepth >= 4
+      ? 100
+      : maxDependencyDepth === 3
+        ? 82
+        : maxDependencyDepth === 2
+          ? 62
+          : 34;
+
+  const scoreBreakdown: ReasoningScoreFactor[] = [
+    {
+      id: 'connectedness',
+      label: 'Connectedness',
+      score: connectednessScore,
+      weight: 25,
+      description: 'How much of the board is connected instead of isolated.',
+      focusNodeIds: orphans.map((n) => n.id),
+    },
+    {
+      id: 'relation_clarity',
+      label: 'Relation clarity',
+      score: relationClarityScore,
+      weight: 20,
+      description: 'Whether links have meaningful types or labels the AI can read.',
+      focusRelationIds: relations.filter((rel) => !meaningfulRelations.some((mr) => mr.id === rel.id)).map((rel) => rel.id),
+    },
+    {
+      id: 'grounding',
+      label: 'Evidence grounding',
+      score: groundingScore,
+      weight: 20,
+      description: 'How well claims are backed by evidence, references, or map pins.',
+      focusNodeIds: unanchoredClaims.map((n) => n.id),
+    },
+    {
+      id: 'logic_safety',
+      label: 'Logic safety',
+      score: logicSafetyScore,
+      weight: 25,
+      description: 'Contradictions and circular dependencies reduce this score.',
+      focusNodeIds: [
+        ...contradictions.flatMap((c) => [c.sourceNode.id, c.targetNode.id]),
+        ...cycles.flat(),
+      ],
+    },
+    {
+      id: 'depth',
+      label: 'Reasoning depth',
+      score: depthScore,
+      weight: 10,
+      description: 'Rewards clear chains from premise to outcome.',
+      focusNodeIds: criticalPaths[0]?.path.map((n) => n.id) || [],
+      focusRelationIds: criticalPaths[0]?.relationIds || [],
+    },
+  ];
+
+  const healthScore = clampScore(Math.round(
+    scoreBreakdown.reduce((sum, item) => sum + item.score * item.weight, 0) /
+    scoreBreakdown.reduce((sum, item) => sum + item.weight, 0)
+  ));
 
   // 9. Generate Actionable Insights
   const insights: GraphInsight[] = [];
@@ -346,6 +416,7 @@ export function analyzeGraphStructure(
       contradictionCount: contradictions.length,
       maxDependencyDepth,
       reasoningHealthScore: healthScore,
+      scoreBreakdown,
     },
     contradictions,
     criticalPaths,
@@ -366,6 +437,10 @@ export function getNodeTitle(node?: LivingNode): string {
     return raw.trim().replace(/\s+/g, ' ').slice(0, 36);
   }
   return node.type === 'map' ? 'Living Map' : `${node.type.charAt(0).toUpperCase() + node.type.slice(1)}`;
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, value));
 }
 
 /**

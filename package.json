@@ -9,12 +9,14 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test:unit": "tsx scripts/unit/run-unit-tests.ts",
     "smoke": "node scripts/smoke-check.mjs",
     "e2e:smoke": "npm run build && node scripts/e2e-smoke.mjs",
     "clean": "turbo clean"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "tsx": "^4.20.0",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"
   },

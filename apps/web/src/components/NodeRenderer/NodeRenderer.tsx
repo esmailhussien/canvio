@@ -22,6 +22,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   const viewportZoom = useCanvasStore(s => s.viewport.zoom);
   
   const activeTool = useCanvasStore(s => s.activeTool);
+  const setActiveTool = useCanvasStore(s => s.setActiveTool);
   const relationSourceId = useCanvasStore(s => s.relationSourceId);
   const relationSourcePort = useCanvasStore(s => s.relationSourcePort);
   const relationTargetId = useCanvasStore(s => s.relationTargetId);
@@ -99,15 +100,22 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       return;
     }
 
+    const isMapPinRelation = Boolean(relationSourcePort?.startsWith('marker:') || targetPort?.startsWith('marker:'));
     addRelation({
       id: nanoid(10),
       sourceId: relationSourceId,
       sourcePort: relationSourcePort || undefined,
       targetId: node.id,
       targetPort,
-      relationship: 'related_to',
-      label,
-      style: { color: targetPort?.startsWith('marker:') ? '#38bdf8' : 'var(--relation-default)', width: 2, type: 'orthogonal', startArrow: 'none', endArrow: 'arrow' }
+      relationship: isMapPinRelation ? 'based_on' : 'related_to',
+      label: label || (isMapPinRelation ? 'site context' : ''),
+      style: {
+        color: isMapPinRelation ? '#38bdf8' : 'var(--relation-default)',
+        width: isMapPinRelation ? 3 : 2,
+        type: 'orthogonal',
+        startArrow: 'none',
+        endArrow: 'arrow',
+      }
     });
     setRelationSourceId(null);
   }, [addRelation, node.id, relationSourceId, relationSourcePort, relations, selectRelation, setRelationSourceId]);
@@ -481,6 +489,9 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMarkerRelation = useCallback((markerId: string) => {
+    if (activeTool !== 'relation') {
+      setActiveTool('relation');
+    }
     const markerPort = makeMarkerPort(markerId);
     if (!relationSourceId) {
       setRelationSource(node.id, markerPort);
@@ -488,7 +499,12 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     }
 
     completeRelationTo(markerPort, 'Site visit location');
-  }, [completeRelationTo, node.id, relationSourceId, setRelationSource]);
+  }, [activeTool, completeRelationTo, node.id, relationSourceId, setActiveTool, setRelationSource]);
+
+  const handleRequestMapRelationMode = useCallback(() => {
+    setActiveTool('relation');
+    selectNode(node.id);
+  }, [node.id, selectNode, setActiveTool]);
 
   const handleMarkerRelationHover = useCallback((markerId: string | null) => {
     const markerPort = markerId ? makeMarkerPort(markerId) : null;
@@ -694,6 +710,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
             relationSourcePort={relationSourceId === node.id ? relationSourcePort : null}
             onMarkerRelation={handleMarkerRelation}
             onMarkerRelationHover={handleMarkerRelationHover}
+            onRequestRelationMode={handleRequestMapRelationMode}
           />
         )}
         {node.type === 'text' && <TextNode node={node} selected={isSelected} onChange={updateNode} />}

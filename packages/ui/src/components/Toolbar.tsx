@@ -54,17 +54,17 @@ const PRIMARY_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?:
   { id: 'text', icon: IconText, label: 'Text (T)', group: '3' },
   { id: 'sticky', icon: IconSticky, label: 'Sticky (S)', group: '3' },
   { id: 'shape', icon: IconShape, label: 'Shape (R)', group: '3' },
+  { id: 'map', icon: IconMap, label: 'Living Map (M)', group: '3' },
   { id: 'relation', icon: IconRelation, label: 'Relation (L)', group: '4' }
 ];
 
-const MOBILE_PRIMARY_TOOLS = new Set<ToolMode>(['select', 'draw', 'sticky', 'relation']);
+const MOBILE_PRIMARY_TOOLS = new Set<ToolMode>(['select', 'draw', 'sticky', 'map', 'relation']);
 
 const ADVANCED_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?: string }[] = [
   { id: 'eraser', icon: IconEraser, label: 'Eraser (E)', group: 'ink' },
   { id: 'image', icon: IconImage, label: 'Image (I)', group: '3' },
   { id: 'frame', icon: IconFrame, label: 'Frame (F)', group: '3' },
-  { id: 'code', icon: IconCode, label: 'Code (C)', group: '3' },
-  { id: 'map', icon: IconMap, label: 'Living Map (M)', group: '3' }
+  { id: 'code', icon: IconCode, label: 'Code (C)', group: '3' }
 ];
 
 export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) => {

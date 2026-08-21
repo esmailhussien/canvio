@@ -228,6 +228,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
         const isSelectTool = activeTool === 'select';
         const isFocusDimmed = Boolean(focusNodeId && rel.sourceId !== focusNodeId && rel.targetId !== focusNodeId);
         const isFocusActive = Boolean(focusNodeId && (rel.sourceId === focusNodeId || rel.targetId === focusNodeId));
+        const isMapRelation = source.type === 'map' || target.type === 'map';
 
         const { sourcePort, targetPort } = resolveRelationPorts(source, target, rel.sourcePort, rel.targetPort);
 
@@ -332,14 +333,14 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
           textColor = '#ec4899';
         }
 
-        const charWidth = 6.8;
+        const charWidth = isMapRelation ? 7.2 : 6.8;
         const iconSpace = hasIcon ? 18 : 0;
         const textWidth = displayText ? displayText.length * charWidth : 0;
         const pillWidth = Math.max(34, iconSpace + textWidth + 22);
-        const pillHeight = 24;
-        const pillRadius = 12;
+        const pillHeight = isMapRelation ? 28 : 24;
+        const pillRadius = pillHeight / 2;
 
-        const lineWidth = style.width || 2.5;
+        const lineWidth = (style.width || 2.5) + (isMapRelation ? 0.45 : 0);
         const shouldAnimate = style.animated || rel.relationship === 'leads_to' || isEnables;
         const strokeDashArray = isContradiction
           ? '6 4'
@@ -485,7 +486,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
                     textAnchor={hasIcon ? 'start' : 'middle'}
                     dominantBaseline="middle"
                     fill={textColor}
-                    fontSize={11}
+                    fontSize={isMapRelation ? 12 : 11}
                     fontWeight={650}
                     letterSpacing="0.01em"
                     fontFamily="var(--font-sans)"

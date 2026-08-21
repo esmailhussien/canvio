@@ -31,8 +31,8 @@ const TOOL_GUIDANCE: Record<string, { label: string; detail: string }> = {
   text: { label: 'Text', detail: 'Click anywhere to place a text block.' },
   sticky: { label: 'Sticky note', detail: 'Click anywhere to place a note.' },
   shape: { label: 'Shape', detail: 'Click anywhere to place a shape.' },
-  map: { label: 'Map', detail: 'Click anywhere to place a map. Map gestures stay inside the map.' },
-  relation: { label: 'Relation', detail: 'Choose a start port, then a target port. Press Esc to cancel.' },
+  map: { label: 'Living Map', detail: 'Click to place a world map. Add pins, then connect exact locations to ideas.' },
+  relation: { label: 'Relation', detail: 'Choose a side or map pin, then choose the target. Press Esc to cancel.' },
   eraser: { label: 'Eraser', detail: 'Click an ink stroke to remove it.' },
   image: { label: 'Image', detail: 'Click the canvas to place an image.' },
   frame: { label: 'Frame', detail: 'Drag an area to create a frame.' },
@@ -56,8 +56,8 @@ export function WorldPage() {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const nodes = useCanvasStore((s) => s.nodes);
-  const canUndo = useCanvasStore((s) => s.past.length > 0);
-  const canRedo = useCanvasStore((s) => s.future.length > 0);
+  const canUndo = useCanvasStore((s) => s.canUndo);
+  const canRedo = useCanvasStore((s) => s.canRedo);
   const addNode = useCanvasStore((s) => s.addNode);
   const selectNode = useCanvasStore((s) => s.selectNode);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
@@ -233,7 +233,15 @@ export function WorldPage() {
       addNode(positionedNode);
       selectNode(positionedNode.id);
       setActiveTool('select');
-      setViewport({ x: 0, y: 0, zoom: 1 });
+      window.setTimeout(() => {
+        const isCompact = window.innerWidth <= 760;
+        fitViewportToNodes([positionedNode], {
+          maxZoom: 1,
+          minZoom: 0.35,
+          paddingX: isCompact ? 44 : 220,
+          paddingY: isCompact ? 230 : 220,
+        });
+      }, 0);
     }
   };
 

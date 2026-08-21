@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
-import { analyzeGraphStructure, getNodeTitle, ContradictionPair, DependencyChain } from '../../utils/graphQueries';
+import { analyzeGraphStructure, getNodeTitle, ContradictionPair, DependencyChain, ReasoningScoreFactor } from '../../utils/graphQueries';
 import {
   analyzeGraphWithAIAsync,
   challengeBoardWithAIAsync,
@@ -28,6 +28,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
   const selectNodes = useCanvasStore((s) => s.selectNodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const addRelation = useCanvasStore((s) => s.addRelation);
+  const setAIAssistantOpen = useCanvasStore((s) => s.setAIAssistantOpen);
   const nextZIndex = useCanvasStore((s) => s.nextZIndex);
 
   const [activeTab, setActiveTab] = useState<TabMode>('overview');
@@ -54,14 +55,24 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
   if (!isOpen) return null;
 
   const handleFocus = (nodeIds: string[]) => {
-    const targetNodes = nodeIds.map((id) => nodes[id]).filter(Boolean);
+    const uniqueNodeIds = Array.from(new Set(nodeIds));
+    const targetNodes = uniqueNodeIds.map((id) => nodes[id]).filter(Boolean);
     if (targetNodes.length > 0) {
-      selectNodes(nodeIds);
+      selectNodes(uniqueNodeIds);
       fitViewportToNodes(targetNodes, { maxZoom: 1.1, minZoom: 0.5, paddingX: 180, paddingY: 180 });
-      if (onFocusNode && nodeIds.length === 1) {
-        onFocusNode(nodeIds[0]);
+      if (onFocusNode && uniqueNodeIds.length === 1) {
+        onFocusNode(uniqueNodeIds[0]);
       }
     }
+  };
+
+  const handleFocusScoreFactor = (factor: ReasoningScoreFactor) => {
+    const directNodeIds = factor.focusNodeIds || [];
+    const relationNodeIds = (factor.focusRelationIds || []).flatMap((relationId) => {
+      const relation = relations[relationId];
+      return relation ? [relation.sourceId, relation.targetId] : [];
+    });
+    handleFocus([...directNodeIds, ...relationNodeIds]);
   };
 
   const handleDeepAudit = async () => {
@@ -146,8 +157,39 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const currentScore = localAnalysis.metrics.reasoningHealthScore;
   const scoreColor = currentScore >= 80 ? '#10b981' : currentScore >= 55 ? '#f59e0b' : '#ef4444';
+  const scoreBand = currentScore >= 85
+    ? 'Strong model'
+    : currentScore >= 65
+      ? 'Developing'
+      : currentScore >= 40
+        ? 'Needs links'
+        : 'Start connecting';
+  const weakestScoreFactor = localAnalysis.metrics.scoreBreakdown
+    .filter((factor) => factor.score < 85)
+    .sort((a, b) => (a.score - b.score) || (b.weight - a.weight))[0] || null;
+  const bestNextMove = getBestNextMove(localAnalysis, weakestScoreFactor);
 
   const displayedInsights = aiInsights.length > 0 ? aiInsights : localAnalysis.insights;
+
+  const handleBestNextMove = () => {
+    if (localAnalysis.metrics.totalNodes === 0) {
+      setAIAssistantOpen(true);
+      onClose();
+      return;
+    }
+    if (weakestScoreFactor) {
+      handleFocusScoreFactor(weakestScoreFactor);
+    }
+  };
+
+  const handleAskAIForNextMove = () => {
+    if (localAnalysis.metrics.totalNodes === 0) {
+      setAIAssistantOpen(true);
+      onClose();
+      return;
+    }
+    void handleDeepAudit();
+  };
 
   return (
     <div className="graph-intelligence" onClick={(e) => e.stopPropagation()}>
@@ -174,6 +216,35 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         </div>
         <div className="gi-health-bar">
           <div className="gi-health-fill" style={{ width: `${currentScore}%`, backgroundColor: scoreColor }} />
+        </div>
+
+        <div className="gi-score-summary">
+          <span>{scoreBand}</span>
+          <span>Based on board structure. AI explains the next move.</span>
+        </div>
+
+        <div className="gi-score-breakdown" aria-label="Reasoning score breakdown">
+          {localAnalysis.metrics.scoreBreakdown.map((factor) => {
+            const canFocus = Boolean((factor.focusNodeIds?.length || 0) + (factor.focusRelationIds?.length || 0));
+            return (
+              <button
+                key={factor.id}
+                type="button"
+                className="gi-score-factor"
+                onClick={() => canFocus && handleFocusScoreFactor(factor)}
+                disabled={!canFocus}
+                title={`${factor.weight}% of score: ${factor.description}`}
+              >
+                <span className="gi-score-factor__text">
+                  <span className="gi-score-factor__label">{factor.label}</span>
+                  <span className="gi-score-factor__desc">{factor.description}</span>
+                </span>
+                <span className="gi-score-factor__value" style={{ color: factor.score >= 80 ? '#10b981' : factor.score >= 55 ? '#f59e0b' : '#ef4444' }}>
+                  {factor.score}%
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="gi-health-chips">
@@ -218,6 +289,25 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
               title="Click to view spatial map evidence"
             >
               <span>📍 {localAnalysis.evidenceNodes.length} Map Evidence</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="gi-next-move-card">
+        <span className="material-symbols-outlined gi-next-move-card__icon" aria-hidden="true">{bestNextMove.icon}</span>
+        <div className="gi-next-move-card__copy">
+          <span>Best next move</span>
+          <strong>{bestNextMove.title}</strong>
+          <p>{bestNextMove.description}</p>
+        </div>
+        <div className="gi-next-move-card__actions">
+          <button type="button" onClick={handleBestNextMove} disabled={!bestNextMove.canFocus}>
+            {bestNextMove.actionLabel}
+          </button>
+          {bestNextMove.aiLabel !== bestNextMove.actionLabel && (
+            <button type="button" onClick={handleAskAIForNextMove} disabled={isLoadingAI}>
+              {isLoadingAI ? 'Thinking...' : bestNextMove.aiLabel}
             </button>
           )}
         </div>
@@ -316,7 +406,9 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
               ))
             ) : (
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', padding: '16px 0' }}>
-                Your board structure is clean and well-connected.
+                {Object.keys(nodes).length === 0
+                  ? 'Add at least two ideas and one relation to get a useful reasoning score.'
+                  : 'Your board structure is clean and well-connected.'}
               </div>
             )}
           </>
@@ -436,3 +528,85 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
     </div>
   );
 };
+
+function getBestNextMove(
+  analysis: ReturnType<typeof analyzeGraphStructure>,
+  factor: ReasoningScoreFactor | null
+) {
+  const canFocusFactor = Boolean((factor?.focusNodeIds?.length || 0) + (factor?.focusRelationIds?.length || 0));
+
+  if (analysis.metrics.totalNodes === 0) {
+    return {
+      icon: 'auto_awesome',
+      title: 'Create the first connected model',
+      description: 'Start with two or three ideas and at least one labeled relation so Canvio can reason over the board.',
+      actionLabel: 'Open AI',
+      aiLabel: 'Open AI',
+      canFocus: true,
+    };
+  }
+
+  if (!factor) {
+    return {
+      icon: 'verified',
+      title: 'Stress-test the strong parts',
+      description: 'The structure is healthy. The next useful move is to ask AI for hidden assumptions or alternative explanations.',
+      actionLabel: 'Focus',
+      aiLabel: 'Audit with AI',
+      canFocus: false,
+    };
+  }
+
+  if (factor.id === 'connectedness') {
+    return {
+      icon: 'hub',
+      title: `Connect ${analysis.metrics.orphanCount} unanchored ${analysis.metrics.orphanCount === 1 ? 'idea' : 'ideas'}`,
+      description: 'Bring loose notes into the main flow with relation labels like evidence, causes, supports, or next step.',
+      actionLabel: 'Focus loose ideas',
+      aiLabel: 'Suggest links',
+      canFocus: canFocusFactor,
+    };
+  }
+
+  if (factor.id === 'relation_clarity') {
+    return {
+      icon: 'label',
+      title: 'Name the unclear relations',
+      description: 'Generic links are hard for people and AI to read. Add labels that describe meaning, dependency, evidence, or contradiction.',
+      actionLabel: 'Focus links',
+      aiLabel: 'Suggest labels',
+      canFocus: canFocusFactor,
+    };
+  }
+
+  if (factor.id === 'grounding') {
+    return {
+      icon: 'fact_check',
+      title: 'Ground claims with evidence',
+      description: 'Add proof, source notes, examples, images, or map pins, then connect them with based-on relations.',
+      actionLabel: 'Focus claims',
+      aiLabel: 'Find gaps',
+      canFocus: canFocusFactor,
+    };
+  }
+
+  if (factor.id === 'logic_safety') {
+    return {
+      icon: 'warning',
+      title: 'Resolve logic risks',
+      description: 'Contradictions or loops need a decision gate, condition, or clarified sequence before the board is reliable.',
+      actionLabel: 'Focus risk',
+      aiLabel: 'Audit conflict',
+      canFocus: canFocusFactor,
+    };
+  }
+
+  return {
+    icon: 'account_tree',
+    title: 'Deepen the reasoning chain',
+    description: 'Add a clear next consequence, outcome, or decision so the board moves from ideas into a usable flow.',
+    actionLabel: 'Focus path',
+    aiLabel: 'Suggest next step',
+    canFocus: canFocusFactor,
+  };
+}

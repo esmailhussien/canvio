@@ -17,8 +17,9 @@ let DefaultIcon = L.icon({
     iconAnchor: [12, 41]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
-const MAP_PADDING = 16;
 const WORLD_MAP_CENTER: [number, number] = [20, 0];
+const WORLD_MAP_ZOOM = 2;
+const DEFAULT_MAP_SIZE = { width: 520, height: 340 };
 
 // Modern SVG Icons
 const IconPin: React.FC<{ size?: number }> = ({ size = 16 }) => (
@@ -82,6 +83,7 @@ interface MapNodeProps {
   relationSourcePort?: string | null;
   onMarkerRelation?: (markerId: string) => void;
   onMarkerRelationHover?: (markerId: string | null) => void;
+  onRequestRelationMode?: () => void;
 }
 
 const TILE_LAYERS: Record<TileLayerType, { url: string; attribution: string }> = {
@@ -211,9 +213,15 @@ const MarkerAnchorTracker: React.FC<{
         const size = map.getSize();
         const anchors = Object.fromEntries(markers.map((marker) => {
           const point = map.latLngToContainerPoint(marker.position);
+          const container = map.getContainer();
+          const mapNode = container.closest('.map-node') as HTMLElement | null;
+          const containerRect = container.getBoundingClientRect();
+          const nodeRect = mapNode?.getBoundingClientRect();
+          const offsetX = nodeRect ? containerRect.left - nodeRect.left : 0;
+          const offsetY = nodeRect ? containerRect.top - nodeRect.top : 0;
           return [marker.id, {
-            x: MAP_PADDING + point.x,
-            y: MAP_PADDING + point.y,
+            x: offsetX + point.x,
+            y: offsetY + point.y,
             visible: point.x >= 0 && point.y >= 0 && point.x <= size.x && point.y <= size.y,
           }];
         }));
@@ -239,11 +247,20 @@ const MarkerAnchorTracker: React.FC<{
   return null;
 };
 
-export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, relationMode = false, relationSourcePort, onMarkerRelation, onMarkerRelationHover }) => {
+export const MapNode: React.FC<MapNodeProps> = ({
+  node,
+  selected,
+  onChange,
+  relationMode = false,
+  relationSourcePort,
+  onMarkerRelation,
+  onMarkerRelationHover,
+  onRequestRelationMode,
+}) => {
   const rawData = node.data as Partial<MapData>;
   const data: MapData = {
     center: Array.isArray(rawData.center) && rawData.center.length === 2 ? rawData.center : WORLD_MAP_CENTER,
-    zoom: typeof rawData.zoom === 'number' ? rawData.zoom : 4,
+    zoom: typeof rawData.zoom === 'number' ? rawData.zoom : WORLD_MAP_ZOOM,
     tileLayer: rawData.tileLayer === 'hybrid' ? 'hybrid' : 'satellite',
     markers: Array.isArray(rawData.markers) ? rawData.markers : [],
     markerAnchors: typeof rawData.markerAnchors === 'object' && rawData.markerAnchors ? rawData.markerAnchors as Record<string, MapMarkerAnchor> : {},
@@ -285,6 +302,13 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
 
   const addMarkerAtCenter = () => {
     addMarker(data.center, `Marker ${data.markers.length + 1}`);
+  };
+
+  const handleStartPinRelation = (markerId: string) => {
+    if (!relationMode) {
+      onRequestRelationMode?.();
+    }
+    onMarkerRelation?.(markerId);
   };
 
   const renameMarker = (markerId: string, label: string) => {
@@ -332,7 +356,7 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
   }, []);
 
   return (
-    <div className={`map-node ${selected ? 'map-node--selected' : ''}`}>
+    <div className={`map-node ${selected ? 'map-node--selected' : ''} ${relationMode ? 'map-node--relation-mode' : ''}`}>
       <div className="map-node__header" title="Drag here to reposition Map Node">
         <div className="map-node__header-title">
           <span className="material-symbols-outlined map-node__drag-icon">drag_indicator</span>
@@ -352,6 +376,7 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
           title={layer === 'satellite' ? 'Show Roads & Labels' : 'Satellite Only'}
         >
           <IconLayers size={16} />
+          <span className="map-node__action-label">Layer</span>
         </button>
         <button
           type="button"
@@ -360,7 +385,19 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
           title="Add Pin at Map Center"
         >
           <IconPin size={16} />
+          <span className="map-node__action-label">Pin</span>
         </button>
+        {data.markers.length > 0 && (
+          <button
+            type="button"
+            className={`map-node__action-btn map-node__action-btn--connect ${relationMode ? 'active' : ''}`}
+            onClick={() => onRequestRelationMode?.()}
+            title={relationMode ? 'Tap a pin to connect it' : 'Connect a relation to a map pin'}
+          >
+            <span className="material-symbols-outlined">hub</span>
+            <span className="map-node__action-label">{relationMode ? 'Pick pin' : 'Connect'}</span>
+          </button>
+        )}
       </div>
 
       <div
@@ -427,6 +464,20 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
         </MapContainer>
       </div>
 
+      {data.markers.length === 0 && (
+        <div className="map-node__empty-hint" aria-hidden="true">
+          <span className="material-symbols-outlined">add_location_alt</span>
+          <span>Double-click the map or press Pin to add a location.</span>
+        </div>
+      )}
+
+      {relationMode && data.markers.length > 0 && (
+        <div className="map-node__relation-hint" aria-hidden="true">
+          <span className="material-symbols-outlined">hub</span>
+          <span>Tap a pin to use its exact location.</span>
+        </div>
+      )}
+
       {data.markers.length > 0 && (
         <div className="map-node__marker-panel" onMouseDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
           {data.markers.slice(-4).map((marker, index) => (
@@ -450,11 +501,11 @@ export const MapNode: React.FC<MapNodeProps> = ({ node, selected, onChange, rela
               </div>
               <button
                 type="button"
-                onClick={() => onMarkerRelation?.(marker.id)}
-                disabled={!relationMode}
-                title={relationMode ? 'Use marker as relation anchor' : 'Select relation tool to connect marker'}
+                className="map-node__marker-connect"
+                onClick={() => handleStartPinRelation(marker.id)}
+                title={relationMode ? 'Use marker as relation anchor' : 'Start a relation from this pin'}
               >
-                ↗
+                {relationSourcePort === `marker:${marker.id}` ? 'Start' : relationMode ? 'Use pin' : 'Connect'}
               </button>
               <button type="button" onClick={() => centerOnMarker(marker)} title="Center map on marker">⌖</button>
               <button type="button" onClick={() => removeMarker(marker.id)} title="Remove marker">×</button>
@@ -471,18 +522,18 @@ export const mapPlugin = {
   name: 'Map',
   icon: 'map',
   category: 'core' as const,
-  defaultSize: { width: 400, height: 300 },
+  defaultSize: DEFAULT_MAP_SIZE,
   create: (position: Point): LivingNode => ({
     id: nanoid(),
     type: 'map',
     position,
-    size: { width: 400, height: 300 },
+    size: DEFAULT_MAP_SIZE,
     rotation: 0,
     zIndex: 0,
     locked: false,
     data: { 
       center: WORLD_MAP_CENTER,
-      zoom: 4,
+      zoom: WORLD_MAP_ZOOM,
       tileLayer: 'satellite',
       markers: [],
       interactive: true

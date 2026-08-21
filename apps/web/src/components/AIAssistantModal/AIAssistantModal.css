@@ -152,6 +152,81 @@
   flex-direction: column;
 }
 
+.ai-modal__intent-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ai-modal__intent {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.ai-modal__intent .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.ai-modal__intent:hover {
+  transform: translateY(-1px);
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 42%, var(--border-default));
+}
+
+.ai-modal__intent.active {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 68%, var(--border-default));
+  background: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-surface));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 14%, transparent);
+}
+
+.ai-modal__intent-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 38px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border-default));
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.ai-modal__intent-help .material-symbols-outlined {
+  color: #a78bfa;
+  font-size: 18px;
+  flex: 0 0 auto;
+}
+
+.ai-modal__intent-help > span:not(.material-symbols-outlined) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ai-modal__intent-help strong {
+  margin-left: auto;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .ai-modal__input-wrapper {
   display: flex;
   gap: 10px;
@@ -230,6 +305,45 @@
   gap: 10px;
 }
 
+.ai-modal__board-intent-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, var(--border-default));
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-surface));
+}
+
+.ai-modal__board-intent-card > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ai-modal__board-intent-card strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+
+.ai-modal__board-intent-card span:not(.material-symbols-outlined) {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.ai-modal__board-intent-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.16);
+  color: #a78bfa;
+}
+
 .ai-action-btn {
   min-width: 0;
   display: flex;
@@ -253,6 +367,11 @@
   background: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-surface));
   border-color: var(--accent-primary);
   transform: translateY(-1px);
+}
+
+.ai-action-btn.active {
+  border-color: color-mix(in srgb, var(--accent-primary) 52%, var(--border-default));
+  background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-surface));
 }
 
 .ai-action-btn:disabled {
@@ -446,6 +565,11 @@
 }
 
 @media (max-width: 720px) {
+  .ai-modal__overlay {
+    align-items: flex-start;
+    padding-top: 10px;
+  }
+
   .ai-modal__content {
     width: calc(100vw - 24px);
     max-height: calc(100dvh - 24px);
@@ -471,6 +595,27 @@
   .ai-modal__input-wrapper {
     flex-direction: column;
     padding: 10px;
+  }
+
+  .ai-modal__intent-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ai-modal__intent-help strong {
+    margin-left: 0;
+    white-space: normal;
+  }
+
+  .ai-modal__intent-help {
+    min-height: 64px;
+  }
+
+  .ai-modal__board-intent-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ai-modal__board-intent-card .ai-modal__generate-btn {
+    grid-column: 1 / -1;
   }
 
   .ai-modal__generate-btn {

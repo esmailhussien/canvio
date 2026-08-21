@@ -150,10 +150,10 @@ export function UpdatesPage() {
           <main className="updates-main">
             <section className="updates-featured" aria-label="Featured update">
               <div className="updates-featured__visual">
-                <span className="material-symbols-outlined" aria-hidden="true">lightbulb</span>
-                <div className="updates-featured__mini-card updates-featured__mini-card--one">Connect</div>
-                <div className="updates-featured__mini-card updates-featured__mini-card--two">Reason</div>
-                <div className="updates-featured__mini-card updates-featured__mini-card--three">Sketch</div>
+                <span className="material-symbols-outlined" aria-hidden="true">psychology_alt</span>
+                <div className="updates-featured__mini-card updates-featured__mini-card--one">Score</div>
+                <div className="updates-featured__mini-card updates-featured__mini-card--two">Next move</div>
+                <div className="updates-featured__mini-card updates-featured__mini-card--three">Board AI</div>
               </div>
               <div className="updates-featured__copy">
                 <div className="updates-article__meta"><span className="updates-category" style={{ color: '#a855f7', backgroundColor: '#a855f718' }}>Featured</span><span>Latest update</span></div>

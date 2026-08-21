@@ -1,16 +1,16 @@
 .pen-inspector {
   position: fixed;
-  bottom: 82px;
+  bottom: 78px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--glass-bg, rgba(18, 18, 26, 0.9));
   backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.14));
   border-radius: var(--radius-full, 9999px);
-  padding: 6px 14px;
+  padding: 5px 11px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   z-index: 930;
   max-width: calc(100vw - 24px);
   overflow-x: auto;
@@ -38,7 +38,7 @@
 }
 
 .pen-inspector__title {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-secondary, #94a3b8);
   white-space: nowrap;
@@ -50,12 +50,12 @@
 .pen-inspector__colors {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .pen-color-btn {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
@@ -74,7 +74,7 @@
 
 .pen-inspector__divider {
   width: 1px;
-  height: 18px;
+  height: 16px;
   background: var(--border-default);
   flex: 0 0 1px;
 }
@@ -89,8 +89,8 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-secondary, #94a3b8);
-  font-size: 0.75rem;
-  padding: 4px 8px;
+  font-size: 0.72rem;
+  padding: 3px 7px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -117,10 +117,10 @@
   background: color-mix(in srgb, var(--bg-surface) 74%, transparent);
   border: 1px solid var(--border-default);
   color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  padding: 3px 9px;
+  border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
   display: inline-flex;
@@ -135,20 +135,20 @@
 }
 
 .pen-shape-toggle.active {
-  background: color-mix(in srgb, var(--accent-primary) 20%, var(--bg-surface));
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--bg-surface));
   border-color: var(--accent-primary);
   color: var(--text-primary);
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 16%, transparent);
 }
 
 .pen-convert-btn {
   background: color-mix(in srgb, var(--accent-warning, #f59e0b) 16%, var(--bg-surface));
   border: 1px solid color-mix(in srgb, var(--accent-warning, #f59e0b) 45%, var(--border-default));
   color: var(--text-primary);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
   display: inline-flex;
@@ -190,7 +190,7 @@
   }
 
   .pen-shape-toggle {
-    max-width: 128px;
+    max-width: 122px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -198,13 +198,13 @@
 
 @media (pointer: coarse) {
   .pen-inspector {
-    gap: 8px;
-    padding: 8px 10px;
+    gap: 7px;
+    padding: 6px 8px;
   }
 
   .pen-color-btn {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border-width: 2.5px;
     touch-action: manipulation;
   }
@@ -213,7 +213,63 @@
   .pen-shape-toggle,
   .pen-finish-btn {
     min-height: 40px;
-    padding-inline: 12px;
+    padding-inline: 10px;
     touch-action: manipulation;
+  }
+}
+
+@media (max-width: 900px) {
+  .pen-inspector__title,
+  .pen-size-btn span:not(.pen-size-dot) {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .pen-inspector {
+    max-width: calc(100vw - 16px);
+    padding: 5px 7px;
+    gap: 4px;
+  }
+
+  .pen-inspector__colors {
+    gap: 3px;
+  }
+
+  .pen-color-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  .pen-inspector__divider {
+    display: none;
+  }
+
+  .pen-size-btn {
+    width: 22px;
+    min-width: 22px;
+    min-height: 34px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .pen-shape-toggle {
+    width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    justify-content: center;
+    padding: 0;
+    background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--accent-primary) 34%, var(--border-default));
+    color: var(--accent-primary);
+  }
+
+  .pen-shape-toggle span {
+    display: none;
+  }
+
+  .pen-shape-toggle svg {
+    width: 17px;
+    height: 17px;
   }
 }

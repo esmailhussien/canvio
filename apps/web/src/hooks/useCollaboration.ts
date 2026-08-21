@@ -10,6 +10,8 @@ import {
   yMapToNode,
   relationToYMap,
   yMapToRelation,
+  syncNodeToYMap,
+  syncRelationToYMap,
   getRandomName,
   getRandomColor,
   type UserPresence,
@@ -20,6 +22,13 @@ import type { LivingNode, Relation, Viewport } from '@canvio/core';
 export type { LivingNode, Relation, UserPresence };
 
 export type PersistenceState = 'loading' | 'saving' | 'saved' | 'error';
+
+const LOCAL_TRANSACTION_ORIGIN = 'canvio-local-transaction';
+const BOOTSTRAP_TRANSACTION_ORIGIN = 'canvio-bootstrap-transaction';
+
+function isLocalYjsOrigin(origin: unknown): boolean {
+  return origin === LOCAL_TRANSACTION_ORIGIN || origin === BOOTSTRAP_TRANSACTION_ORIGIN;
+}
 
 function isStoredViewport(value: unknown): value is Viewport {
   if (!value || typeof value !== 'object') return false;
@@ -59,6 +68,7 @@ export function useCollaboration(worldId: string) {
     if (!worldId) return;
     setPersistenceState('loading');
     const currentStore = useCanvasStore.getState();
+    currentStore.setCollaborationHistoryAdapter(null);
     currentStore.replaceWorld({
       nodes: {},
       relations: {},
@@ -106,10 +116,31 @@ export function useCollaboration(worldId: string) {
 
     const yNodes = doc.getMap<Y.Map<any>>('nodes');
     const yRelations = doc.getMap<Y.Map<any>>('relations');
+    const undoManager = new Y.UndoManager([yNodes, yRelations], {
+      trackedOrigins: new Set([LOCAL_TRANSACTION_ORIGIN]),
+      captureTimeout: 600,
+    });
+    const collaborationHistoryAdapter = {
+      undo: () => undoManager.undo(),
+      redo: () => undoManager.redo(),
+      canUndo: () => undoManager.undoStack.length > 0,
+      canRedo: () => undoManager.redoStack.length > 0,
+    };
+    const refreshCollaborationHistoryAvailability = () => {
+      const store = useCanvasStore.getState();
+      if (store.historyAdapter === collaborationHistoryAdapter) {
+        store.refreshHistoryAvailability();
+      }
+    };
+
+    currentStore.setCollaborationHistoryAdapter(collaborationHistoryAdapter);
+    undoManager.on('stack-item-added', refreshCollaborationHistoryAvailability);
+    undoManager.on('stack-item-popped', refreshCollaborationHistoryAvailability);
+    undoManager.on('stack-cleared', refreshCollaborationHistoryAvailability);
 
     // ─── Remote → Local Sync ───────────────────────────────────────────
     const handleNodesObserve = (event: Y.YMapEvent<Y.Map<any>>) => {
-      if (event.transaction.origin === 'local-transaction') return;
+      if (isLocalYjsOrigin(event.transaction.origin)) return;
 
       isReceivingRemote = true;
       try {
@@ -129,8 +160,34 @@ export function useCollaboration(worldId: string) {
       }
     };
 
+    const handleNodesObserveDeep = (events: Y.YEvent<any>[], transaction: Y.Transaction) => {
+      if (isLocalYjsOrigin(transaction.origin)) return;
+
+      const changedNodeIds = new Set<string>();
+      events.forEach((event) => {
+        const [nodeId] = event.path;
+        if (typeof nodeId === 'string') {
+          changedNodeIds.add(nodeId);
+        }
+      });
+
+      if (changedNodeIds.size === 0) return;
+
+      isReceivingRemote = true;
+      try {
+        changedNodeIds.forEach((id) => {
+          const yNode = yNodes.get(id);
+          if (yNode) {
+            upsertNodeRemote(yMapToNode(yNode));
+          }
+        });
+      } finally {
+        isReceivingRemote = false;
+      }
+    };
+
     const handleRelationsObserve = (event: Y.YMapEvent<Y.Map<any>>) => {
-      if (event.transaction.origin === 'local-transaction') return;
+      if (isLocalYjsOrigin(event.transaction.origin)) return;
 
       isReceivingRemote = true;
       try {
@@ -149,8 +206,36 @@ export function useCollaboration(worldId: string) {
       }
     };
 
+    const handleRelationsObserveDeep = (events: Y.YEvent<any>[], transaction: Y.Transaction) => {
+      if (isLocalYjsOrigin(transaction.origin)) return;
+
+      const changedRelationIds = new Set<string>();
+      events.forEach((event) => {
+        const [relationId] = event.path;
+        if (typeof relationId === 'string') {
+          changedRelationIds.add(relationId);
+        }
+      });
+
+      if (changedRelationIds.size === 0) return;
+
+      isReceivingRemote = true;
+      try {
+        changedRelationIds.forEach((id) => {
+          const yRelation = yRelations.get(id);
+          if (yRelation) {
+            upsertRelationRemote(yMapToRelation(yRelation));
+          }
+        });
+      } finally {
+        isReceivingRemote = false;
+      }
+    };
+
     yNodes.observe(handleNodesObserve);
+    yNodes.observeDeep(handleNodesObserveDeep);
     yRelations.observe(handleRelationsObserve);
+    yRelations.observeDeep(handleRelationsObserveDeep);
 
     // ─── IndexedDB Preload (offline fallback) ─────────────────────────
     // Only load IndexedDB cache if we don't have remote data yet.
@@ -244,6 +329,7 @@ export function useCollaboration(worldId: string) {
     const enterOfflineMode = (label: string) => {
       if (hasEnteredOfflineMode) return;
       hasEnteredOfflineMode = true;
+      useCanvasStore.getState().setCollaborationHistoryAdapter(null);
       wsProvider.off('connection-error', handleConnectionFailure);
       wsProvider.off('connection-close', handleConnectionClose);
       wsProvider.disconnect();
@@ -328,18 +414,23 @@ export function useCollaboration(worldId: string) {
             // Push local nodes to Yjs
             Object.entries(localNodes).forEach(([id, node]) => {
               const existing = yNodes.get(id);
-              if (!existing || existing.get('updatedAt') !== node.updatedAt) {
+              if (!existing) {
                 yNodes.set(id, nodeToYMap(node));
+              } else if (existing.get('updatedAt') !== node.updatedAt) {
+                syncNodeToYMap(existing, node);
               }
             });
             
             // Push local relations to Yjs
             Object.entries(localRelations).forEach(([id, rel]) => {
-              if (!yRelations.has(id)) {
+              const existing = yRelations.get(id);
+              if (!existing) {
                 yRelations.set(id, relationToYMap(rel));
+              } else {
+                syncRelationToYMap(existing, rel);
               }
             });
-          }, 'local-transaction');
+          }, BOOTSTRAP_TRANSACTION_ORIGIN);
         }, 100);
       }
     };
@@ -384,7 +475,11 @@ export function useCollaboration(worldId: string) {
             const needsSync = !existing || existing.get('updatedAt') !== node.updatedAt;
 
             if (needsSync) {
-              yNodes.set(id, nodeToYMap(node));
+              if (existing) {
+                syncNodeToYMap(existing, node);
+              } else {
+                yNodes.set(id, nodeToYMap(node));
+              }
             }
           });
 
@@ -394,7 +489,7 @@ export function useCollaboration(worldId: string) {
               yNodes.delete(prevId);
             }
           });
-        }, 'local-transaction');
+        }, LOCAL_TRANSACTION_ORIGIN);
       }
     );
 
@@ -413,7 +508,7 @@ export function useCollaboration(worldId: string) {
               const currentStyle = existing.get('style');
               const currentLabel = existing.get('label');
               if (currentStyle !== JSON.stringify(rel.style) || currentLabel !== rel.label) {
-                yRelations.set(id, relationToYMap(rel));
+                syncRelationToYMap(existing, rel);
               }
             }
           });
@@ -424,7 +519,7 @@ export function useCollaboration(worldId: string) {
               yRelations.delete(prevId);
             }
           });
-        }, 'local-transaction');
+        }, LOCAL_TRANSACTION_ORIGIN);
       }
     );
 
@@ -501,8 +596,15 @@ export function useCollaboration(worldId: string) {
       wsProvider.off('connection-error', handleConnectionFailure);
       wsProvider.off('connection-close', handleConnectionClose);
       awareness.off('change', handleAwarenessChange);
+      undoManager.off('stack-item-added', refreshCollaborationHistoryAvailability);
+      undoManager.off('stack-item-popped', refreshCollaborationHistoryAvailability);
+      undoManager.off('stack-cleared', refreshCollaborationHistoryAvailability);
+      useCanvasStore.getState().setCollaborationHistoryAdapter(null);
       yNodes.unobserve(handleNodesObserve);
+      yNodes.unobserveDeep(handleNodesObserveDeep);
       yRelations.unobserve(handleRelationsObserve);
+      yRelations.unobserveDeep(handleRelationsObserveDeep);
+      undoManager.destroy();
       wsProvider.destroy();
       doc.destroy();
     };

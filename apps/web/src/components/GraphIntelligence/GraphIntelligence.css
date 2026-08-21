@@ -143,6 +143,102 @@
   transition: width 0.4s ease;
 }
 
+.gi-score-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+
+.gi-score-summary span:first-child {
+  color: var(--text-primary, #f8fafc);
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.gi-score-summary span:last-child {
+  text-align: right;
+}
+
+.gi-score-breakdown {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.gi-score-factor {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.gi-score-factor:hover:not(:disabled) {
+  border-color: rgba(129, 140, 248, 0.45);
+  background: rgba(99, 102, 241, 0.11);
+  transform: translateY(-1px);
+}
+
+.gi-score-factor:disabled {
+  cursor: default;
+  opacity: 0.82;
+}
+
+.gi-score-factor__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gi-score-factor__label {
+  color: var(--text-primary, #f8fafc);
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.gi-score-factor__desc {
+  color: var(--text-secondary, #94a3b8);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.gi-score-factor__value {
+  min-width: 38px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: Outfit, sans-serif;
+}
+
+[data-theme='light'] .gi-score-summary span:first-child,
+[data-theme='light'] .gi-score-factor__label {
+  color: #111827;
+}
+
+[data-theme='light'] .gi-score-factor {
+  border-color: rgba(17, 24, 39, 0.08);
+  background: rgba(248, 250, 252, 0.74);
+}
+
+[data-theme='light'] .gi-score-factor:hover:not(:disabled) {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.08);
+}
+
 .gi-health-chips {
   display: flex;
   flex-wrap: wrap;
@@ -184,6 +280,98 @@
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.3);
   color: #6ee7b7;
+}
+
+.gi-next-move-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(56, 189, 248, 0.06));
+}
+
+.gi-next-move-card__icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.17);
+  color: #c4b5fd;
+}
+
+.gi-next-move-card__copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.gi-next-move-card__copy span {
+  color: #a5b4fc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.gi-next-move-card__copy strong {
+  color: var(--text-primary, #f8fafc);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.gi-next-move-card__copy p {
+  margin: 0;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.gi-next-move-card__actions {
+  grid-column: 2;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.gi-next-move-card__actions button {
+  border: 1px solid rgba(129, 140, 248, 0.32);
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.14);
+  color: #c7d2fe;
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.gi-next-move-card__actions button:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.26);
+  border-color: rgba(129, 140, 248, 0.62);
+  transform: translateY(-1px);
+}
+
+.gi-next-move-card__actions button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+[data-theme='light'] .gi-next-move-card {
+  border-bottom-color: rgba(17, 24, 39, 0.06);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(14, 165, 233, 0.06));
+}
+
+[data-theme='light'] .gi-next-move-card__copy strong {
+  color: #111827;
+}
+
+[data-theme='light'] .gi-next-move-card__actions button {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4338ca;
 }
 
 /* Tabs */

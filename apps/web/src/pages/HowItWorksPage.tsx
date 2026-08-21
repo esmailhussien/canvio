@@ -29,12 +29,12 @@ const TAB_CONTENT: Record<FeatureTab, {
     icon: '+',
     label: 'Start',
     eyebrow: '01 / Begin anywhere',
-    title: 'Open a blank board, choose a model, or draft an initial structure with AI.',
-    description: 'Start immediately without complex setup: begin on an open canvas, load a curated model, or prompt the AI Navigator to lay out the first set of nodes.',
+    title: 'Open a blank board, choose a model, or ask AI to create, study, summarize, article, or tidy.',
+    description: 'Start immediately without complex setup: begin on an open canvas, load a curated model, or use the AI Navigator to create a first structure from your prompt or the board already in front of you.',
     points: [
       { glyph: 'B', title: 'Blank canvas', text: 'Start from scratch when exploring an open-ended idea or rough architecture.', color: '#38bdf8' },
       { glyph: 'M', title: 'Curated models', text: 'Use study, strategy, logic tree, and planning boards as clean starting points.', color: '#22c55e' },
-      { glyph: 'AI', title: 'AI board draft', text: 'Prompt the navigator (Ctrl+K) to generate structured notes and relationships.', color: '#a855f7' },
+      { glyph: 'AI', title: 'AI Navigator modes', text: 'Choose Create, Study, Summary, Article, or Tidy. When a board has content, AI uses its notes, relations, and map pins.', color: '#a855f7' },
       { glyph: 'T', title: 'Readable themes', text: 'Switch dark, light, and board background styles for different rooms and devices.', color: '#f59e0b' },
     ],
   },
@@ -55,13 +55,14 @@ const TAB_CONTENT: Record<FeatureTab, {
     icon: 'C',
     label: 'Connect',
     eyebrow: '03 / Structure reasoning',
-    title: 'Connect ideas with quick-drag ports, assign semantic meaning, and audit board health.',
-    description: 'Lines in Canvio explain how ideas relate. Drag from any edge to connect, assign logical assertions like Contradicts or Depends on, and check graph health.',
+    title: 'Connect ideas with quick-drag ports, assign semantic meaning, and see what needs attention next.',
+    description: 'Lines in Canvio explain how ideas relate. Drag from any edge to connect, assign logical assertions like Contradicts or Depends on, then use the reasoning score to improve the board.',
     points: [
       { glyph: 'QD', title: 'Quick-Connect drag', text: 'Drag from any node edge port to connect to an existing note or spawn a new connected note on empty space.', color: '#38bdf8' },
       { glyph: '1-8', title: '8 Semantic types', text: 'Press 1–8 on any relation to specify Contradicts, Depends on, Enables, Based on, Part of, Leads to, or Inspired by.', color: '#f472b6' },
-      { glyph: 'R', title: 'Reasoning Partner (Ctrl+Shift+R)', text: 'Run local graph queries to detect orphans, circular dependencies, and contradiction pairs with health score 0–100.', color: '#a855f7' },
-      { glyph: 'CH', title: 'Challenge & Socratic modes', text: 'Ask the assistant to test weak assumptions or generate follow-up questions from the graph.', color: '#10b981' },
+      { glyph: 'R', title: 'Reasoning Partner (Ctrl+Shift+R)', text: 'See a 0-100 score based on connectedness, relation clarity, evidence grounding, logic safety, and reasoning depth.', color: '#a855f7' },
+      { glyph: 'NEXT', title: 'Best next move', text: 'The panel turns the weakest score factor into a focused action so you know whether to connect, label, ground, resolve, or deepen.', color: '#10b981' },
+      { glyph: 'CH', title: 'Challenge & Socratic modes', text: 'Ask the assistant to test weak assumptions or generate follow-up questions from the graph.', color: '#f59e0b' },
     ],
   },
   deliver: {
@@ -90,7 +91,7 @@ const USE_CASES = [
   { glyph: 'ED', title: 'Teach a lesson', text: 'Plan the flow, show relationships, focus the class, and export the result.' },
   { glyph: 'ST', title: 'Study a topic', text: 'Turn a messy subject into a concept map with examples and review prompts.' },
   { glyph: 'PR', title: 'Plan a project', text: 'Map goals, dependencies, decisions, risks, and delivery steps in one place.' },
-  { glyph: 'MAP', title: 'Work with places', text: 'Use maps when location matters, without making the whole product only about maps.' },
+  { glyph: 'MAP', title: 'Work with places', text: 'Use maps when location matters, connect relations to exact pins, and keep place evidence beside the rest of the board.' },
 ];
 
 export function HowItWorksPage() {
