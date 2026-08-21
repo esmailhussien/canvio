@@ -41,7 +41,14 @@ export async function generateSpatialBoardAsync(
       model,
       context: buildAIContext(),
     });
-    return normalizeServerBoardResult(result.title, result.nodes, result.relations, prompt, 'server');
+    if (result.source === 'server-ai') {
+      return normalizeServerBoardResult(result.title, result.nodes, result.relations, prompt, 'server');
+    }
+    return {
+      ...generateSpatialBoard(prompt),
+      source: 'local',
+      message: getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
+    };
   } catch (err) {
     console.warn('Server AI generation unavailable. Falling back to local spatial template.', err);
     return {
@@ -425,6 +432,10 @@ export async function summarizeBoardWithAIAsync(
       output,
       context: buildAIContext(nodes, relations),
     });
+    if (result.source !== 'server-ai') {
+      const localResult = createLocalBoardDocument(nodes, relations, output);
+      return output === 'article' ? composeArticlePage(localResult) : localResult;
+    }
     const normalized = normalizeServerBoardResult(
       result.title,
       result.nodes,

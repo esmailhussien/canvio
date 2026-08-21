@@ -82,12 +82,14 @@ export interface RawAIBoardRelation {
 }
 
 export interface AIBoardResponse {
-  source: 'server-ai';
-  provider: AIProvider;
-  model: string;
+  source: 'server-ai' | 'local-fallback';
+  provider?: AIProvider;
+  model?: string;
   title: string;
   nodes: RawAIBoardNode[];
   relations: RawAIBoardRelation[];
+  error?: 'AI_NOT_CONFIGURED' | 'AI_REQUEST_FAILED';
+  details?: string;
 }
 
 export interface AIClusterResponse {

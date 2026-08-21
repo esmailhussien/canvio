@@ -66,6 +66,17 @@ const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on',
 const NODE_TYPES = ['sticky', 'shape', 'text', 'frame'];
 const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
 const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_PREFERRED_MODELS = [
+  'openai/gpt-oss-20b',
+  'openai/gpt-oss-120b',
+  'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+  'qwen/qwen3-32b',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'meta-llama/llama-4-maverick-17b-128e-instruct',
+];
+
+let groqModelsCache: { expiresAt: number; ids: string[] } | null = null;
 
 export async function aiRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', createRateLimitHook({
@@ -105,7 +116,16 @@ export async function aiRoutes(fastify: FastifyInstance) {
       };
     } catch (err: any) {
       fastify.log.error({ err }, 'AI board generation failed');
-      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+      return reply.send({
+        source: 'local-fallback',
+        provider: primaryProvider,
+        model: resolveModel(primaryProvider, request.body?.model),
+        title: '',
+        nodes: [],
+        relations: [],
+        error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED',
+        details: err?.message,
+      });
     }
   });
 
@@ -138,7 +158,16 @@ export async function aiRoutes(fastify: FastifyInstance) {
       };
     } catch (err: any) {
       fastify.log.error({ err }, 'AI summarize failed');
-      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+      return reply.send({
+        source: 'local-fallback',
+        provider: primaryProvider,
+        model: resolveModel(primaryProvider, request.body?.model),
+        title: '',
+        nodes: [],
+        relations: [],
+        error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED',
+        details: err?.message,
+      });
     }
   });
 
@@ -396,15 +425,35 @@ async function callAIWithFallback(
       lastError = err instanceof Error ? err : new Error(String(err));
       providerErrors.push(formatProviderFailure(prov, mod, lastError));
 
-      if (prov === 'groq' && mod !== DEFAULT_GROQ_MODEL && isModelUnavailableError(lastError)) {
-        try {
-          console.warn(`[Canvio AI Fallback Agent] Retrying Groq with default model "${DEFAULT_GROQ_MODEL}".`);
-          const parsed = await callProviderForJson(prov, key, DEFAULT_GROQ_MODEL, systemPrompt, userPrompt);
-          return { parsed, provider: prov, model: DEFAULT_GROQ_MODEL };
-        } catch (fallbackErr: any) {
-          console.warn(`[Canvio AI Fallback Agent] Groq default model "${DEFAULT_GROQ_MODEL}" failed:`, fallbackErr?.message || fallbackErr);
-          lastError = fallbackErr instanceof Error ? fallbackErr : new Error(String(fallbackErr));
-          providerErrors.push(formatProviderFailure(prov, DEFAULT_GROQ_MODEL, lastError));
+      if (prov === 'groq' && isModelUnavailableError(lastError)) {
+        const attemptedGroqModels = new Set<string>([mod]);
+
+        if (mod !== DEFAULT_GROQ_MODEL) {
+          try {
+            console.warn(`[Canvio AI Fallback Agent] Retrying Groq with default model "${DEFAULT_GROQ_MODEL}".`);
+            const parsed = await callProviderForJson(prov, key, DEFAULT_GROQ_MODEL, systemPrompt, userPrompt);
+            return { parsed, provider: prov, model: DEFAULT_GROQ_MODEL };
+          } catch (fallbackErr: any) {
+            console.warn(`[Canvio AI Fallback Agent] Groq default model "${DEFAULT_GROQ_MODEL}" failed:`, fallbackErr?.message || fallbackErr);
+            lastError = fallbackErr instanceof Error ? fallbackErr : new Error(String(fallbackErr));
+            attemptedGroqModels.add(DEFAULT_GROQ_MODEL);
+            providerErrors.push(formatProviderFailure(prov, DEFAULT_GROQ_MODEL, lastError));
+          }
+        }
+
+        if (isModelUnavailableError(lastError)) {
+          const accessibleModel = await resolveAccessibleGroqModel(key, attemptedGroqModels);
+          if (accessibleModel) {
+            try {
+              console.warn(`[Canvio AI Fallback Agent] Retrying Groq with discovered model "${accessibleModel}".`);
+              const parsed = await callProviderForJson(prov, key, accessibleModel, systemPrompt, userPrompt);
+              return { parsed, provider: prov, model: accessibleModel };
+            } catch (discoveredErr: any) {
+              console.warn(`[Canvio AI Fallback Agent] Groq discovered model "${accessibleModel}" failed:`, discoveredErr?.message || discoveredErr);
+              lastError = discoveredErr instanceof Error ? discoveredErr : new Error(String(discoveredErr));
+              providerErrors.push(formatProviderFailure(prov, accessibleModel, lastError));
+            }
+          }
         }
       }
     }
@@ -419,6 +468,53 @@ async function callAIWithFallback(
 
 function isModelUnavailableError(error: Error) {
   return /model_not_found|does not exist|do not have access/i.test(error.message);
+}
+
+async function resolveAccessibleGroqModel(apiKey: string, attemptedModels: Set<string>) {
+  const modelIds = await fetchGroqModelIds(apiKey);
+  if (modelIds.length === 0) return null;
+
+  const preferred = GROQ_PREFERRED_MODELS.find((id) => modelIds.includes(id) && !attemptedModels.has(id));
+  if (preferred) return preferred;
+
+  return modelIds.find((id) => {
+    const lowered = id.toLowerCase();
+    return (
+      !attemptedModels.has(id) &&
+      !lowered.includes('whisper') &&
+      !lowered.includes('tts') &&
+      !lowered.includes('guard') &&
+      !lowered.includes('embed')
+    );
+  }) || null;
+}
+
+async function fetchGroqModelIds(apiKey: string) {
+  if (groqModelsCache && groqModelsCache.expiresAt > Date.now()) {
+    return groqModelsCache.ids;
+  }
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      console.warn(`[Canvio AI Fallback Agent] Could not list Groq models: HTTP ${response.status}: ${errBody}`);
+      return [];
+    }
+
+    const payload = await response.json() as { data?: Array<{ id?: unknown }> };
+    const ids = (payload.data || [])
+      .map((model) => cleanText(model.id, 120))
+      .filter(Boolean);
+    groqModelsCache = { ids, expiresAt: Date.now() + 10 * 60 * 1000 };
+    return ids;
+  } catch (err: any) {
+    console.warn('[Canvio AI Fallback Agent] Could not list Groq models:', err?.message || err);
+    return [];
+  }
 }
 
 function formatProviderFailure(provider: AIProvider, model: string, error: Error) {
@@ -577,7 +673,7 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
         contents: [{ parts: [{ text: systemPrompt }, { text: userPrompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
-          maxOutputTokens: 3500,
+          maxOutputTokens: 8192,
         },
       }),
       signal: AbortSignal.timeout(25_000),
