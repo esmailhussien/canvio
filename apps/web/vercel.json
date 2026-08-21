@@ -37,11 +37,11 @@
     },
     {
       "source": "/w/:path*",
-      "destination": "/index.html"
+      "destination": "/"
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/"
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useLocation, useParams } from 'react-router-dom';
 import { Seo } from './components/Seo/Seo';
 import { useCanvasStore } from './store/canvasStore';
 
@@ -44,6 +44,15 @@ function PageLoadingFallback() {
   );
 }
 
+function LegacyWorldRedirect() {
+  const { worldId = '' } = useParams();
+  const location = useLocation();
+  const looksLikeBoardId = /^[A-Za-z0-9_-]{6,64}$/.test(worldId);
+  const suffix = `${location.search}${location.hash}`;
+
+  return <Navigate to={looksLikeBoardId ? `/w/${encodeURIComponent(worldId)}${suffix}` : '/'} replace />;
+}
+
 export function App() {
   const themePreference = useCanvasStore((state) => state.themePreference);
   const syncSystemTheme = useCanvasStore((state) => state.syncSystemTheme);
@@ -72,9 +81,9 @@ export function App() {
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/updates" element={<UpdatesPage />} />
           <Route path="/updates/:slug" element={<UpdatesPage />} />
+          <Route path="/:worldId" element={<LegacyWorldRedirect />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
   );
 }
-
