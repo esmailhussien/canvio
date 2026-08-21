@@ -7,6 +7,7 @@ import {
   organizeAndClusterWithAIAsync,
   generateSpatialBoard,
   getPromptOutputLanguage,
+  formatAIContextStats,
 } from '../../utils/spatialAIEngine';
 import { nanoid } from 'nanoid';
 import { useCanvasStore, type LivingNode } from '../../store/canvasStore';
@@ -21,6 +22,15 @@ interface AIAssistantModalProps {
 
 type AIIntent = 'create' | 'study' | 'summary' | 'article' | 'organize';
 type BoardActionIntent = 'summary' | 'article' | 'quiz' | 'presentation' | 'organize' | 'gaps' | 'next';
+type AIStatus = {
+  kind: 'info' | 'error' | 'success';
+  title: string;
+  text: string;
+  detail?: string;
+  source?: 'server' | 'local';
+  provider?: string;
+  actionLabel?: string;
+};
 
 const AI_INTENTS: Array<{
   id: AIIntent;
@@ -76,7 +86,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   const [prompt, setPrompt] = useState('');
   const [activeIntent, setActiveIntent] = useState<AIIntent>('create');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [aiStatus, setAIStatus] = useState<{ kind: 'info' | 'error' | 'success'; text: string } | null>(null);
+  const [aiStatus, setAIStatus] = useState<AIStatus | null>(null);
 
   const addNode = useCanvasStore((s) => s.addNode);
   const addRelation = useCanvasStore((s) => s.addRelation);
@@ -87,9 +97,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   const hasBoardContent = nodeCount > 0;
   const activeIntentConfig = AI_INTENTS.find((intent) => intent.id === activeIntent) || AI_INTENTS[0];
   const isPromptIntent = activeIntent === 'create' || activeIntent === 'study';
-  const boardContextText = hasBoardContent
-    ? `${nodeCount} ${nodeCount === 1 ? 'element' : 'elements'} · ${relationCount} ${relationCount === 1 ? 'connection' : 'connections'}${mapPinCount > 0 ? ` · ${mapPinCount} map ${mapPinCount === 1 ? 'pin' : 'pins'}` : ''}`
-    : 'No board content yet';
+  const boardContextText = formatAIContextStats({ nodeCount, relationCount, mapPinCount, hasBoardContent });
   const boardContextHint = hasBoardContent
     ? relationCount > 0
       ? 'AI will use node text, relation labels, relationship types, and map pins as source material.'
@@ -102,14 +110,47 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   if (!isOpen) return null;
 
-  const closeWithAIStatus = (result: { message?: string; source?: string }) => {
+  const showWorkingStatus = (text: string) => {
     setAIStatus({
-      kind: result.source === 'local' ? 'info' : 'success',
-      text: result.source === 'local'
-        ? result.message || 'Done with Canvio smart mode. Everything is editable.'
-        : 'Done. Your board is ready to edit.',
+      kind: 'info',
+      title: hasBoardContent ? 'Reading board context' : 'Building from your prompt',
+      text,
+      detail: hasBoardContent
+        ? `Using ${boardContextText}: visible text, relation labels, relationship types, and map pins.`
+        : 'No board content is available yet, so this starts from the prompt only.',
     });
-    window.setTimeout(onClose, result.source === 'local' ? 1500 : 900);
+  };
+
+  const showAIResultStatus = (
+    result: { message?: string; source?: string; provider?: string; model?: string },
+    successText: string,
+    autoClose = true
+  ) => {
+    const isLocal = result.source === 'local';
+    const providerLabel = formatAIProvider(result.provider);
+    setAIStatus({
+      kind: isLocal ? 'info' : 'success',
+      source: isLocal ? 'local' : 'server',
+      provider: result.provider,
+      title: isLocal
+        ? 'Local smart mode used'
+        : `${providerLabel} used ${hasBoardContent ? 'board context' : 'your prompt'}`,
+      text: isLocal
+        ? `${result.message || 'Server AI was unavailable, so Canvio used local smart mode.'} ${successText}`
+        : successText,
+      detail: `${hasBoardContent ? `Read source context: ${boardContextText}` : 'Prompt-only generation'} · Added editable Canvio objects.`,
+      actionLabel: isLocal ? 'View board' : undefined,
+    });
+    if (autoClose && !isLocal) {
+      window.setTimeout(onClose, 900);
+    }
+  };
+
+  const closeWithAIStatus = (
+    result: { message?: string; source?: string; provider?: string; model?: string },
+    successText = 'Done. Your board is ready to edit.'
+  ) => {
+    showAIResultStatus(result, successText);
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -121,7 +162,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     if (!prompt.trim() || isGenerating) return;
 
     setIsGenerating(true);
-    setAIStatus({ kind: 'info', text: 'Building a structured board...' });
+    showWorkingStatus('Building a structured board with editable nodes and semantic relations...');
 
     try {
       const result = await generateSpatialBoardAsync(buildIntentPrompt(activeIntent, prompt));
@@ -144,10 +185,15 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       fitViewportToNodes(placedNodes, { maxZoom: 0.95, minZoom: 0.42, paddingX: 220, paddingY: 240 });
 
       setPrompt('');
-      closeWithAIStatus(result);
+      closeWithAIStatus(result, 'Created an editable board from your prompt and context.');
     } catch (err) {
       console.error('Failed to generate spatial board:', err);
-      setAIStatus({ kind: 'error', text: 'AI generation failed. Please try again or switch to a local template.' });
+      setAIStatus({
+        kind: 'error',
+        title: 'AI generation failed',
+        text: 'Please try again, simplify the request, or use a ready-made template.',
+        detail: hasBoardContent ? `Board context available: ${boardContextText}.` : undefined,
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -160,16 +206,17 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const handleBoardDocument = async (output: BoardDocumentFormat) => {
     if (!hasBoardContent) {
-      setAIStatus({ kind: 'info', text: 'Add a note, shape, or drawing first. Then Canvio can explain the board.' });
+      setAIStatus({
+        kind: 'info',
+        title: 'Add board context first',
+        text: 'Add a note, shape, or drawing first. Then Canvio can explain the board.',
+      });
       return;
     }
     setIsGenerating(true);
-    setAIStatus({
-      kind: 'info',
-      text: output === 'article'
-        ? 'Reading the board and writing an editable article draft...'
-        : 'Reading the board graph and building a concise summary...',
-    });
+    showWorkingStatus(output === 'article'
+      ? 'Writing an editable article draft from the board...'
+      : 'Building a concise editable summary from the board graph...');
     try {
       const allNodes = Object.values(useCanvasStore.getState().nodes);
       const allRelations = Object.values(useCanvasStore.getState().relations);
@@ -178,10 +225,17 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       placedNodes.forEach((n) => addNode(n));
       res.relations.forEach((r) => addRelation(r));
       fitTemplateToViewport(placedNodes);
-      closeWithAIStatus(res);
+      closeWithAIStatus(res, output === 'article'
+        ? 'Wrote an editable article draft from the board.'
+        : 'Summarized the board into editable notes.');
     } catch (err) {
       console.error(`Board ${output} failed:`, err);
-      setAIStatus({ kind: 'error', text: `${output === 'article' ? 'Article' : 'Summary'} failed. Please try again.` });
+      setAIStatus({
+        kind: 'error',
+        title: `${output === 'article' ? 'Article' : 'Summary'} failed`,
+        text: 'Please try again after simplifying the board.',
+        detail: `Attempted to read ${boardContextText}.`,
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -189,24 +243,29 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const handleOrganizeCluster = async () => {
     if (!hasBoardContent) {
-      setAIStatus({ kind: 'info', text: 'Add a few elements first. Then Canvio can group them into clear areas.' });
+      setAIStatus({
+        kind: 'info',
+        title: 'Add board context first',
+        text: 'Add a few elements first. Then Canvio can group them into clear areas.',
+      });
       return;
     }
     setIsGenerating(true);
-    setAIStatus({ kind: 'info', text: 'Grouping related elements into clearer clusters...' });
+    showWorkingStatus('Grouping related elements into clearer clusters...');
     try {
       const allNodes = Object.values(useCanvasStore.getState().nodes);
       const updateNode = useCanvasStore.getState().updateNode;
       const result = await organizeAndClusterWithAIAsync(allNodes, updateNode, addNode);
       fitViewportToNodes(Object.values(useCanvasStore.getState().nodes), { minZoom: 0.5 });
-      setAIStatus({
-        kind: result.source === 'local' ? 'info' : 'success',
-        text: result.message || 'Board organized into readable clusters.',
-      });
-      window.setTimeout(onClose, result.source === 'local' ? 1100 : 700);
+      showAIResultStatus(result, `Organized the board into ${result.clustersCount} readable ${result.clustersCount === 1 ? 'cluster' : 'clusters'}.`);
     } catch (err) {
       console.error('Organize cluster failed:', err);
-      setAIStatus({ kind: 'error', text: 'Organize failed. Please try again after selecting fewer elements.' });
+      setAIStatus({
+        kind: 'error',
+        title: 'Organize failed',
+        text: 'Please try again after selecting fewer elements.',
+        detail: `Attempted to read ${boardContextText}.`,
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -220,7 +279,11 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const handleBoardAction = (intent: BoardActionIntent) => {
     if (!hasBoardContent) {
-      setAIStatus({ kind: 'info', text: 'Add a note, shape, map pin, or relation first. Then Canvio can use the board.' });
+      setAIStatus({
+        kind: 'info',
+        title: 'Add board context first',
+        text: 'Add a note, shape, map pin, or relation first. Then Canvio can use the board.',
+      });
       return;
     }
 
@@ -254,12 +317,9 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     if (allNodes.length === 0) return;
 
     setIsGenerating(true);
-    setAIStatus({
-      kind: 'info',
-      text: intent === 'quiz'
-        ? 'Reading the board and creating an editable quiz...'
-        : 'Reading the board and creating a presentation outline...',
-    });
+    showWorkingStatus(intent === 'quiz'
+      ? 'Creating an editable quiz from the board...'
+      : 'Creating a presentation outline from the board...');
 
     try {
       const result = await generateSpatialBoardAsync(buildBoardActionPrompt(intent));
@@ -280,15 +340,17 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       result.relations.forEach((rel) => addRelation(rel));
       selectNodes(placedNodes.map((node) => node.id));
       fitViewportToNodes(placedNodes, { maxZoom: 0.95, minZoom: 0.42, paddingX: 220, paddingY: 240 });
-      closeWithAIStatus({
-        source: result.source,
-        message: intent === 'quiz'
-          ? 'Created an editable quiz from the board.'
-          : 'Created an editable presentation outline from the board.',
-      });
+      closeWithAIStatus(result, intent === 'quiz'
+        ? 'Created an editable quiz from the board.'
+        : 'Created an editable presentation outline from the board.');
     } catch (err) {
       console.error(`Board ${intent} generation failed:`, err);
-      setAIStatus({ kind: 'error', text: intent === 'quiz' ? 'Quiz failed. Please try again.' : 'Presentation outline failed. Please try again.' });
+      setAIStatus({
+        kind: 'error',
+        title: intent === 'quiz' ? 'Quiz failed' : 'Presentation outline failed',
+        text: 'Please try again after simplifying the board.',
+        detail: `Attempted to read ${boardContextText}.`,
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -300,12 +362,9 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     if (allNodes.length === 0) return;
 
     setIsGenerating(true);
-    setAIStatus({
-      kind: 'info',
-      text: intent === 'gaps'
-        ? 'Checking the board for missing links and weak spots...'
-        : 'Reading the board and choosing one useful next move...',
-    });
+    showWorkingStatus(intent === 'gaps'
+      ? 'Checking the board for missing links and weak spots...'
+      : 'Choosing one useful next move from the board...');
 
     try {
       const result = await analyzeGraphWithAIAsync(allNodes, allRelations);
@@ -334,16 +393,17 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       });
       selectNodes(createdNodes.map((node) => node.id));
       fitViewportToNodes(createdNodes, { maxZoom: 0.95, minZoom: 0.5, paddingX: 180, paddingY: 220 });
-      setAIStatus({
-        kind: result.source === 'local' ? 'info' : 'success',
-        text: intent === 'gaps'
-          ? 'Added editable gap notes beside the board.'
-          : 'Added one editable next-step note beside the board.',
-      });
-      window.setTimeout(onClose, result.source === 'local' ? 1300 : 900);
+      showAIResultStatus(result, intent === 'gaps'
+        ? 'Added editable gap notes beside the board.'
+        : 'Added one editable next-step note beside the board.');
     } catch (err) {
       console.error(`AI ${intent} assist failed:`, err);
-      setAIStatus({ kind: 'error', text: 'Could not analyze the board. Try again after simplifying the selection.' });
+      setAIStatus({
+        kind: 'error',
+        title: 'Could not analyze board',
+        text: 'Try again after simplifying the selection.',
+        detail: `Attempted to read ${boardContextText}.`,
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -620,7 +680,19 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
         {aiStatus && (
           <div className={`ai-modal__status ai-modal__status--${aiStatus.kind}`} role="status">
-            {aiStatus.text}
+            <span className="ai-modal__status-icon material-symbols-outlined" aria-hidden="true">
+              {aiStatus.kind === 'error' ? 'warning' : aiStatus.source === 'local' ? 'offline_bolt' : aiStatus.kind === 'success' ? 'verified' : 'account_tree'}
+            </span>
+            <span className="ai-modal__status-copy">
+              <strong>{aiStatus.title}</strong>
+              <span>{aiStatus.text}</span>
+              {aiStatus.detail && <small>{aiStatus.detail}</small>}
+            </span>
+            {aiStatus.actionLabel && (
+              <button type="button" className="ai-modal__status-action" onClick={onClose}>
+                {aiStatus.actionLabel}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -850,4 +922,19 @@ function countMapPins(nodes: LivingNode[]) {
     const markers = Array.isArray(data?.markers) ? data.markers : [];
     return total + markers.length;
   }, 0);
+}
+
+function formatAIProvider(provider?: string) {
+  switch (provider) {
+    case 'groq':
+      return 'Groq';
+    case 'gemini':
+      return 'Gemini';
+    case 'openai':
+      return 'OpenAI';
+    case 'anthropic':
+      return 'Anthropic';
+    default:
+      return 'Server AI';
+  }
 }

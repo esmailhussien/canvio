@@ -3,7 +3,7 @@
   bottom: 16px;
   right: 16px;
   width: 160px;
-  height: 120px;
+  height: 154px;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--glass-bg);
@@ -21,13 +21,67 @@
 
 .minimap__canvas {
   width: 100%;
-  height: 100%;
+  height: 120px;
   cursor: pointer;
   display: block;
 }
 
+.minimap__controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 5px;
+  border-top: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--glass-bg) 84%, var(--bg-canvas));
+}
+
+.minimap__controls button {
+  height: 24px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.minimap__controls button:hover,
+.minimap__controls button:focus-visible {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.minimap__controls .material-symbols-outlined {
+  width: 17px;
+  font-size: 17px;
+  line-height: 1;
+}
+
 @media (max-width: 768px) {
   .minimap-container {
-    display: none;
+    bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+    right: 10px;
+    width: 118px;
+    height: 116px;
+    border-radius: 12px;
+  }
+
+  .minimap__canvas {
+    height: 82px;
+  }
+
+  .minimap__controls {
+    padding: 4px;
+    gap: 3px;
+  }
+
+  .minimap__controls button {
+    height: 25px;
   }
 }

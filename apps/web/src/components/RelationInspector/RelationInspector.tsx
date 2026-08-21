@@ -80,7 +80,7 @@ export function RelationInspector() {
     return () => window.removeEventListener('canvio:focus-relation-label', handleFocusLabel);
   }, [selectedRelationId]);
 
-  // Keyboard shortcut listener (1-8 to pick relationship type instantly)
+  // Keyboard shortcut listener (1-9,0 to pick relationship type instantly)
   useEffect(() => {
     if (!selectedRelationId) return;
 
@@ -206,7 +206,7 @@ export function RelationInspector() {
       <div className="relation-inspector__section">
         <div className="relation-inspector__label-row">
           <label className="relation-inspector__label">Semantic Type</label>
-          <span className="relation-inspector__hint">Press 1-8</span>
+          <span className="relation-inspector__hint">Press 1-9,0</span>
         </div>
         <div className="relation-inspector__pills relation-inspector__pills--grid">
           {RELATION_TYPES.map((t) => {

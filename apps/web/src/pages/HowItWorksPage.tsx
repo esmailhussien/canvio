@@ -34,7 +34,7 @@ const TAB_CONTENT: Record<FeatureTab, {
     points: [
       { glyph: 'B', title: 'Blank canvas', text: 'Start from scratch when exploring an open-ended idea or rough architecture.', color: '#38bdf8' },
       { glyph: 'M', title: 'Curated models', text: 'Use study, strategy, logic tree, and planning boards as clean starting points.', color: '#22c55e' },
-      { glyph: 'AI', title: 'AI Navigator modes', text: 'Choose Create, Study, Summary, Article, or Tidy. When a board has content, AI uses its notes, relations, and map pins.', color: '#a855f7' },
+      { glyph: 'AI', title: 'AI Navigator modes', text: 'Choose Create, Study, Summary, Article, or Tidy. When a board has content, AI uses its notes, relations, and map pins when present.', color: '#a855f7' },
       { glyph: 'T', title: 'Readable themes', text: 'Switch dark, light, and board background styles for different rooms and devices.', color: '#f59e0b' },
     ],
   },
@@ -59,7 +59,7 @@ const TAB_CONTENT: Record<FeatureTab, {
     description: 'Lines in Canvio explain how ideas relate. Drag from any edge to connect, assign logical assertions like Contradicts or Depends on, then use the reasoning score to improve the board.',
     points: [
       { glyph: 'QD', title: 'Quick-Connect drag', text: 'Drag from any node edge port to connect to an existing note or spawn a new connected note on empty space.', color: '#38bdf8' },
-      { glyph: '1-8', title: '8 Semantic types', text: 'Press 1–8 on any relation to specify Contradicts, Depends on, Enables, Based on, Part of, Leads to, or Inspired by.', color: '#f472b6' },
+      { glyph: '1-0', title: '10 Semantic types', text: 'Press 1–9 or 0 on any relation to specify Contradicts, Depends on, Enables, Based on, Part of, Leads to, Inspired by, Explains, Causes, or Related to.', color: '#f472b6' },
       { glyph: 'R', title: 'Reasoning Partner (Ctrl+Shift+R)', text: 'See a 0-100 score based on connectedness, relation clarity, evidence grounding, logic safety, and reasoning depth.', color: '#a855f7' },
       { glyph: 'NEXT', title: 'Best next move', text: 'The panel turns the weakest score factor into a focused action so you know whether to connect, label, ground, resolve, or deepen.', color: '#10b981' },
       { glyph: 'CH', title: 'Challenge & Socratic modes', text: 'Ask the assistant to test weak assumptions or generate follow-up questions from the graph.', color: '#f59e0b' },
@@ -91,7 +91,7 @@ const USE_CASES = [
   { glyph: 'ED', title: 'Teach a lesson', text: 'Plan the flow, show relationships, focus the class, and export the result.' },
   { glyph: 'ST', title: 'Study a topic', text: 'Turn a messy subject into a concept map with examples and review prompts.' },
   { glyph: 'PR', title: 'Plan a project', text: 'Map goals, dependencies, decisions, risks, and delivery steps in one place.' },
-  { glyph: 'MAP', title: 'Work with places', text: 'Use maps when location matters, connect relations to exact pins, and keep place evidence beside the rest of the board.' },
+  { glyph: 'MAP', title: 'Work with places', text: 'Add maps only when location matters, connect relations to exact pins, and keep place evidence beside the rest of the board.' },
 ];
 
 export function HowItWorksPage() {
@@ -108,6 +108,10 @@ export function HowItWorksPage() {
     const newId = nanoid(10);
     createBoard().catch(() => {});
     navigate(`/w/${newId}`);
+  };
+
+  const handleOpenSampleBoard = () => {
+    navigate(`/w/demo-${nanoid(8)}`);
   };
 
   const tab = TAB_CONTENT[activeTab];
@@ -147,16 +151,16 @@ export function HowItWorksPage() {
           </div>
           <h1 className="guide-hero__title">How Canvio works</h1>
           <p className="guide-hero__subtitle">
-            Canvio is an interactive online whiteboard for visual knowledge work: start with a board, add living elements, connect the meaning, then present or export the result.
+            Canvio is an interactive online whiteboard for visual knowledge work: start with a board, add living elements, connect the meaning, and bring in maps only when place matters.
           </p>
           <div className="guide-hero__actions">
             <button className="guide-btn-action" onClick={handleCreateWorld}>
               <GuideGlyph value="GO" />
               <span>Start a blank board</span>
             </button>
-            <button className="guide-btn-secondary" onClick={() => navigate(`/w/demo-${nanoid(6)}`)}>
-              <GuideGlyph value="DE" />
-              <span>Open demo board</span>
+            <button className="guide-btn-secondary" onClick={handleOpenSampleBoard}>
+              <GuideGlyph value="SA" />
+              <span>Open sample board</span>
             </button>
           </div>
         </div>
@@ -241,7 +245,7 @@ export function HowItWorksPage() {
           <div className="guide-section-heading">
             <GuideGlyph value="USE" />
             <h2>One board, many familiar jobs</h2>
-            <p>The main idea is not one feature. It is a flexible visual workspace that adapts to the task.</p>
+            <p>The main idea is not one feature. Notes, relations, AI, maps, frames, drawing, and presentation adapt to the task.</p>
           </div>
           <div className="use-case-grid">
             {USE_CASES.map((item) => (
@@ -277,7 +281,7 @@ export function HowItWorksPage() {
             <div className="shortcut-card"><kbd>P</kbd><span>Freehand pen</span></div>
             <div className="shortcut-card"><kbd>E</kbd><span>Stroke eraser</span></div>
             <div className="shortcut-card"><kbd>Q</kbd><span>Laser pointer</span></div>
-            <div className="shortcut-card"><kbd>1 – 8</kbd><span>Semantic relation type</span></div>
+            <div className="shortcut-card"><kbd>1 – 9, 0</kbd><span>Semantic relation type</span></div>
             <div className="shortcut-card"><kbd>Ctrl + K</kbd><span>AI Navigator</span></div>
             <div className="shortcut-card"><kbd>Ctrl + Shift + R</kbd><span>Reasoning Partner</span></div>
             <div className="shortcut-card"><kbd>Space + drag</kbd><span>Pan canvas</span></div>
@@ -287,15 +291,15 @@ export function HowItWorksPage() {
 
         <section className="guide-cta-section">
           <h2>Try the full workflow on a real board</h2>
-          <p>Start with a blank canvas or open a demo and move through the loop yourself.</p>
+          <p>Start with a blank canvas or open the sample board and move through the full workflow yourself.</p>
           <div className="guide-cta-actions">
             <button className="guide-btn-action" onClick={handleCreateWorld}>
               <GuideGlyph value="+" />
               <span>Launch Canvas</span>
             </button>
-            <button className="guide-btn-secondary" onClick={() => navigate('/')}>
-              <GuideGlyph value="HM" />
-              <span>Back to workspace</span>
+            <button className="guide-btn-secondary" onClick={handleOpenSampleBoard}>
+              <GuideGlyph value="SA" />
+              <span>Open sample board</span>
             </button>
           </div>
         </section>
@@ -304,7 +308,7 @@ export function HowItWorksPage() {
       <footer className="guide-footer">
         <div className="guide-footer__brand">
           <CanvioLogoIcon size={20} />
-          <span>Canvio - Connect ideas. Create knowledge.</span>
+          <span>Canvio — Connect ideas. Create knowledge.</span>
         </div>
         <div className="guide-footer__links">
           <button className="guide-footer__link" onClick={() => navigate('/')}>Home</button>

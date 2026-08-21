@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
-import { IconCopy, IconTrash } from '@canvio/ui';
+import { IconTrash } from '@canvio/ui';
 import './MultiSelectionInspector.css';
 
 function IconGrid({ size = 16 }: { size?: number }) {
@@ -80,7 +80,6 @@ export function MultiSelectionInspector() {
   const tidyUpNodes = useCanvasStore((s) => s.tidyUpNodes);
   const alignNodes = useCanvasStore((s) => s.alignNodes);
   const removeNodes = useCanvasStore((s) => s.removeNodes);
-  const branchSelectionAsExperiment = useCanvasStore((s) => s.branchSelectionAsExperiment);
   const snapshot = useCanvasStore((s) => s.snapshot);
 
   const bounds = useMemo(() => {
@@ -124,34 +123,41 @@ export function MultiSelectionInspector() {
       }}
     >
       <div className="inspector-panel" onPointerDown={(e) => e.stopPropagation()}>
-        <button className="inspector-btn" onClick={handleAction(tidyUpNodes)} title="Tidy Up (Distribute Evenly)">
+        <button
+          className="inspector-btn"
+          onClick={handleAction(tidyUpNodes)}
+          title="Tidy Up (Distribute Evenly)"
+          aria-label="Tidy up selection evenly"
+        >
           <IconGrid size={16} />
         </button>
-        <button className="inspector-btn" onClick={handleAction(branchSelectionAsExperiment)} title="Experiment Copy">
-          <IconCopy size={16} />
-        </button>
         <div className="inspector-divider" />
-        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('top'))} title="Align Top">
+        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('top'))} title="Align Top" aria-label="Align tops">
           <IconAlignTop size={16} />
         </button>
-        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('center'))} title="Align Center (Vertical)">
+        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('center'))} title="Align Center (Vertical)" aria-label="Align vertical centers">
           <IconAlignCenterVert size={16} />
         </button>
-        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('bottom'))} title="Align Bottom">
+        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('bottom'))} title="Align Bottom" aria-label="Align bottoms">
           <IconAlignBottom size={16} />
         </button>
         <div className="inspector-divider" />
-        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('left'))} title="Align Left">
+        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('left'))} title="Align Left" aria-label="Align lefts">
           <IconAlignLeft size={16} />
         </button>
-        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('middle'))} title="Align Middle (Horizontal)">
+        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('middle'))} title="Align Middle (Horizontal)" aria-label="Align horizontal centers">
           <IconAlignMiddleHoriz size={16} />
         </button>
-        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('right'))} title="Align Right">
+        <button className="inspector-btn" onClick={handleAction(() => alignNodes?.('right'))} title="Align Right" aria-label="Align rights">
           <IconAlignRight size={16} />
         </button>
         <div className="inspector-divider" />
-        <button className="inspector-btn danger" onClick={handleAction(() => removeNodes?.(selectedNodeIds))} title="Delete Selection">
+        <button
+          className="inspector-btn danger"
+          onClick={handleAction(() => removeNodes?.(selectedNodeIds))}
+          title="Delete Selection"
+          aria-label="Delete selected elements"
+        >
           <IconTrash size={16} />
         </button>
       </div>

@@ -87,8 +87,17 @@ async function downscaleImage(img: HTMLImageElement): Promise<string> {
   return output;
 }
 
+function getImageUploadErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  return 'Image could not be added. Try a smaller PNG, JPG, or WebP file.';
+}
+
 export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }) => {
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
   const rawData = node.data as Partial<ImageData>;
   const data: ImageData = {
     src: typeof rawData.src === 'string' ? rawData.src : '',
@@ -120,9 +129,16 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
   }, [src, node.createdAt]);
 
   const applyFile = (file?: File | null) => {
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Choose an image file like PNG, JPG, or WebP.');
+      return;
+    }
+    setUploadError(null);
+    setIsUploading(true);
     normalizeImageFile(file)
       .then((normalizedSrc) => {
+        setUploadError(null);
         onChange?.(node.id, {
           data: {
             ...data,
@@ -131,8 +147,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
           }
         });
       })
-      .catch((err: Error) => {
-        window.alert(err.message || 'Image could not be added.');
+      .catch((err) => {
+        setUploadError(getImageUploadErrorMessage(err));
+      })
+      .finally(() => {
+        setIsUploading(false);
       });
   };
 
@@ -163,7 +182,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
 
   return (
     <div
-      className={`image-node ${selected ? 'image-node--selected' : ''} ${!src ? 'image-node--empty' : ''}`}
+      className={`image-node ${selected ? 'image-node--selected' : ''} ${!src ? 'image-node--empty' : ''} ${uploadError ? 'image-node--error' : ''}`}
       style={{
         borderRadius: `${borderRadius}px`,
         opacity,
@@ -186,6 +205,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
         }
       }}
       tabIndex={0}
+      aria-busy={isUploading}
     >
       <input
         ref={inputRef}
@@ -220,6 +240,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
               Replace
             </button>
           )}
+          {uploadError && (
+            <div className="image-node__error" role="status">
+              {uploadError}
+            </div>
+          )}
         </>
       ) : (
         <button
@@ -234,7 +259,8 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
             <circle cx="9" cy="9" r="2" />
             <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
           </svg>
-          <span>Drop, paste, or choose image</span>
+          <span>{isUploading ? 'Preparing image...' : uploadError ? 'Choose another image' : 'Drop, paste, or choose image'}</span>
+          {uploadError && <small className="image-node__placeholder-error">{uploadError}</small>}
         </button>
       )}
     </div>

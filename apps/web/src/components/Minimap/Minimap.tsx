@@ -1,11 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
+import { fitViewportToNodes } from '../../utils/viewportFit';
 import './Minimap.css';
 
 export const Minimap: React.FC = () => {
   const nodes = useCanvasStore((s) => s.nodes);
   const viewport = useCanvasStore((s) => s.viewport);
   const setViewport = useCanvasStore((s) => s.setViewport);
+  const zoomAtPoint = useCanvasStore((s) => s.zoomAtPoint);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -192,8 +194,34 @@ export const Minimap: React.FC = () => {
     setIsDragging(false);
   };
 
+  const handleFit = () => {
+    const nodeValues = Object.values(nodes);
+    if (nodeValues.length > 0) {
+      fitViewportToNodes(nodeValues, { maxZoom: 1.05, minZoom: 0.35, paddingX: 220, paddingY: 220 });
+      return;
+    }
+
+    setViewport({ x: 0, y: 0, zoom: 1 });
+  };
+
+  const handleZoom = (factor: number) => {
+    const width = typeof window === 'undefined' ? 1200 : window.innerWidth;
+    const height = typeof window === 'undefined' ? 800 : window.innerHeight;
+    zoomAtPoint(
+      factor,
+      { x: width / 2, y: height / 2 },
+      { left: 0, top: 0, width, height },
+      true
+    );
+  };
+
   return (
-    <div ref={containerRef} className="minimap-container">
+    <div
+      ref={containerRef}
+      className="minimap-container"
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
       <canvas
         ref={canvasRef}
         width={160}
@@ -205,6 +233,17 @@ export const Minimap: React.FC = () => {
         onPointerCancel={handlePointerUp}
         className="minimap__canvas"
       />
+      <div className="minimap__controls" role="toolbar" aria-label="Board view controls">
+        <button type="button" onClick={() => handleZoom(0.86)} aria-label="Zoom out" title="Zoom out">
+          <span className="material-symbols-outlined" aria-hidden="true">remove</span>
+        </button>
+        <button type="button" onClick={handleFit} aria-label="Fit board" title="Fit board">
+          <span className="material-symbols-outlined" aria-hidden="true">fit_screen</span>
+        </button>
+        <button type="button" onClick={() => handleZoom(1.16)} aria-label="Zoom in" title="Zoom in">
+          <span className="material-symbols-outlined" aria-hidden="true">add</span>
+        </button>
+      </div>
     </div>
   );
 };

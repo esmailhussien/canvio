@@ -4,7 +4,7 @@
 
 > A visual reasoning workspace where the spatial layout is the thinking — and AI acts as a partner that reads the structure, not a generator that replaces it.
 
-Canvio is an infinite canvas built for structured visual work. Every element is a **Living Node** — an object that understands its content and connects to other objects through **Semantic Relations** that carry logical meaning. Draw freely, connect deliberately, and let the graph intelligence surface what your board is actually saying.
+Canvio is an infinite canvas built for structured visual work. Every element is a **Living Node** — an object that understands its content and connects to other objects through **Semantic Relations** that carry logical meaning. Draw freely, connect deliberately, add maps only when place matters, and let the graph intelligence surface what your board is actually saying.
 
 **No signup required.** Open a board, share the URL, start working.
 

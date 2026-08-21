@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { CanvioBackupError, parseCanvioBackup } from '../../utils/backupSchema';
 import { exportAsJSON, exportAsPDF, exportAsPNG } from '../../utils/exportUtils';
-import { PRESET_TEMPLATES } from '../../utils/presetTemplates';
-import { fitTemplateToViewport } from '../../utils/viewportFit';
 import './ExportMenu.css';
 
 interface ExportMenuProps {
@@ -18,17 +16,12 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
   const localRef = useRef<HTMLDivElement | null>(null);
   const refToUse = containerRef || localRef;
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const [showPresets, setShowPresets] = useState(false);
   const [exporting, setExporting] = useState<'png' | 'pdf' | 'json' | 'import' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const relations = useCanvasStore((s) => s.relations);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const addRelation = useCanvasStore((s) => s.addRelation);
-  const nextZIndex = useCanvasStore((s) => s.nextZIndex);
-  const viewport = useCanvasStore((s) => s.viewport);
   const replaceWorld = useCanvasStore((s) => s.replaceWorld);
 
   useEffect(() => {
@@ -39,22 +32,6 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
     }, 7000);
     return () => window.clearTimeout(timeout);
   }, [exportStatus, exportError]);
-
-  const handleSpawnPreset = (presetId: string) => {
-    const preset = PRESET_TEMPLATES.find((p) => p.id === presetId);
-    if (!preset) return;
-
-    const centerX = -viewport.x;
-    const centerY = -viewport.y;
-
-    const { nodes: newNodes, relations: newRelations } = preset.create(centerX, centerY, nextZIndex);
-
-    newNodes.forEach((n) => addNode(n));
-    newRelations.forEach((r) => addRelation(r));
-    fitTemplateToViewport(newNodes);
-    setShowPresets(false);
-    onClose();
-  };
 
   const handleExportPNG = async () => {
     try {
@@ -113,7 +90,6 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       replaceWorld(result.world);
       const warningText = result.meta.warnings.length > 0 ? ` (${result.meta.warnings[0]})` : '';
       setExportStatus(`Restored ${Object.keys(result.world.nodes).length} nodes${warningText}`);
-      setShowPresets(false);
       onClose();
     } catch (error) {
       setExportError(error instanceof CanvioBackupError ? error.message : 'Import failed: choose a Canvio JSON backup');
@@ -142,37 +118,6 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
 
       {isOpen && (
         <div className="canvio-dropdown-menu export-menu__popover">
-          <button
-            className="canvio-menu-item"
-            onClick={() => setShowPresets(!showPresets)}
-          >
-            <span className="material-symbols-outlined text-sm">auto_awesome</span>
-            <span>Spawn Diagram Preset</span>
-            <span className="material-symbols-outlined text-xs" style={{ marginLeft: 'auto' }}>
-              {showPresets ? 'expand_less' : 'expand_more'}
-            </span>
-          </button>
-
-          {showPresets && (
-            <div className="export-menu__preset-list">
-              {PRESET_TEMPLATES.map((p) => (
-                <button
-                  key={p.id}
-                  className="export-menu__preset-item"
-                  onClick={() => handleSpawnPreset(p.id)}
-                >
-                  <span className="material-symbols-outlined text-sm">{p.icon}</span>
-                  <div className="export-menu__preset-info">
-                    <div className="export-menu__preset-title">{p.name}</div>
-                    <div className="export-menu__preset-desc">{p.description}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="canvio-menu-divider" />
-
           <button
             className="canvio-menu-item"
             disabled={exporting !== null}

@@ -180,58 +180,6 @@
   background: var(--border-subtle);
 }
 
-.export-menu__preset-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 220px;
-  overflow-y: auto;
-  margin-top: 2px;
-  padding: 2px 0;
-}
-
-.export-menu__preset-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 10px;
-  text-align: left;
-  cursor: pointer;
-  width: 100%;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.export-menu__preset-item:hover {
-  background: var(--bg-hover);
-}
-
-.export-menu__preset-item .material-symbols-outlined {
-  margin-top: 2px;
-  color: var(--text-primary);
-  font-size: 16px;
-}
-
-.export-menu__preset-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.export-menu__preset-title {
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.export-menu__preset-desc {
-  font-size: 11px;
-  color: var(--text-secondary);
-  line-height: 1.35;
-}
-
 .export-menu__file-input {
   display: none;
 }

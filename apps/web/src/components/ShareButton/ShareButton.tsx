@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconCopy, IconShare, IconX } from '@canvio/ui';
 import { ApiRequestError, createBoardShareLink } from '../../utils/api';
 import { useDialogA11y } from '../../hooks/useDialogA11y';
@@ -14,7 +14,14 @@ function getSavedName() {
   }
 }
 
-export function ShareButton({ worldId }: { worldId: string }) {
+interface ShareButtonProps {
+  worldId: string;
+  // Bump this token to open the dialog and focus the display-name field —
+  // used by the presence avatar so joiners can rename "Anonymous Fox".
+  focusNameSignal?: number;
+}
+
+export function ShareButton({ worldId, focusNameSignal = 0 }: ShareButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<ShareStatus>('idle');
   const [shareUrl, setShareUrl] = useState('');
@@ -22,6 +29,7 @@ export function ShareButton({ worldId }: { worldId: string }) {
   const [isPublic, setIsPublic] = useState(false);
   const [errorText, setErrorText] = useState('Unable to create a share link.');
   const dialogRef = useRef<HTMLElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   useDialogA11y(dialogRef, isOpen, () => setIsOpen(false));
 
   const openShare = async (forcePublic = isPublic) => {
@@ -55,6 +63,17 @@ export function ShareButton({ worldId }: { worldId: string }) {
     setIsPublic(nextPublic);
     await openShare(nextPublic);
   };
+
+  const openShareRef = useRef(openShare);
+  openShareRef.current = openShare;
+
+  useEffect(() => {
+    if (!focusNameSignal) return;
+    openShareRef.current();
+    // Wait for the dialog to mount before moving focus into the name field.
+    const timer = window.setTimeout(() => nameInputRef.current?.focus(), 120);
+    return () => window.clearTimeout(timer);
+  }, [focusNameSignal]);
 
   const qrUrl = useMemo(() => (
     shareUrl
@@ -143,6 +162,7 @@ export function ShareButton({ worldId }: { worldId: string }) {
             <label className="share-dialog__field">
               <span>Your name</span>
               <input
+                ref={nameInputRef}
                 value={name}
                 onChange={(event) => saveName(event.target.value)}
                 placeholder="Enter your name"

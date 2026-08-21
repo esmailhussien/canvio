@@ -24,7 +24,16 @@ export interface SpatialAIResult {
   nodes: LivingNode[];
   relations: Relation[];
   source?: 'server' | 'local';
+  provider?: AIProvider;
+  model?: string;
   message?: string;
+}
+
+export interface AIContextStats {
+  nodeCount: number;
+  relationCount: number;
+  mapPinCount: number;
+  hasBoardContent: boolean;
 }
 
 export type BoardDocumentFormat = 'summary' | 'article';
@@ -45,11 +54,13 @@ export async function generateSpatialBoardAsync(
       context: buildAIContext(),
     });
     if (result.source === 'server-ai') {
-      return normalizeServerBoardResult(result.title, result.nodes, result.relations, prompt, 'server');
+      return normalizeServerBoardResult(result.title, result.nodes, result.relations, prompt, 'server', result.provider, result.model);
     }
     return {
       ...generateSpatialBoard(prompt),
       source: 'local',
+      provider: normalizeProvider(provider) || result.provider,
+      model,
       message: result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
     };
   } catch (err) {
@@ -57,6 +68,8 @@ export async function generateSpatialBoardAsync(
     return {
       ...generateSpatialBoard(prompt),
       source: 'local',
+      provider: normalizeProvider(provider),
+      model,
       message: getAIFallbackMessage(err),
     };
   }
@@ -67,7 +80,9 @@ function normalizeServerBoardResult(
   rawNodes: RawAIBoardNode[],
   rawRelations: RawAIBoardRelation[],
   fallbackTitle: string,
-  source: SpatialAIResult['source']
+  source: SpatialAIResult['source'],
+  provider?: AIProvider,
+  model?: string
 ): SpatialAIResult {
   const createdAt = Date.now();
   const idMap = new Map<string, string>();
@@ -145,6 +160,8 @@ function normalizeServerBoardResult(
     nodes: improveAIVisualStructure(finalTitle, nodes, createdAt),
     relations,
     source,
+    provider,
+    model,
   };
 }
 
@@ -288,6 +305,30 @@ function getMapPins(node: LivingNode) {
       longitude,
     }];
   });
+}
+
+export function getAIContextStats(
+  nodes = Object.values(useCanvasStore.getState().nodes),
+  relations = Object.values(useCanvasStore.getState().relations)
+): AIContextStats {
+  const mapPinCount = nodes.reduce((total, node) => total + (node.type === 'map' ? getMapPins(node).length : 0), 0);
+  return {
+    nodeCount: nodes.length,
+    relationCount: relations.length,
+    mapPinCount,
+    hasBoardContent: nodes.length > 0 || relations.length > 0 || mapPinCount > 0,
+  };
+}
+
+export function formatAIContextStats(stats: AIContextStats) {
+  const parts = [
+    `${stats.nodeCount} ${stats.nodeCount === 1 ? 'element' : 'elements'}`,
+    `${stats.relationCount} ${stats.relationCount === 1 ? 'connection' : 'connections'}`,
+  ];
+  if (stats.mapPinCount > 0) {
+    parts.push(`${stats.mapPinCount} map ${stats.mapPinCount === 1 ? 'pin' : 'pins'}`);
+  }
+  return stats.hasBoardContent ? parts.join(' · ') : 'No board content yet';
 }
 
 function getRelationEndpointName(node: LivingNode | undefined, port?: string) {
@@ -508,6 +549,10 @@ export async function expandNodeWithAIAsync(
       relation(targetNode.id, child2Id, 'enables', '#22c55e', 'leads_to'),
       relation(targetNode.id, child3Id, 'identifies risk', '#ef4444', 'depends_on'),
     ],
+    source: 'local',
+    provider,
+    model,
+    message: 'Server AI was unavailable, so Canvio expanded this node with local smart mode.',
   };
 }
 
@@ -531,6 +576,8 @@ export async function summarizeBoardWithAIAsync(
       const localResult = createLocalBoardDocument(nodes, relations, output);
       const withMessage = {
         ...localResult,
+        provider: provider || result.provider,
+        model,
         message: result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
       };
       return output === 'article' ? composeArticlePage(withMessage) : withMessage;
@@ -540,7 +587,9 @@ export async function summarizeBoardWithAIAsync(
       result.nodes,
       result.relations,
       output === 'article' ? 'Board article draft' : 'Board summary',
-      'server'
+      'server',
+      result.provider,
+      result.model
     );
     return output === 'article' ? composeArticlePage(normalized) : normalized;
   } catch (err) {
@@ -551,7 +600,7 @@ export async function summarizeBoardWithAIAsync(
   }
 
   const localResult = createLocalBoardDocument(nodes, relations, output);
-  const withMessage = { ...localResult, message: fallbackMessage };
+  const withMessage = { ...localResult, provider, model, message: fallbackMessage };
   return output === 'article' ? composeArticlePage(withMessage) : withMessage;
 }
 
@@ -683,7 +732,7 @@ export async function organizeAndClusterWithAIAsync(
   nodes: LivingNode[],
   updateNode: (id: string, patch: Partial<LivingNode>) => void,
   addNode: (node: LivingNode) => void
-): Promise<{ clustersCount: number; source?: 'server' | 'local'; message?: string }> {
+): Promise<{ clustersCount: number; source?: 'server' | 'local'; provider?: AIProvider; model?: string; message?: string }> {
   if (nodes.length === 0) return { clustersCount: 0 };
 
   const CLUSTER_PRESETS = [
@@ -713,7 +762,7 @@ export async function organizeAndClusterWithAIAsync(
         updateNode,
         addNode
       );
-      return { clustersCount: result.clusters.length, source: 'server' };
+      return { clustersCount: result.clusters.length, source: 'server', provider: result.provider, model: result.model };
     }
     if (result.source === 'local-fallback') {
       throw new ApiRequestError(
@@ -740,6 +789,8 @@ export async function organizeAndClusterWithAIAsync(
   return {
     clustersCount: localClusters.length,
     source: 'local',
+    provider,
+    model,
     message: fallbackMessage,
   };
 }
@@ -753,6 +804,8 @@ export async function analyzeGraphWithAIAsync(
   insights: GraphInsight[];
   suggestedRelations: Array<{ sourceId: string; targetId: string; relationship: Relation['relationship']; label: string; reason?: string }>;
   source: 'server' | 'local';
+  provider?: AIProvider;
+  model?: string;
   message?: string;
 }> {
   const nodesRecord = Object.fromEntries(nodes.map((n) => [n.id, n]));
@@ -794,6 +847,8 @@ export async function analyzeGraphWithAIAsync(
           reason: sr.reason,
         })),
         source: 'server',
+        provider: result.provider,
+        model: result.model,
       };
     }
     if (result?.source === 'local-fallback') {
@@ -852,6 +907,8 @@ export async function analyzeGraphWithAIAsync(
     insights: localAnalysis.insights,
     suggestedRelations,
     source: 'local',
+    provider,
+    model,
     message: fallbackMessage,
   };
 }
@@ -865,6 +922,8 @@ export async function challengeBoardWithAIAsync(
   challengerNodes: LivingNode[];
   challengerRelations: Relation[];
   source: 'server' | 'local';
+  provider?: AIProvider;
+  model?: string;
   message?: string;
 }> {
   const provider = getClientAIProvider();
@@ -902,6 +961,8 @@ export async function challengeBoardWithAIAsync(
         challengerNodes: normalizedResult.nodes,
         challengerRelations: normalizedResult.relations,
         source: 'server',
+        provider: result.provider,
+        model: result.model,
       };
     }
   } catch (err) {
@@ -943,6 +1004,8 @@ export async function challengeBoardWithAIAsync(
       relation(challengerId, targetNode.id, 'challenges', '#ef4444', 'contradicts'),
     ] : [],
     source: 'local',
+    provider,
+    model,
     message: fallbackMessage,
   };
 }
@@ -954,6 +1017,8 @@ export async function socraticInquiryWithAIAsync(
   inquiryFocus: string;
   questions: Array<{ id: string; question: string; relatedNodeIds?: string[]; learningGoal?: string }>;
   source: 'server' | 'local';
+  provider?: AIProvider;
+  model?: string;
   message?: string;
 }> {
   const provider = getClientAIProvider();
@@ -981,6 +1046,8 @@ export async function socraticInquiryWithAIAsync(
         inquiryFocus: result.inquiryFocus || 'Mental Model Reflection',
         questions: result.questions,
         source: 'server',
+        provider: result.provider,
+        model: result.model,
       };
     }
   } catch (err) {
@@ -1039,6 +1106,8 @@ export async function socraticInquiryWithAIAsync(
     inquiryFocus: 'Mental Model & First Principles Examination',
     questions,
     source: 'local',
+    provider,
+    model,
     message: fallbackMessage,
   };
 }

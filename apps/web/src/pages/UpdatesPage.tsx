@@ -203,7 +203,7 @@ export function UpdatesPage() {
       )}
 
       <footer className="updates-footer">
-        <div><CanvioLogoIcon size={20} /><span>Canvio - Connect ideas. Create knowledge.</span></div>
+        <div><CanvioLogoIcon size={20} /><span>Canvio — Connect ideas. Create knowledge.</span></div>
         <div><Link to="/">Home</Link><Link to="/how-it-works">How It Works</Link><Link to="/support">Support</Link></div>
       </footer>
     </div>

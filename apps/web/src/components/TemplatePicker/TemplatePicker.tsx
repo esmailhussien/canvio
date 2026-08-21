@@ -1,5 +1,8 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { TEMPLATES, applyTemplate } from '../../utils/templates';
+import { PRESET_TEMPLATES } from '../../utils/presetTemplates';
+import { useCanvasStore } from '../../store/canvasStore';
+import { fitTemplateToViewport } from '../../utils/viewportFit';
 import { tidyGrid, tidyFlow } from '../../utils/autoLayout';
 import { useDialogA11y } from '../../hooks/useDialogA11y';
 import { CanvioLogoIcon } from '../CanvioLogo/CanvioLogo';
@@ -19,7 +22,7 @@ const CATEGORIES = [
   { id: 'architecture', label: 'Architecture & Systems', icon: 'schema' },
   { id: 'operations', label: 'Operations & Execution', icon: 'view_kanban' },
   { id: 'maps', label: 'Maps & Field Work', icon: 'map' },
-  { id: 'decision', label: 'Decision & Spatial AI', icon: 'psychology' },
+  { id: 'decision', label: 'Decision & AI', icon: 'psychology' },
 ];
 
 export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose, onStartBlank }) => {
@@ -30,21 +33,8 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
 
   const filteredTemplates = useMemo(() => {
     return TEMPLATES.filter((t) => {
-      // Filter by Category
-      let matchesCat = true;
-      if (selectedCategory === 'education') {
-        matchesCat = /education|learning|teaching|study|classroom/i.test(t.category);
-      } else if (selectedCategory === 'strategy') {
-        matchesCat = /strategy|research|brainstorming/i.test(t.category);
-      } else if (selectedCategory === 'architecture') {
-        matchesCat = /engineering|architecture|system/i.test(t.category);
-      } else if (selectedCategory === 'operations') {
-        matchesCat = /operations|execution/i.test(t.category);
-      } else if (selectedCategory === 'maps') {
-        matchesCat = /maps|field/i.test(t.category);
-      } else if (selectedCategory === 'decision') {
-        matchesCat = /decision|spatial/i.test(t.category);
-      }
+      // Exact bucket match — every template declares its categoryId.
+      let matchesCat = selectedCategory === 'all' || t.categoryId === selectedCategory;
 
       // Filter by Search Query
       let matchesSearch = true;
@@ -60,6 +50,19 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
       return matchesCat && matchesSearch;
     });
   }, [selectedCategory, searchQuery]);
+
+  const spawnPreset = (presetId: string) => {
+    const preset = PRESET_TEMPLATES.find((p) => p.id === presetId);
+    if (!preset) return;
+    const store = useCanvasStore.getState();
+    const centerX = -store.viewport.x;
+    const centerY = -store.viewport.y;
+    const { nodes, relations } = preset.create(centerX, centerY, store.nextZIndex);
+    nodes.forEach((n) => store.addNode(n));
+    relations.forEach((r) => store.addRelation(r));
+    fitTemplateToViewport(nodes);
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -182,6 +185,27 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
                     <p>Align nodes into a clean process line</p>
                   </div>
                 </button>
+              </div>
+            </section>
+
+            {/* Quick Diagram Presets — previously buried in the Export menu */}
+            <section className="template-section">
+              <h3 className="template-section__label">Quick Diagrams</h3>
+              <div className="template-presets-grid">
+                {PRESET_TEMPLATES.map((p) => (
+                  <button
+                    key={p.id}
+                    className="template-preset-chip"
+                    onClick={() => spawnPreset(p.id)}
+                    title={p.description}
+                  >
+                    <span className="material-symbols-outlined text-lg">{p.icon}</span>
+                    <span className="template-preset-chip__copy">
+                      <strong>{p.name}</strong>
+                      <small>{p.description}</small>
+                    </span>
+                  </button>
+                ))}
               </div>
             </section>
 

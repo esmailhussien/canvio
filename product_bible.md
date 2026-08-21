@@ -102,40 +102,41 @@ A Relation in Canvio knows *"this report is based on that data."*
 
 ### 3.3 — Maps as Native Citizens (The Proof)
 
-Maps are the most spatial thing that exists. No infinite canvas has them. We do.
+Maps are not the whole brand. They are one of the clearest proofs that Canvio treats real-world context as part of thinking, not as a separate app in another tab.
 
 This is our day-one proof that Canvio thinks differently. When someone drops a Living Map Node onto their World and it *actually works* — zoom, satellite, markers, Relations to sticky notes — they get it. Instantly.
 
-Maps are where we start. But the idea is bigger than maps.
+Maps are optional for the workflow, but native in the system. A lesson, research board, architecture review, or decision map should not need a geographic map unless place matters. When place does matter, Canvio should make maps feel as natural as notes, relations, frames, ink, images, and AI.
 
 ---
 
 ## 4. Who Is the First User?
 
-**Not "everyone."**
+**Not "everyone at once."**
 
-### The First 1,000 — Spatial Workers (Phase 0–1)
+### The First 1,000 — Connected Knowledge Workers (Phase 0–1)
 
-People whose daily work is **inherently spatial**:
+People whose daily work depends on making relationships visible:
 
 | Who | Why they need Canvio | What they use today |
 |---|---|---|
-| **GIS Engineers** | Collaborate on map data with reports, images, measurements | ArcGIS (expensive, not collaborative), QGIS (not real-time) |
-| **Urban Planners** | Pin projects on maps, connect to documents, discuss spatially | Miro (no maps) + Google Earth (no collaboration) |
-| **Architects** | Site analysis boards with maps, photos, sketches, reports | Multiple disconnected tools |
-| **Emergency Management** | Incident boards with real-time map, photos, status, assignments | Fragmented radio + email + GIS |
-| **University Researchers** | Fieldwork boards with map locations, data, photos, notes | Paper + spreadsheets + presentations |
+| **Teachers** | Explain concepts, examples, misconceptions, and classroom flow | Slides + whiteboard screenshots |
+| **Students** | Turn confusing subjects into connected study boards | Notes apps + disconnected diagrams |
+| **Researchers** | Connect evidence, papers, field notes, places, and conclusions | Docs + spreadsheets + screenshots |
+| **Product & project teams** | Map decisions, dependencies, risks, and next actions | Miro/FigJam + docs + task tools |
+| **Spatial & field workers** | Add maps when location matters, then connect pins to reports and evidence | GIS tools + docs + separate whiteboards |
+| **Developers** | Explain systems, flows, code snippets, and architecture decisions | Diagrams + tickets + markdown |
 
-**These people will find Canvio immediately valuable because maps on canvas isn't a "nice to have" for them — it's the missing tool they've been waiting for.**
+**These people will find Canvio valuable because it is not only a blank canvas. It is a connected whiteboard where notes, relations, AI, maps, frames, drawing, and presentation belong to the same thinking space.**
 
-### The Next 10,000 — Knowledge Workers (Phase 2)
+### The Next 10,000 — Teams and Institutions (Phase 2)
 
 | Who | Why |
 |---|---|
-| **Students** | Study boards with PDFs, videos, mind maps, notes — all connected |
-| **Product Teams** | Roadmaps, wireframes, data, research — spatially organized |
-| **Researchers** | Literature review boards with semantic connections between papers |
-| **Teachers** | Interactive lesson boards shared with students in real-time |
+| **Classrooms and departments** | Shared lesson boards, study spaces, and exportable learning artifacts |
+| **Research labs** | Evidence boards with semantic connections between papers, data, places, and conclusions |
+| **Product organizations** | Roadmaps, wireframes, data, research, and decisions organized visually |
+| **Field and planning teams** | Maps, images, checklists, and site evidence connected in real time |
 
 ### The Next 100,000 — Everyone (Phase 3)
 
@@ -145,14 +146,14 @@ People whose daily work is **inherently spatial**:
 | **Consultants** | Client presentations on interactive boards |
 | **Travel planners** | Trip planning on real maps |
 | **Conference organizers** | Live Space events |
-| **Anyone with complex ideas** | The "Operating System for Ideas" becomes real |
+| **Anyone with complex ideas** | The connected workspace for ideas becomes real |
 
 > [!IMPORTANT]
-> **Marketing for Phase 0 speaks to spatial workers. Not "everyone."**
+> **Marketing for Phase 0 speaks to connected work first. Maps are a native advantage when location matters, not the whole category.**
 >
 > ❌ "The infinite canvas for everything"
 >
-> ✅ "The first collaborative workspace built on maps. Free. Open source. No signup."
+> ✅ "A connected whiteboard for ideas, evidence, and work. Maps are native when place matters. Free. Open source. No signup."
 
 ---
 
@@ -207,7 +208,7 @@ Not a chat. Not a popup. A quiet, spatial awareness.
 
 *They feel: "It... understands what I'm doing."*
 
-### ✨ Magic Moment 8 — The Spatial AI *(Phase 2)*
+### ✨ Magic Moment 8 — The AI Navigator *(Phase 2)*
 The user types: "Plan a field visit for three priority sites."
 
 The AI doesn't reply with text. It *creates*: a global map, a checklist, a timeline, connected notes, markers on key locations. All as real Nodes with real Relations.
@@ -258,7 +259,7 @@ Everything you need to work spatially:
 For people who use Canvio daily:
 - Unlimited collaborators per World
 - Ambient AI suggestions
-- Spatial AI — 50 creations/day
+- AI Navigator — 50 creations/day
 - Semantic Relations (knowledge graph)
 - Version history (unlimited)
 - 10 GB storage
@@ -426,7 +427,7 @@ The switching cost isn't financial. It's **cognitive**. Once you think spatially
 
 **And the kicker:** it's free. There's no cost to stay. No subscription to cancel. No "trial expired." The only question is: *"Is this better than what I was doing?"*
 
-For spatial workers — GIS engineers, urban planners, emergency managers — the answer is almost certainly yes. Because **nothing else exists** that combines an infinite canvas with real maps and real-time collaboration.
+For students, teachers, researchers, planners, developers, and spatial workers, the answer should be yes for the same reason: Canvio keeps ideas, evidence, relations, AI, drawings, frames, and maps connected in one shared space.
 
 ---
 
@@ -440,7 +441,7 @@ Before building any feature, ask:
 | 2 | Does this help ideas connect spatially? | Yes, or don't build it. |
 | 3 | Can a new user discover this in 30 seconds? | Yes, or simplify it. |
 | 4 | Does this work without signup? | Yes for core features. |
-| 5 | Would a GIS engineer use this tomorrow? | In Phase 0–1, yes. |
+| 5 | Would a teacher, student, researcher, planner, developer, or spatial worker understand this tomorrow? | In Phase 0–1, yes. |
 | 6 | Does this exist in Miro/Excalidraw/FigJam? | If yes, ours must be meaningfully better. |
 | 7 | Is it fast before fancy? | Yes. Performance first. |
 | 8 | Is it one click less? | Yes. Reduce friction. |
@@ -466,7 +467,7 @@ Before building any feature, ask:
 ### 8 Months (Phase 2)
 - 10,000 users
 - First Pro subscribers
-- Spatial AI and smart suggestions are live
+- AI Navigator and smart suggestions are live
 - "Canvio" appears in discussions about spatial collaboration tools
 
 ### 14 Months (Phase 3)

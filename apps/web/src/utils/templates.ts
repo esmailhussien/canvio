@@ -2,12 +2,23 @@ import { nanoid } from 'nanoid';
 import { LivingNode, Relation, useCanvasStore } from '../store/canvasStore';
 import { fitTemplateToViewport } from './viewportFit';
 
+export type TemplateCategoryId =
+  | 'education'
+  | 'strategy'
+  | 'architecture'
+  | 'operations'
+  | 'maps'
+  | 'decision';
+
 export interface CanvasTemplate {
   id: string;
   name: string;
   description: string;
   outcome: string;
+  // Human-readable label shown on the card.
   category: string;
+  // Exact bucket used by the TemplatePicker filter — no regex guessing.
+  categoryId: TemplateCategoryId;
   icon: string;
   accent: string;
   nodes: number;
@@ -144,11 +155,88 @@ function relation(
 
 export const TEMPLATES: CanvasTemplate[] = [
   {
+    id: 'canvio-demo-board',
+    name: 'Canvio Sample Board',
+    description: 'A guided tour board that shows notes, relations, frames, map pins, code, AI use, and delivery flow together.',
+    outcome: 'Best for first-time users who want to understand the full Canvio workspace before starting from scratch.',
+    category: 'Getting Started',
+    categoryId: 'education',
+    icon: 'auto_awesome',
+    accent: '#8083ff',
+    nodes: 9,
+    relations: 8,
+    preview: 'spatial',
+    generate: () => {
+      const frameId = nanoid(10);
+      const titleId = nanoid(10);
+      const questionId = nanoid(10);
+      const evidenceId = nanoid(10);
+      const mapId = nanoid(10);
+      const markerId = nanoid(8);
+      const aiId = nanoid(10);
+      const reasoningId = nanoid(10);
+      const actionId = nanoid(10);
+      const codeId = nanoid(10);
+
+      const nodes: LivingNode[] = [
+        frame(frameId, -600, -330, 1220, 700, 'Canvio Sample Workspace', '#8083ff'),
+        textBlock(titleId, -520, -265, 520, 62, 'Sample board: connect ideas into useful work', 1, 24),
+        sticky(questionId, -520, -150, 'Question\nWhat are we trying to understand, explain, or decide?', 'yellow', 2),
+        sticky(evidenceId, -220, -150, 'Evidence\nNotes, examples, screenshots, research, and files stay close to the idea.', 'blue', 3),
+        {
+          id: mapId,
+          type: 'map',
+          position: { x: 110, y: -170 },
+          size: { width: 430, height: 260 },
+          rotation: 0,
+          zIndex: 4,
+          locked: false,
+          data: {
+            center: [20, 0],
+            zoom: 2,
+            tileLayer: 'street',
+            markers: [
+              { id: markerId, label: 'Site context', position: [30.0444, 31.2357] },
+            ],
+            interactive: true,
+          },
+          createdAt: now(),
+          updatedAt: now(),
+        },
+        shape(aiId, -520, 90, 240, 112, {
+          shape: 'hexagon',
+          fill: 'rgba(168, 85, 247, 0.16)',
+          stroke: '#a855f7',
+          strokeWidth: 2,
+          label: 'AI Navigator',
+        }, 5),
+        sticky(reasoningId, -220, 92, 'Reasoning Partner\nChecks clarity, gaps, evidence, and next moves from the board.', 'purple', 6),
+        sticky(actionId, 110, 160, 'Deliver\nPresent, share, export frames, or turn the board into a summary or article.', 'green', 7),
+        codeBlock(codeId, 390, 190, 210, 118, 'board-output.ts', 'const output = [\n  "summary",\n  "article",\n  "presentation"\n];', 8),
+      ];
+
+      return {
+        nodes,
+        relations: [
+          relation(questionId, evidenceId, 'answered by', '#38bdf8', 'based_on'),
+          relation(evidenceId, mapId, 'has location context', '#22c55e', 'related_to', undefined, markerPort(markerId)),
+          relation(questionId, aiId, 'asks for help', '#a855f7', 'enables'),
+          relation(evidenceId, reasoningId, 'checked by', '#8b5cf6', 'based_on'),
+          relation(aiId, reasoningId, 'improves', '#a855f7', 'enables'),
+          relation(reasoningId, actionId, 'suggests', '#22c55e', 'leads_to'),
+          relation(mapId, actionId, 'grounds', '#06b6d4', 'based_on', markerPort(markerId)),
+          relation(actionId, codeId, 'can become', '#f59e0b', 'leads_to'),
+        ],
+      };
+    },
+  },
+  {
     id: 'lesson-plan-board',
     name: 'Lesson Plan Board',
     description: 'A teacher-ready board with objectives, warm-up, instruction, activity, check for understanding, and exit ticket.',
     outcome: 'Best for live lessons, flipped classrooms, tutoring sessions, and reusable lesson preparation.',
     category: 'Education & Teaching',
+    categoryId: 'education',
     icon: 'school',
     accent: '#38bdf8',
     nodes: 8,
@@ -201,6 +289,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'A student-friendly concept map for turning a topic into definitions, examples, questions, mistakes, and review prompts.',
     outcome: 'Best for revision, exam prep, tutoring, self-study, and explaining difficult topics visually.',
     category: 'Education & Study',
+    categoryId: 'education',
     icon: 'neurology',
     accent: '#f59e0b',
     nodes: 8,
@@ -259,6 +348,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'A structured CER board that guides students from a claim to evidence, reasoning, counterpoint, and revision.',
     outcome: 'Best for science, history, literature, debate, writing practice, and critical thinking activities.',
     category: 'Education & Learning',
+    categoryId: 'education',
     icon: 'fact_check',
     accent: '#22c55e',
     nodes: 9,
@@ -320,6 +410,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'A simple board for group responses, themes, questions, teacher synthesis, and next steps.',
     outcome: 'Best for warm discussions, collaborative seminars, group activities, and remote classroom participation.',
     category: 'Education & Classroom',
+    categoryId: 'education',
     icon: 'groups',
     accent: '#8b5cf6',
     nodes: 9,
@@ -379,6 +470,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'A global map with field pins, issue notes, evidence, and semantic relations attached to exact locations.',
     outcome: 'Best for site visits, logistics, inspections, emergency response, and field coordination.',
     category: 'Maps & field work',
+    categoryId: 'maps',
     icon: 'map-pin',
     accent: '#38bdf8',
     nodes: 5,
@@ -443,6 +535,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'Map, status cards, incident notes, and response flow arranged as an operations-room board.',
     outcome: 'Best for live incidents, risk response, command centers, and planning drills.',
     category: 'Operations',
+    categoryId: 'operations',
     icon: 'activity',
     accent: '#ef4444',
     nodes: 7,
@@ -508,6 +601,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'Research, problems, hypotheses, experiments, and decisions connected into a fast product strategy map.',
     outcome: 'Best for product teams, founders, consultants, and UX discovery workshops.',
     category: 'Strategy',
+    categoryId: 'strategy',
     icon: 'target',
     accent: '#8b5cf6',
     nodes: 7,
@@ -551,6 +645,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'Client, API, workers, database, and observability nodes connected with labeled technical dependencies.',
     outcome: 'Best for engineering diagrams, implementation planning, and architecture reviews.',
     category: 'Engineering',
+    categoryId: 'architecture',
     icon: 'network',
     accent: '#22c55e',
     nodes: 6,
@@ -591,6 +686,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'A structured decision board with options, evidence, tradeoffs, risks, owner, and next action.',
     outcome: 'Best for executive decisions, product calls, investment reviews, and high-stakes prioritization.',
     category: 'Decision work',
+    categoryId: 'decision',
     icon: 'decision',
     accent: '#f59e0b',
     nodes: 8,
@@ -651,6 +747,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'A synthesis wall that turns raw signals into insights, opportunities, confidence, and decisions.',
     outcome: 'Best for UX research, market discovery, customer development, and workshop synthesis.',
     category: 'Research',
+    categoryId: 'strategy',
     icon: 'research',
     accent: '#06b6d4',
     nodes: 9,
@@ -720,6 +817,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'A launch command board with milestones, risks, owners, comms, metrics, and implementation notes.',
     outcome: 'Best for go-to-market launches, internal rollouts, delivery planning, and release readiness.',
     category: 'Execution',
+    categoryId: 'operations',
     icon: 'launch',
     accent: '#22c55e',
     nodes: 9,
@@ -795,6 +893,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'Backlog, To Do, In Progress, Review, and Done swimlanes with task stickies and dependency relations.',
     outcome: 'Best for engineering teams, sprint planning, task tracking, and cross-functional agile workflows.',
     category: 'Operations & Execution',
+    categoryId: 'operations',
     icon: 'view_kanban',
     accent: '#a855f7',
     nodes: 10,
@@ -830,6 +929,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'Central core theme radiating into 4 thematic cluster frames with sticky notes and directional relations.',
     outcome: 'Best for team ideation workshops, feature brainstorming, problem solving, and creative strategy.',
     category: 'Strategy & Brainstorming',
+    categoryId: 'strategy',
     icon: 'lightbulb',
     accent: '#38bdf8',
     nodes: 9,
@@ -872,6 +972,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: '4 quadrant frames (Strengths, Weaknesses, Opportunities, Threats) linked to a central Action Plan node.',
     outcome: 'Best for quarterly business reviews, competitive analysis, strategic planning, and leadership syncs.',
     category: 'Strategy & Brainstorming',
+    categoryId: 'strategy',
     icon: 'grid_view',
     accent: '#f59e0b',
     nodes: 9,
@@ -914,6 +1015,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     description: 'Multi-phase journey steps (Awareness, Onboarding, Core Use, Retention) with user touchpoints and friction notes.',
     outcome: 'Best for UX designers, product managers, customer success, and service design mapping.',
     category: 'Research & UX',
+    categoryId: 'strategy',
     icon: 'map',
     accent: '#06b6d4',
     nodes: 9,
@@ -927,7 +1029,7 @@ export const TEMPLATES: CanvasTemplate[] = [
 
       const s1 = sticky(nanoid(10), -560, -150, 'Lands on home page\n- Reads value prop\n- Clicks Create World', 'blue', 1);
       const s2 = sticky(nanoid(10), -320, -150, 'Creates sticky notes\n- Uses template picker\n- Invites teammate', 'purple', 2);
-      const s3 = sticky(nanoid(10), -80, -150, 'Live multiplayer call\n- Real-time cursors\n- Spatial AI queries', 'green', 3);
+      const s3 = sticky(nanoid(10), -80, -150, 'Live multiplayer call\n- Real-time cursors\n- AI Navigator queries', 'green', 3);
       const s4 = sticky(nanoid(10), 160, -150, 'Exports board output\n- Shares URL link\n- Returns weekly', 'yellow', 4);
 
       const friction = sticky(nanoid(10), -320, 70, 'Friction point\nFirst time users need a 10-second interactive guided hint.', 'pink', 5);
@@ -945,17 +1047,18 @@ export const TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'spatial-ai-research-lab',
-    name: 'Spatial AI & RAG Pipeline Hub',
+    name: 'AI & RAG Pipeline Hub',
     description: 'Prompt Inputs, Vector Knowledge Base, Model Inference, and Output evaluation nodes for AI engineering.',
-    outcome: 'Best for AI developers, prompt engineers, LLM product teams, and spatial AI architecture.',
-    category: 'Decision & Spatial AI',
+    outcome: 'Best for AI developers, prompt engineers, LLM product teams, and board-aware AI architecture.',
+    category: 'Decision & AI',
+    categoryId: 'decision',
     icon: 'psychology',
     accent: '#6366f1',
     nodes: 6,
     relations: 4,
     preview: 'system',
     generate: () => {
-      const f1 = frame(nanoid(10), -480, -240, 960, 480, 'Spatial AI Knowledge Pipeline', '#6366f1');
+      const f1 = frame(nanoid(10), -480, -240, 960, 480, 'AI Knowledge Pipeline', '#6366f1');
       const inputId = nanoid(10);
       const ragId = nanoid(10);
       const modelId = nanoid(10);

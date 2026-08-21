@@ -121,6 +121,26 @@ const ROADMAP = [
   },
 ];
 
+const SUPPORT_FAQS = [
+  {
+    question: 'How do I report a bug or issue in Canvio?',
+    answer: (
+      <>
+        Email <a href={BUG_REPORT_URL}>{SUPPORT_EMAIL}</a> or open an issue on the official{' '}
+        <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">GitHub repository</a>.
+      </>
+    ),
+  },
+  {
+    question: 'Are Canvio workspace boards private?',
+    answer: 'Yes. Boards accessed via /w/ links are private by default, blocked from search engine crawlers, and only accessible to people who have the link or share token.',
+  },
+  {
+    question: 'Does Canvio require an account or login to start?',
+    answer: 'No signup is required. You can open a canvas and start drawing, creating notes, and collaborating immediately.',
+  },
+];
+
 export function SupportPage() {
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
@@ -356,6 +376,25 @@ export function SupportPage() {
               <strong>3. What would feel better?</strong>
               <span>Describe the expected interaction in plain words. Screenshots help a lot.</span>
             </div>
+          </div>
+        </section>
+
+        <section className="support-section support-faq">
+          <div className="support-section__heading">
+            <SupportIcon value="HELP" color="#38bdf8" />
+            <div>
+              <h2>Support FAQ</h2>
+              <p>Quick answers for the most common questions before you email us.</p>
+            </div>
+          </div>
+
+          <div className="support-faq-grid">
+            {SUPPORT_FAQS.map((faq) => (
+              <article className="support-faq-card" key={faq.question}>
+                <h3>{faq.question}</h3>
+                <p>{faq.answer}</p>
+              </article>
+            ))}
           </div>
         </section>
 

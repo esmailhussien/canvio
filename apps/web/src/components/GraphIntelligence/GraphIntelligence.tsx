@@ -4,6 +4,8 @@ import { analyzeGraphStructure, getNodeTitle, ContradictionPair, DependencyChain
 import {
   analyzeGraphWithAIAsync,
   challengeBoardWithAIAsync,
+  formatAIContextStats,
+  getAIContextStats,
   socraticInquiryWithAIAsync,
 } from '../../utils/spatialAIEngine';
 import { fitViewportToNodes } from '../../utils/viewportFit';
@@ -17,6 +19,14 @@ interface GraphIntelligenceProps {
 }
 
 type TabMode = 'overview' | 'challenge' | 'socratic';
+type AITrustStatus = {
+  kind: 'info' | 'success' | 'error';
+  title: string;
+  text: string;
+  detail?: string;
+  source?: 'server' | 'local';
+  provider?: string;
+};
 
 export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
   isOpen,
@@ -33,7 +43,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const [activeTab, setActiveTab] = useState<TabMode>('overview');
   const [isLoadingAI, setIsLoadingAI] = useState(false);
-  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [aiNotice, setAiNotice] = useState<AITrustStatus | null>(null);
   const [aiCritique, setAiCritique] = useState<string | null>(null);
   const [aiInsights, setAiInsights] = useState<GraphInsight[]>([]);
   const [suggestedBridges, setSuggestedBridges] = useState<Array<{ sourceId: string; targetId: string; relationship: string; label: string; reason?: string }>>([]);
@@ -56,7 +66,49 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
     return analyzeGraphStructure(nodes, relations);
   }, [isOpen, nodes, relations]);
 
+  const contextStats = useMemo(() => {
+    if (!isOpen) return { nodeCount: 0, relationCount: 0, mapPinCount: 0, hasBoardContent: false };
+    return getAIContextStats(Object.values(nodes), Object.values(relations));
+  }, [isOpen, nodes, relations]);
+  const contextSummary = formatAIContextStats(contextStats);
+
   if (!isOpen || !localAnalysis) return null;
+
+  const showWorkingNotice = (text: string) => {
+    setAiNotice({
+      kind: 'info',
+      title: 'Reading board context',
+      text,
+      detail: `Using ${contextSummary}: node text, relation labels, relationship types, and map pins.`,
+    });
+  };
+
+  const showResultNotice = (
+    result: { source?: 'server' | 'local'; provider?: string; message?: string },
+    successText: string
+  ) => {
+    const isLocal = result.source === 'local';
+    const providerLabel = formatAIProvider(result.provider);
+    setAiNotice({
+      kind: isLocal ? 'info' : 'success',
+      source: isLocal ? 'local' : 'server',
+      provider: result.provider,
+      title: isLocal ? 'Local reasoning mode used' : `${providerLabel} used board context`,
+      text: isLocal
+        ? result.message || 'Server AI was unavailable, so Canvio used local reasoning.'
+        : successText,
+      detail: `Read ${contextSummary}. Results stay editable and grounded in the visible board.`,
+    });
+  };
+
+  const showErrorNotice = (title: string, text: string) => {
+    setAiNotice({
+      kind: 'error',
+      title,
+      text,
+      detail: `Attempted to read ${contextSummary}.`,
+    });
+  };
 
   const handleFocus = (nodeIds: string[]) => {
     const uniqueNodeIds = Array.from(new Set(nodeIds));
@@ -81,7 +133,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const handleDeepAudit = async () => {
     setIsLoadingAI(true);
-    setAiNotice(null);
+    showWorkingNotice('Auditing reasoning clarity, missing evidence, contradictions, and next useful links...');
     try {
       const allNodes = Object.values(nodes);
       const allRelations = Object.values(relations);
@@ -89,10 +141,10 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
       setAiCritique(res.critique);
       setAiInsights(res.insights);
       setSuggestedBridges(res.suggestedRelations);
-      setAiNotice(res.source === 'local' ? res.message || 'Canvio used local reasoning mode for this audit.' : null);
+      showResultNotice(res, 'Finished a board-aware reasoning audit.');
     } catch (err) {
       console.error('Deep AI audit failed:', err);
-      setAiNotice('Canvio could not finish the audit. Try again after simplifying the board.');
+      showErrorNotice('Audit failed', 'Canvio could not finish the audit. Try again after simplifying the board.');
     } finally {
       setIsLoadingAI(false);
     }
@@ -100,7 +152,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const handleRunChallenge = async () => {
     setIsLoadingAI(true);
-    setAiNotice(null);
+    showWorkingNotice('Stress-testing assumptions against the current board structure...');
     try {
       const allNodes = Object.values(nodes);
       const allRelations = Object.values(relations);
@@ -111,10 +163,10 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         nodes: res.challengerNodes,
         relations: res.challengerRelations,
       });
-      setAiNotice(res.source === 'local' ? res.message || 'Canvio used local challenge mode.' : null);
+      showResultNotice(res, 'Finished a board-aware challenge pass.');
     } catch (err) {
       console.error('AI challenge failed:', err);
-      setAiNotice('Canvio could not finish the challenge. Try again after simplifying the board.');
+      showErrorNotice('Challenge failed', 'Canvio could not finish the challenge. Try again after simplifying the board.');
     } finally {
       setIsLoadingAI(false);
     }
@@ -122,7 +174,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const handleRunSocratic = async () => {
     setIsLoadingAI(true);
-    setAiNotice(null);
+    showWorkingNotice('Forming questions from visible nodes, relations, labels, and evidence...');
     try {
       const allNodes = Object.values(nodes);
       const allRelations = Object.values(relations);
@@ -131,10 +183,10 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         focus: res.inquiryFocus,
         questions: res.questions,
       });
-      setAiNotice(res.source === 'local' ? res.message || 'Canvio used local Socratic mode.' : null);
+      showResultNotice(res, 'Created board-aware Socratic questions.');
     } catch (err) {
       console.error('AI Socratic inquiry failed:', err);
-      setAiNotice('Canvio could not finish Socratic questions. Try again after simplifying the board.');
+      showErrorNotice('Socratic questions failed', 'Canvio could not finish Socratic questions. Try again after simplifying the board.');
     } finally {
       setIsLoadingAI(false);
     }
@@ -235,7 +287,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
         <div className="gi-score-summary">
           <span>{scoreBand}</span>
-          <span>Based on board structure. AI explains the next move.</span>
+          <span>Local structure score. AI can explain the next move from board context.</span>
         </div>
 
         <div className="gi-score-breakdown" aria-label="Reasoning score breakdown">
@@ -367,9 +419,15 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
       {/* Body Content */}
       <div className="gi-body">
         {aiNotice && (
-          <div className="gi-ai-notice" role="status">
-            <span className="material-symbols-outlined" aria-hidden="true">offline_bolt</span>
-            <span>{aiNotice}</span>
+          <div className={`gi-ai-notice gi-ai-notice--${aiNotice.kind}`} role="status">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              {aiNotice.kind === 'error' ? 'warning' : aiNotice.source === 'local' ? 'offline_bolt' : aiNotice.kind === 'success' ? 'verified' : 'account_tree'}
+            </span>
+            <span className="gi-ai-notice__copy">
+              <strong>{aiNotice.title}</strong>
+              <span>{aiNotice.text}</span>
+              {aiNotice.detail && <small>{aiNotice.detail}</small>}
+            </span>
           </div>
         )}
 
@@ -639,4 +697,19 @@ function getBestNextMove(
     aiLabel: 'Suggest next step',
     canFocus: canFocusFactor,
   };
+}
+
+function formatAIProvider(provider?: string) {
+  switch (provider) {
+    case 'groq':
+      return 'Groq';
+    case 'gemini':
+      return 'Gemini';
+    case 'openai':
+      return 'OpenAI';
+    case 'anthropic':
+      return 'Anthropic';
+    default:
+      return 'Server AI';
+  }
 }

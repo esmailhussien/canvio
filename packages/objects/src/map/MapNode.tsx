@@ -64,7 +64,7 @@ export interface MapMarkerAnchor {
   visible: boolean;
 }
 
-export type TileLayerType = 'satellite' | 'hybrid';
+export type TileLayerType = 'street' | 'satellite' | 'hybrid';
 
 export interface MapData {
   center: [number, number];
@@ -88,11 +88,17 @@ interface MapNodeProps {
 
 // Licensed, free tile sources. Google's mt*.google.com endpoints are
 // undocumented and against Google's ToS — do not use them.
+const OSM_STREET_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 const ESRI_IMAGERY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ESRI_REFERENCE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 const ESRI_ATTRIBUTION = 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
 
 const TILE_LAYERS: Record<TileLayerType, { url: string; attribution: string }> = {
+  street: {
+    url: OSM_STREET_URL,
+    attribution: OSM_ATTRIBUTION
+  },
   satellite: {
     url: ESRI_IMAGERY_URL,
     attribution: ESRI_ATTRIBUTION
@@ -267,7 +273,7 @@ export const MapNode: React.FC<MapNodeProps> = ({
   const data: MapData = {
     center: Array.isArray(rawData.center) && rawData.center.length === 2 ? rawData.center : WORLD_MAP_CENTER,
     zoom: typeof rawData.zoom === 'number' ? rawData.zoom : WORLD_MAP_ZOOM,
-    tileLayer: rawData.tileLayer === 'hybrid' ? 'hybrid' : 'satellite',
+    tileLayer: rawData.tileLayer === 'hybrid' || rawData.tileLayer === 'street' ? rawData.tileLayer : 'satellite',
     markers: Array.isArray(rawData.markers) ? rawData.markers : [],
     markerAnchors: typeof rawData.markerAnchors === 'object' && rawData.markerAnchors ? rawData.markerAnchors as Record<string, MapMarkerAnchor> : {},
     interactive: true,
@@ -375,11 +381,11 @@ export const MapNode: React.FC<MapNodeProps> = ({
 
       {/* Floating Action Buttons */}
       <div className="map-node__controls" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-        <button 
+        <button
           type="button"
-          className={`map-node__action-btn ${layer === 'hybrid' ? 'active' : ''}`}
-          onClick={() => setLayer(layer === 'satellite' ? 'hybrid' : 'satellite')}
-          title={layer === 'satellite' ? 'Show Roads & Labels' : 'Satellite Only'}
+          className={`map-node__action-btn ${layer !== 'satellite' ? 'active' : ''}`}
+          onClick={() => setLayer(layer === 'street' ? 'satellite' : layer === 'satellite' ? 'hybrid' : 'street')}
+          title={layer === 'street' ? 'Satellite view' : layer === 'satellite' ? 'Roads & labels on imagery' : 'Street map'}
         >
           <IconLayers size={16} />
           <span className="map-node__action-label">Layer</span>

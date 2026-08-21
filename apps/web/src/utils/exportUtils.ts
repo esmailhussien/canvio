@@ -5,6 +5,51 @@ import { createCanvioBackupDocument } from './backupSchema';
 
 type CanvasContext = CanvasRenderingContext2D;
 const MAP_CONTENT_PADDING = 16;
+type ExportTileLayerType = 'street' | 'satellite' | 'hybrid';
+
+interface ExportTileSource {
+  url: string;
+  attribution: string;
+}
+
+const EXPORT_TILE_SOURCES: Record<ExportTileLayerType, ExportTileSource[]> = {
+  street: [
+    {
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: 'OpenStreetMap contributors'
+    }
+  ],
+  satellite: [
+    {
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles (c) Esri, Maxar, Earthstar Geographics'
+    }
+  ],
+  hybrid: [
+    {
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles (c) Esri, Maxar, Earthstar Geographics'
+    },
+    {
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      attribution: ''
+    }
+  ]
+};
+
+function normalizeExportTileLayer(value: unknown): ExportTileLayerType {
+  return value === 'street' || value === 'hybrid' ? value : 'satellite';
+}
+
+function resolveExportTileUrl(template: string, tx: number, ty: number, zoom: number) {
+  const tileCount = 2 ** zoom;
+  if (ty < 0 || ty >= tileCount) return null;
+  const wrappedX = ((tx % tileCount) + tileCount) % tileCount;
+  return template
+    .replace('{x}', String(wrappedX))
+    .replace('{y}', String(ty))
+    .replace('{z}', String(zoom));
+}
 
 function safeName(value: string) {
   return (value || 'canvas').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '') || 'canvas';
@@ -455,10 +500,8 @@ async function drawMapNode(ctx: CanvasContext, node: LivingNode, x: number, y: n
   const center = Array.isArray(node.data?.center) ? node.data.center : [20, 0];
   const zoom = typeof node.data?.zoom === 'number' ? Math.round(node.data.zoom) : 4;
   const safeCenter = toLatLngTuple(center) || [20, 0];
-  const tileLayerType = node.data?.tileLayer === 'hybrid' ? 'hybrid' : 'satellite';
-  const urlTemplate = tileLayerType === 'hybrid'
-    ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
-    : 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
+  const tileLayerType = normalizeExportTileLayer(node.data?.tileLayer);
+  const tileSources = EXPORT_TILE_SOURCES[tileLayerType];
 
   const width = node.size.width;
   const height = node.size.height;
@@ -489,26 +532,26 @@ async function drawMapNode(ctx: CanvasContext, node: LivingNode, x: number, y: n
   const minTileY = Math.floor(originY / 256);
   const maxTileY = Math.floor((originY + height) / 256);
 
-  const tilePromises: Promise<{ img: HTMLImageElement | null; tx: number; ty: number }>[] = [];
+  for (const source of tileSources) {
+    const tilePromises: Promise<{ img: HTMLImageElement | null; tx: number; ty: number }>[] = [];
 
-  for (let tx = minTileX; tx <= maxTileX; tx += 1) {
-    for (let ty = minTileY; ty <= maxTileY; ty += 1) {
-      const tileUrl = urlTemplate
-        .replace('{x}', String(tx))
-        .replace('{y}', String(ty))
-        .replace('{z}', String(zoom));
-      tilePromises.push(
-        loadImage(tileUrl).then((img) => ({ img, tx, ty }))
-      );
+    for (let tx = minTileX; tx <= maxTileX; tx += 1) {
+      for (let ty = minTileY; ty <= maxTileY; ty += 1) {
+        const tileUrl = resolveExportTileUrl(source.url, tx, ty, zoom);
+        if (!tileUrl) continue;
+        tilePromises.push(
+          loadImage(tileUrl).then((img) => ({ img, tx, ty }))
+        );
+      }
     }
-  }
 
-  const loadedTiles = await Promise.all(tilePromises);
-  for (const { img, tx, ty } of loadedTiles) {
-    if (img) {
-      const destX = x + (tx * 256 - originX);
-      const destY = y + (ty * 256 - originY);
-      ctx.drawImage(img, destX, destY, 256, 256);
+    const loadedTiles = await Promise.all(tilePromises);
+    for (const { img, tx, ty } of loadedTiles) {
+      if (img) {
+        const destX = x + (tx * 256 - originX);
+        const destY = y + (ty * 256 - originY);
+        ctx.drawImage(img, destX, destY, 256, 256);
+      }
     }
   }
 
@@ -531,6 +574,24 @@ async function drawMapNode(ctx: CanvasContext, node: LivingNode, x: number, y: n
       resolveCanvasColor(marker.color, '#38bdf8')
     );
   });
+
+  const attribution = tileSources.map(source => source.attribution).filter(Boolean).join(' | ');
+  if (attribution) {
+    ctx.save();
+    ctx.font = '500 10px Inter, system-ui, sans-serif';
+    const labelText = attribution.length > 58 ? `${attribution.slice(0, 55)}...` : attribution;
+    const textWidth = ctx.measureText(labelText).width;
+    const labelWidth = Math.max(24, Math.min(textWidth + 14, width - 16));
+    const labelX = x + width - labelWidth - 8;
+    const labelY = y + height - 22;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+    ctx.beginPath();
+    roundedRect(ctx, labelX, labelY, labelWidth, 16, 5);
+    ctx.fill();
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillText(labelText, labelX + 7, labelY + 11, labelWidth - 14);
+    ctx.restore();
+  }
 
   ctx.restore();
 }

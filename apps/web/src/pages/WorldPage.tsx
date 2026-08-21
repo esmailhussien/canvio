@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { Canvas } from '../components/Canvas/Canvas';
@@ -10,7 +10,7 @@ import { TemplatePicker } from '../components/TemplatePicker/TemplatePicker';
 import { AIAssistantModal } from '../components/AIAssistantModal/AIAssistantModal';
 import { Minimap } from '../components/Minimap/Minimap';
 import { applyTemplate } from '../utils/templates';
-import { useCanvasStore } from '../store/canvasStore';
+import { useCanvasStore, type HistorySnapshot, type Viewport } from '../store/canvasStore';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { RelationInspector } from '../components/RelationInspector/RelationInspector';
 import { PenInspector } from '../components/PenInspector/PenInspector';
@@ -50,6 +50,9 @@ const BACKGROUND_SWATCHES = [
 ];
 
 const COACH_DISMISS_KEY = 'CANVIO_STARTER_COACH_DISMISSED_V1';
+const STARTER_DISMISS_KEY = 'CANVIO_STARTER_DISMISSED_V1';
+const DEMO_BOARD_PREFIX = 'demo-';
+const DEMO_TEMPLATE_ID = 'canvio-demo-board';
 
 type CoachAction = 'add-note' | 'connect' | 'open-ai' | 'open-templates' | 'select-tool';
 
@@ -61,6 +64,30 @@ type StarterGoal = {
   accent: string;
   templateId: string;
 };
+
+type BoardNoticeAction = 'restore-cleared-board' | 'retry-fork';
+
+type BoardNotice = {
+  id: number;
+  kind: 'success' | 'warning' | 'error' | 'info';
+  text: string;
+  action?: BoardNoticeAction;
+  actionLabel?: string;
+};
+
+type RecoverableWorldSnapshot = HistorySnapshot & {
+  viewport: Viewport;
+  appearance: {
+    theme: 'dark' | 'light';
+    canvasBackground: string | null;
+  };
+};
+
+function cloneRecoverableWorldSnapshot(snapshot: RecoverableWorldSnapshot): RecoverableWorldSnapshot {
+  return typeof structuredClone === 'function'
+    ? structuredClone(snapshot)
+    : JSON.parse(JSON.stringify(snapshot)) as RecoverableWorldSnapshot;
+}
 
 const STARTER_GOALS: StarterGoal[] = [
   {
@@ -229,6 +256,8 @@ export function WorldPage() {
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const nodes = useCanvasStore((s) => s.nodes);
   const relations = useCanvasStore((s) => s.relations);
+  const inkStrokes = useCanvasStore((s) => s.inkStrokes);
+  const viewport = useCanvasStore((s) => s.viewport);
   const canUndo = useCanvasStore((s) => s.canUndo);
   const canRedo = useCanvasStore((s) => s.canRedo);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
@@ -253,6 +282,8 @@ export function WorldPage() {
   const [isCanvioMenuOpen, setIsCanvioMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isStarterDismissed, setIsStarterDismissed] = useState(false);
+  const [boardNotice, setBoardNotice] = useState<BoardNotice | null>(null);
+  const [shareNameFocusSignal, setShareNameFocusSignal] = useState(0);
   const [hasLoadedCoachPreference, setHasLoadedCoachPreference] = useState(false);
   const [isCoachDismissed, setIsCoachDismissed] = useState(false);
   const [autoShapeEnabled, setAutoShapeEnabled] = useState(false);
@@ -262,6 +293,9 @@ export function WorldPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const boardAppearanceLoadedRef = useRef(false);
   const saveAppearanceTimerRef = useRef<number | null>(null);
+  const seededDemoWorldRef = useRef<string | null>(null);
+  const recoveredWorldRef = useRef<RecoverableWorldSnapshot | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
 
   const activeBackground = BACKGROUND_SWATCHES.find((swatch) => swatch.value === canvasBackground);
 
@@ -284,6 +318,14 @@ export function WorldPage() {
   } as React.CSSProperties;
 
   useEffect(() => {
+    try {
+      setIsStarterDismissed(window.localStorage.getItem(STARTER_DISMISS_KEY) === '1');
+    } catch {
+      setIsStarterDismissed(false);
+    }
+  }, []);
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', activeTheme);
   }, [activeTheme, theme]);
 
@@ -298,10 +340,77 @@ export function WorldPage() {
   }, []);
 
   useEffect(() => {
-    setIsStarterDismissed(false);
     setIsPresenting(false);
     setFocusNodeId(null);
   }, [worldId]);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+  }, []);
+
+  const showBoardNotice = useCallback((notice: Omit<BoardNotice, 'id'>, timeoutMs = 5200) => {
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+      noticeTimerRef.current = null;
+    }
+
+    setBoardNotice({ ...notice, id: Date.now() });
+
+    if (timeoutMs > 0 && !notice.action) {
+      noticeTimerRef.current = window.setTimeout(() => {
+        setBoardNotice(null);
+        noticeTimerRef.current = null;
+      }, timeoutMs);
+    }
+  }, []);
+
+  const dismissStarter = useCallback((persist = true) => {
+    setIsStarterDismissed(true);
+    if (!persist) return;
+    try {
+      window.localStorage.setItem(STARTER_DISMISS_KEY, '1');
+    } catch {
+      // Ignore storage errors; the starter still closes for this session.
+    }
+  }, []);
+
+  const handleRestoreClearedBoard = useCallback(() => {
+    const snapshot = recoveredWorldRef.current;
+    if (!snapshot) return;
+    replaceWorld(snapshot);
+    setViewport(snapshot.viewport);
+    showBoardNotice({
+      kind: 'success',
+      text: 'Board restored.'
+    }, 2800);
+  }, [replaceWorld, setViewport, showBoardNotice]);
+
+  // One-time hint that right-click opens the Quick-add radial menu — the
+  // feature is invisible otherwise (its label is hidden on desktop).
+  useEffect(() => {
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem('CANVIO_RADIAL_HINT_SEEN_V1') === '1';
+    } catch {
+      seen = false;
+    }
+    if (seen) return;
+
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem('CANVIO_RADIAL_HINT_SEEN_V1', '1');
+      } catch {
+        // Storage blocked: showing the tip once per visit is fine.
+      }
+      showBoardNotice({
+        kind: 'info',
+        text: 'Tip: right-click the canvas for Quick add',
+      }, 6000);
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [showBoardNotice]);
 
   const handleFitToWorld = () => {
     const allNodes = Object.values(nodes);
@@ -365,8 +474,15 @@ export function WorldPage() {
     const newId = nanoid(10);
     createBoard().catch(() => {});
     setIsCanvioMenuOpen(false);
-    setIsStarterDismissed(false);
+    dismissStarter();
     navigate(`/w/${newId}`);
+  };
+
+  const handleOpenSampleBoard = () => {
+    setIsCanvioMenuOpen(false);
+    setIsTemplateOpen(false);
+    setIsExportMenuOpen(false);
+    navigate(`/w/${DEMO_BOARD_PREFIX}${nanoid(8)}`);
   };
 
   const handleExperimentSelection = () => {
@@ -391,7 +507,7 @@ export function WorldPage() {
 
   const handleShowCoach = () => {
     setIsCoachDismissed(false);
-    setIsStarterDismissed(true);
+    dismissStarter();
     setIsCanvioMenuOpen(false);
     setIsExportMenuOpen(false);
     try {
@@ -422,12 +538,18 @@ export function WorldPage() {
   };
 
   const handleStartFromScratch = (reset = false) => {
-    if (reset && Object.keys(nodes).length > 0) {
-      const confirmed = window.confirm('Start with a blank canvas? Current canvas content will be cleared.');
-      if (!confirmed) return;
+    const hasContent = Object.keys(nodes).length > 0 || Object.keys(relations).length > 0 || inkStrokes.length > 0;
+    if (reset && hasContent) {
+      recoveredWorldRef.current = cloneRecoverableWorldSnapshot({
+        nodes,
+        relations,
+        inkStrokes,
+        viewport,
+        appearance: { theme, canvasBackground },
+      });
     }
 
-    setIsStarterDismissed(true);
+    dismissStarter();
     replaceWorld({
       nodes: {},
       relations: {},
@@ -436,10 +558,19 @@ export function WorldPage() {
     });
     setActiveTool('select');
     setViewport({ x: 0, y: 0, zoom: 1 });
+
+    if (reset && hasContent) {
+      showBoardNotice({
+        kind: 'warning',
+        text: 'Board cleared. You can restore the previous version.',
+        action: 'restore-cleared-board',
+        actionLabel: 'Restore'
+      }, 0);
+    }
   };
 
   const handleStartTemplate = (templateId: string) => {
-    setIsStarterDismissed(true);
+    dismissStarter();
     applyTemplate(templateId);
     clearSelection();
     setActiveTool('select');
@@ -483,6 +614,7 @@ export function WorldPage() {
   const handleForkWorld = async () => {
     if (!worldId || isForking) return;
     setIsForking(true);
+    setBoardNotice(null);
     try {
       const forked = await forkBoard(worldId);
       if (forked?.url) {
@@ -490,9 +622,25 @@ export function WorldPage() {
       }
     } catch (err) {
       console.error('Failed to fork world:', err);
-      window.alert('Unable to remix board. Please try again.');
+      showBoardNotice({
+        kind: 'error',
+        text: 'Unable to remix board. Check your connection and try again.',
+        action: 'retry-fork',
+        actionLabel: 'Retry'
+      }, 0);
     } finally {
       setIsForking(false);
+    }
+  };
+
+  const handleBoardNoticeAction = () => {
+    if (!boardNotice?.action) return;
+    if (boardNotice.action === 'restore-cleared-board') {
+      handleRestoreClearedBoard();
+      return;
+    }
+    if (boardNotice.action === 'retry-fork') {
+      handleForkWorld();
     }
   };
 
@@ -513,7 +661,7 @@ export function WorldPage() {
     return () => window.removeEventListener('pointerdown', handleClickOutside);
   }, [isCanvioMenuOpen, isExportMenuOpen]);
 
-  // Ctrl+K shortcut for Spatial AI Navigator, Ctrl+Shift+R for Reasoning Partner
+  // Ctrl+K shortcut for AI Navigator, Ctrl+Shift+R for Reasoning Partner
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -576,15 +724,30 @@ export function WorldPage() {
   const { connected, connectionIssue, users, persistenceState, retryConnection } = useCollaboration(worldId || '');
   const nodeCount = Object.keys(nodes).length;
   const relationCount = Object.keys(relations).length;
+  const isDemoWorld = Boolean(worldId?.startsWith(DEMO_BOARD_PREFIX));
   const toolGuidance = TOOL_GUIDANCE[activeTool] || TOOL_GUIDANCE.select;
   const showStarter = nodeCount === 0 && !isStarterDismissed && !isPresenting;
+
+  useEffect(() => {
+    if (!showStarter) return;
+
+    const handleStarterKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      dismissStarter();
+    };
+
+    window.addEventListener('keydown', handleStarterKeyDown);
+    return () => window.removeEventListener('keydown', handleStarterKeyDown);
+  }, [showStarter, dismissStarter]);
+
   const coachTip = getCoachTip({
     activeTool,
     nodeCount,
     relationCount,
     selectedCount: selectedNodeIds.length,
   });
-  const showCoach = hasLoadedCoachPreference && !isCoachDismissed && !showStarter && !isPresenting;
+  const showCoach = hasLoadedCoachPreference && !isCoachDismissed && !showStarter && !isPresenting && !isDemoWorld;
   const saveLabel = persistenceState === 'loading'
     ? 'Restoring board'
     : persistenceState === 'saving'
@@ -613,6 +776,33 @@ export function WorldPage() {
           ? 'Live'
           : 'Local';
 
+  const seedDemoBoardIfEmpty = useCallback(() => {
+    if (!worldId || seededDemoWorldRef.current === worldId) return;
+    const store = useCanvasStore.getState();
+    if (Object.keys(store.nodes).length > 0 || Object.keys(store.relations).length > 0) {
+      seededDemoWorldRef.current = worldId;
+      dismissStarter();
+      return;
+    }
+
+    seededDemoWorldRef.current = worldId;
+    dismissStarter();
+    applyTemplate(DEMO_TEMPLATE_ID);
+    useCanvasStore.getState().clearSelection();
+    setActiveTool('select');
+  }, [worldId, dismissStarter, setActiveTool]);
+
+  useEffect(() => {
+    if (!isDemoWorld || persistenceState === 'loading' && !connectionIssue) return;
+    seedDemoBoardIfEmpty();
+  }, [isDemoWorld, persistenceState, connectionIssue, seedDemoBoardIfEmpty]);
+
+  useEffect(() => {
+    if (!isDemoWorld) return;
+    const timer = window.setTimeout(seedDemoBoardIfEmpty, 1300);
+    return () => window.clearTimeout(timer);
+  }, [isDemoWorld, seedDemoBoardIfEmpty]);
+
   return (
     <div className={`world-page ${isPresenting ? 'is-presenting' : ''}`} data-tool={activeTool} style={worldStyle}>
       <Canvas
@@ -638,6 +828,15 @@ export function WorldPage() {
           </div>
 
           <div className="world-page__starter-panel">
+            <button
+              type="button"
+              className="world-page__starter-close"
+              onClick={() => dismissStarter()}
+              aria-label="Close starter and use blank canvas"
+              title="Close starter"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
             <div className="world-page__starter-section">
               <span className="world-page__starter-label">Clean start</span>
               <button
@@ -676,24 +875,31 @@ export function WorldPage() {
             </div>
             <div className="world-page__starter-actions">
               <button
+                className="world-page__starter-link world-page__starter-link--sample"
+                onClick={handleOpenSampleBoard}
+              >
+                <span className="material-symbols-outlined text-xl">preview</span>
+                <span>Sample board</span>
+              </button>
+              <button
                 className="world-page__starter-link"
                 onClick={() => {
                   setIsTemplateOpen(true);
-                  setIsStarterDismissed(true);
+                  dismissStarter();
                 }}
               >
                 <span className="material-symbols-outlined text-xl">space_dashboard</span>
-                <span>Browse all templates</span>
+                <span>Templates</span>
               </button>
               <button
                 className="world-page__starter-link world-page__starter-link--ai"
                 onClick={() => {
                   setIsAIOpen(true);
-                  setIsStarterDismissed(true);
+                  dismissStarter();
                 }}
               >
                 <span className="material-symbols-outlined text-xl">auto_awesome</span>
-                <span>Generate with AI</span>
+                <span>Ask AI</span>
               </button>
             </div>
           </div>
@@ -737,6 +943,36 @@ export function WorldPage() {
             </button>
           </div>
         </aside>
+      )}
+      {boardNotice && !isPresenting && (
+        <div
+          className={`world-page__notice world-page__notice--${boardNotice.kind}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="world-page__notice-icon material-symbols-outlined" aria-hidden="true">
+            {boardNotice.kind === 'error' ? 'error' : boardNotice.kind === 'warning' ? 'restart_alt' : 'check_circle'}
+          </span>
+          <span className="world-page__notice-text">{boardNotice.text}</span>
+          {boardNotice.action && boardNotice.actionLabel && (
+            <button
+              type="button"
+              className="world-page__notice-action"
+              onClick={handleBoardNoticeAction}
+            >
+              {boardNotice.actionLabel}
+            </button>
+          )}
+          <button
+            type="button"
+            className="world-page__notice-close"
+            onClick={() => setBoardNotice(null)}
+            aria-label="Dismiss notice"
+            title="Dismiss"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </div>
       )}
       {!isPresenting && (
         <>
@@ -887,6 +1123,11 @@ export function WorldPage() {
                 <span>New Blank Board</span>
               </button>
 
+              <button className="canvio-menu-item" onClick={handleOpenSampleBoard}>
+                <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                <span>Open Sample Board</span>
+              </button>
+
               {Object.keys(nodes).length > 0 && (
                 <button
                   className="canvio-menu-item canvio-menu-item--danger"
@@ -937,19 +1178,6 @@ export function WorldPage() {
                 <span className="material-symbols-outlined text-sm">present_to_all</span>
                 <span>Present Board</span>
               </button>
-
-              {selectedNodeIds.length > 0 && (
-                <button
-                  className="canvio-menu-item"
-                  onClick={() => {
-                    handleExperimentSelection();
-                    setIsCanvioMenuOpen(false);
-                  }}
-                >
-                  <span className="material-symbols-outlined text-sm">difference</span>
-                  <span>Experiment With Selection</span>
-                </button>
-              )}
 
               <button
                 className="canvio-menu-item"
@@ -1047,7 +1275,7 @@ export function WorldPage() {
             className="ai-navigator-pill"
             onClick={() => setIsAIOpen(true)}
             aria-label="AI Navigator"
-            title="Spatial AI Navigator (Ctrl+K)"
+            title="AI Navigator (Ctrl+K)"
           >
             <span className="material-symbols-outlined text-base">auto_awesome</span>
             <span>AI Navigator (Ctrl+K)</span>
@@ -1119,7 +1347,7 @@ export function WorldPage() {
             <span className="material-symbols-outlined text-base">auto_awesome</span>
           </button>
 
-          <ShareButton worldId={worldId || ''} />
+          <ShareButton worldId={worldId || ''} focusNameSignal={shareNameFocusSignal} />
 
           {connectionIssue && !connected ? (
             <button
@@ -1144,10 +1372,17 @@ export function WorldPage() {
 
           {/* Overlapping Multiplayer Avatar Stack */}
           <div className="presence-avatar-stack" title={`${users.length + 1} online collaborator${users.length > 0 ? 's' : ''}`}>
-            {/* Host / Current User Avatar */}
-            <div className="presence-avatar" style={{ borderColor: '#8083ff', zIndex: 30 }} title="You (Host)">
+            {/* Host / Current User Avatar — click to set your display name */}
+            <button
+              type="button"
+              className="presence-avatar presence-avatar--self"
+              style={{ borderColor: '#8083ff', zIndex: 30 }}
+              title="Change your display name"
+              aria-label="Change your display name"
+              onClick={() => setShareNameFocusSignal(Date.now())}
+            >
               <span className="material-symbols-outlined text-sm">person</span>
-            </div>
+            </button>
 
             {/* Remote Online Collaborators */}
             {users.slice(0, 2).map((u, i) => (
@@ -1192,7 +1427,7 @@ export function WorldPage() {
         onFocusNode={setFocusNodeId}
       />
 
-      {!isPresenting && Object.keys(nodes).length > 0 && <Minimap />}
+      {!isPresenting && <Minimap />}
     </div>
   );
 }

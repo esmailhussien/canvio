@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCanvasStore, LivingNode } from '../../store/canvasStore';
-import { expandNodeWithAIAsync } from '../../utils/spatialAIEngine';
+import { expandNodeWithAIAsync, getAIFallbackMessage } from '../../utils/spatialAIEngine';
 import {
   IconCopy,
   IconLock,
@@ -73,6 +73,7 @@ interface NodeInspectorProps {
 
 export function NodeInspector({ node }: NodeInspectorProps) {
   const [isExpanding, setIsExpanding] = useState(false);
+  const [aiExpandNotice, setAIExpandNotice] = useState<{ kind: 'info' | 'success' | 'error'; text: string } | null>(null);
   const [isFrameMoreOpen, setIsFrameMoreOpen] = useState(false);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -89,18 +90,29 @@ export function NodeInspector({ node }: NodeInspectorProps) {
   const handleAIExpand = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isExpanding) return;
+    setAIExpandNotice(null);
     setIsExpanding(true);
 
     try {
       const res = await expandNodeWithAIAsync(node);
       res.nodes.forEach((n) => addNode(n));
       res.relations.forEach((r) => addRelation(r));
+      if (res.source !== 'server') {
+        setAIExpandNotice({ kind: 'info', text: 'Local smart expansion. Editable.' });
+      } else {
+        setAIExpandNotice({ kind: 'success', text: `${formatAIProvider(res.provider)} expanded this node.` });
+      }
     } catch (err) {
       console.error('AI expand failed:', err);
+      setAIExpandNotice({ kind: 'error', text: getAIFallbackMessage(err) });
     } finally {
       setIsExpanding(false);
     }
   };
+
+  useEffect(() => {
+    setAIExpandNotice(null);
+  }, [node.id]);
 
   const isSticky = node.type === 'sticky';
   const isText = node.type === 'text';
@@ -630,6 +642,14 @@ export function NodeInspector({ node }: NodeInspectorProps) {
               {isExpanding ? 'sync' : 'auto_awesome'}
             </span>
           </button>
+          {aiExpandNotice && (
+            <span className={`node-inspector__ai-status node-inspector__ai-status--${aiExpandNotice.kind}`}>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                {aiExpandNotice.kind === 'error' ? 'warning' : aiExpandNotice.kind === 'success' ? 'verified' : 'offline_bolt'}
+              </span>
+              <span>{aiExpandNotice.text}</span>
+            </span>
+          )}
 
           <button
             className="node-inspector__btn"
@@ -674,4 +694,19 @@ export function NodeInspector({ node }: NodeInspectorProps) {
       )}
     </div>
   );
+}
+
+function formatAIProvider(provider?: string) {
+  switch (provider) {
+    case 'groq':
+      return 'Groq';
+    case 'gemini':
+      return 'Gemini';
+    case 'openai':
+      return 'OpenAI';
+    case 'anthropic':
+      return 'Anthropic';
+    default:
+      return 'Server AI';
+  }
 }

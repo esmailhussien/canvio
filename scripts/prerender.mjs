@@ -15,7 +15,9 @@ if (!existsSync(templatePath)) {
 
 const template = readFileSync(templatePath, 'utf8');
 const SITE_URL = 'https://canvio.space';
-const DEFAULT_IMAGE = `${SITE_URL}/logo.png`;
+// og-image.png is the branded 1200x630 social card (see scripts/generate-og-image.mjs).
+const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`;
+const ORGANIZATION_LOGO = `${SITE_URL}/logo.png`;
 
 const articlesPath = join(root, 'apps', 'web', 'src', 'pages', 'updatesData.json');
 const UPDATE_ARTICLES = JSON.parse(readFileSync(articlesPath, 'utf8'));
@@ -43,7 +45,7 @@ function buildFooterHtml() {
     <footer class="home-footer" style="padding: 40px 24px; text-align: center; border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); margin-top: 60px;">
       <div style="max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 20px;">
         <div style="text-align: left;">
-          <strong>Canvio</strong> — Visual Knowledge Workspace
+          <strong>Canvio</strong> — Connect ideas. Create knowledge.
           <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 14px;">Connect ideas, maps, notes, and AI-assisted models on an infinite canvas.</p>
         </div>
         <div style="display: flex; gap: 20px; font-size: 14px;">
@@ -60,8 +62,8 @@ function buildFooterHtml() {
 const PAGES = [
   {
     path: '/',
-    title: 'Canvio | Online Whiteboard for Learning, Planning and Research',
-    description: 'Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
+    title: 'Canvio | Connected Whiteboard for Learning, Planning and Research',
+    description: 'Canvio is a connected online whiteboard for learning, planning, research, AI-assisted boards, semantic relations, and maps when place matters.',
     jsonLd: {
       '@context': 'https://schema.org',
       '@graph': [
@@ -70,7 +72,7 @@ const PAGES = [
           '@id': 'https://canvio.space/#organization',
           name: 'Canvio',
           url: 'https://canvio.space',
-          logo: 'https://canvio.space/logo.png',
+          logo: ORGANIZATION_LOGO,
           sameAs: ['https://github.com/esmailhussien/canvio'],
         },
         {
@@ -78,7 +80,7 @@ const PAGES = [
           '@id': 'https://canvio.space/#website',
           name: 'Canvio',
           url: 'https://canvio.space',
-          description: 'Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
+          description: 'Canvio is a connected online whiteboard for learning, planning, research, AI-assisted boards, semantic relations, and maps when place matters.',
           publisher: { '@id': 'https://canvio.space/#organization' },
         },
         {
@@ -86,7 +88,7 @@ const PAGES = [
           '@id': 'https://canvio.space/#application',
           name: 'Canvio',
           url: 'https://canvio.space',
-          description: 'Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
+          description: 'Canvio is a connected online whiteboard for learning, planning, research, AI-assisted boards, semantic relations, and maps when place matters.',
           applicationCategory: 'EducationalApplication',
           operatingSystem: 'Web',
           browserRequirements: 'Requires a modern web browser',
@@ -109,13 +111,13 @@ const PAGES = [
         <main class="home-main">
           <section class="home-hero" style="padding: 60px 24px; text-align: center; max-width: 900px; margin: 0 auto;">
             <div class="home-hero__badge" style="display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(99,102,241,0.12); color: #818cf8; margin-bottom: 20px; font-weight: 500;">
-              ✨ The Operating System for Ideas
+              ✨ Connected whiteboard for learning, planning, and research
             </div>
             <h1 style="font-size: clamp(32px, 5vw, 56px); font-weight: 800; line-height: 1.15; margin-bottom: 20px;">
-              An online whiteboard built for connected thinking.
+              A connected whiteboard for thinking, learning, and research.
             </h1>
             <p style="font-size: clamp(16px, 2vw, 20px); color: var(--text-secondary, #94a3b8); max-width: 680px; margin: 0 auto 32px; line-height: 1.6;">
-              Combine sticky notes, interactive maps, freehand drawing, vector shapes, frames, and AI drafts on a collaborative spatial canvas.
+              Bring notes, relations, AI, frames, drawing, maps, presentation, and export into one familiar workspace. Use maps when location matters while the board stays centered on the idea.
             </p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px;">
               <a href="/w/new" class="home-btn-primary" style="padding: 14px 28px; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 12px; background: #6366f1; color: #fff;">
@@ -138,7 +140,7 @@ const PAGES = [
               <div class="home-card" style="padding: 24px; border-radius: 16px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
                 <div style="font-size: 24px; font-weight: 800; color: #22c55e; margin-bottom: 12px;">02. Build</div>
                 <h3 style="font-size: 18px; margin-bottom: 8px;">Living canvas nodes</h3>
-                <p style="color: var(--text-secondary, #94a3b8); line-height: 1.5;">Drop sticky notes, Leaflet satellite maps, stylus drawings, code blocks, and structured frames.</p>
+                <p style="color: var(--text-secondary, #94a3b8); line-height: 1.5;">Drop sticky notes, maps when place matters, stylus drawings, code blocks, and structured frames.</p>
               </div>
               <div class="home-card" style="padding: 24px; border-radius: 16px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
                 <div style="font-size: 24px; font-weight: 800; color: #a855f7; margin-bottom: 12px;">03. Connect</div>
@@ -170,7 +172,7 @@ const PAGES = [
               </div>
               <div style="padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
                 <strong style="color: #f59e0b;">Spatial & Field Work</strong>
-                <p style="font-size: 14px; color: var(--text-secondary, #94a3b8); margin-top: 8px;">Embed interactive geographic maps right next to site notes, images, and connected checklists.</p>
+                <p style="font-size: 14px; color: var(--text-secondary, #94a3b8); margin-top: 8px;">Add interactive geographic maps right next to site notes, images, and connected checklists when location matters.</p>
               </div>
             </div>
           </section>
@@ -182,7 +184,7 @@ const PAGES = [
   {
     path: '/how-it-works',
     title: 'How Canvio Works | Interactive Online Whiteboard for Visual Thinking',
-    description: 'Learn how Canvio turns notes, shapes, maps, relations, and AI drafts into one editable online whiteboard for visual thinking, learning, and planning.',
+    description: 'Learn how Canvio turns notes, relations, AI, frames, drawing, maps, and presentation into one editable online whiteboard for visual thinking.',
     jsonLd: {
       '@context': 'https://schema.org',
       '@graph': [
@@ -202,7 +204,7 @@ const PAGES = [
               '@type': 'HowToStep',
               position: 1,
               name: 'Start Anywhere',
-              text: 'Open a blank canvas, choose a ready-made study model, or generate a structured board with Spatial AI.',
+              text: 'Open a blank canvas, choose a ready-made study model, or generate a structured board with AI Navigator.',
             },
             {
               '@type': 'HowToStep',
@@ -234,7 +236,7 @@ const PAGES = [
             <p style="color: #818cf8; font-weight: 600; margin-bottom: 8px;">A Calm & Powerful Workflow</p>
             <h1 style="font-size: clamp(30px, 4vw, 44px); font-weight: 800; margin-bottom: 16px;">How Canvio Works</h1>
             <p style="font-size: 18px; color: var(--text-secondary, #94a3b8); max-width: 650px; margin: 0 auto;">
-              From the first stroke to a completed knowledge map — four steps to organize complex ideas spatially.
+              From the first stroke to a completed knowledge board — four steps to organize complex ideas visually.
             </p>
           </header>
 
@@ -243,7 +245,7 @@ const PAGES = [
               <span style="color: #38bdf8; font-weight: 700; font-size: 14px;">STEP 01</span>
               <h2 style="font-size: 24px; margin: 8px 0 12px;">Start Anywhere: Blank, Model, or AI Draft</h2>
               <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">
-                Begin your work without friction. Open a blank canvas in 2 seconds, pick from pre-built models (study concept maps, lesson plans, decision matrices), or type a prompt into Spatial AI to generate an editable starting structure with connected cards.
+                Begin your work without friction. Open a blank canvas in 2 seconds, pick from pre-built models (study concept maps, lesson plans, decision matrices), or type a prompt into AI Navigator to generate an editable starting structure with connected cards.
               </p>
             </article>
 
@@ -251,7 +253,7 @@ const PAGES = [
               <span style="color: #22c55e; font-weight: 700; font-size: 14px;">STEP 02</span>
               <h2 style="font-size: 24px; margin: 8px 0 12px;">Build with Living Canvas Objects</h2>
               <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">
-                Every item is an interactive object. Write notes, draw with pressure-sensitive stylus ink, create geometric shapes, group sections with frames, add code blocks, and embed interactive Leaflet satellite maps.
+                Every item is an interactive object. Write notes, draw with pressure-sensitive stylus ink, create geometric shapes, group sections with frames, add code blocks, and add interactive maps when location matters.
               </p>
             </article>
 
@@ -357,7 +359,7 @@ const PAGES = [
   {
     path: '/updates',
     title: 'Canvio Updates | Online Whiteboard Features, Releases & Guides',
-    description: 'Read Canvio product updates, design notes, guides, and releases about online whiteboard features, visual thinking, AI boards, relations, maps, and collaboration.',
+    description: 'Read Canvio updates about connected whiteboard design, visual thinking, AI boards, semantic relations, maps when place matters, and collaboration.',
     jsonLd: {
       '@context': 'https://schema.org',
       '@graph': [
@@ -443,7 +445,7 @@ for (const article of UPDATE_ARTICLES) {
           datePublished: article.datePublished,
           dateModified: article.datePublished,
           author: { '@type': 'Organization', name: 'Canvio', url: SITE_URL },
-          publisher: { '@type': 'Organization', name: 'Canvio', url: SITE_URL, logo: { '@type': 'ImageObject', url: DEFAULT_IMAGE } },
+          publisher: { '@type': 'Organization', name: 'Canvio', url: SITE_URL, logo: { '@type': 'ImageObject', url: ORGANIZATION_LOGO } },
           mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/updates/${article.slug}` },
         },
       ],

@@ -173,37 +173,38 @@
   },
   {
     "slug": "maps-are-an-optional-lens",
-    "title": "Why Maps Are an Optional Lens in Canvio",
-    "excerpt": "Location is powerful when it matters, but the main idea is a flexible visual workspace for connected work.",
+    "title": "Maps Are Optional in the Workflow, Native in the System",
+    "excerpt": "Location is powerful when it matters. Canvio keeps maps native without making every board start from a map.",
     "category": "Design note",
     "datePublished": "2026-07-02",
     "readTime": "4 min read",
     "icon": "map",
     "accent": "#22c55e",
     "takeaways": [
-      "Maps appear when location matters, without defining the whole product.",
+      "Maps are optional for each board, not optional as a first-class Canvio object.",
       "Relations can attach to exact pins, not only to the whole map object.",
       "Pins can sit beside evidence, decisions, and notes on the same board.",
-      "People can move between a world view and a focused site view."
+      "The larger product remains a connected workspace for notes, relations, AI, frames, drawing, presentation, and research."
     ],
     "sections": [
       {
-        "heading": "Start with the task",
+        "heading": "Optional for the workflow",
         "paragraphs": [
-          "A field visit, geography lesson, or site investigation may need a map. A study guide, architecture review, or decision board may not. Canvio keeps the canvas open so the task determines the objects, not the other way around."
+          "A field visit, geography lesson, or site investigation may need a map. A study guide, architecture review, or decision board may not. Canvio starts with the task, so the board determines which objects matter."
         ]
       },
       {
-        "heading": "Place can become evidence",
+        "heading": "Native when place matters",
         "paragraphs": [
           "When a map is useful, pins can sit alongside notes, images, relations, and decisions. A location becomes part of the reasoning instead of a separate screen that people have to leave the board to inspect.",
-          "Relations can now point to individual pins, so a note can connect to a specific site visit, address, classroom example, or research location. That makes place feel native to the board without making every board a map board."
+          "Relations can now point to individual pins, so a note can connect to a specific site visit, address, classroom example, or research location. That makes place feel native to the board without making every board about maps."
         ]
       },
       {
-        "heading": "One workspace, different lenses",
+        "heading": "Part of the larger workspace",
         "paragraphs": [
-          "The same board can move from a world view to a focused site visit, then back to the larger story. Maps are one strong lens inside a broader workspace for thinking."
+          "The same board can move from a concept map to a site view, then back to the larger story. Maps are one strong object inside a broader workspace for connected thinking, learning, planning, and research.",
+          "That is the product direction: Canvio is a connected whiteboard first, where maps, AI, relations, notes, frames, drawing, and presentation work together when the idea needs them."
         ]
       }
     ]

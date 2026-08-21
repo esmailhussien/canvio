@@ -779,7 +779,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           },
           {
             id: 'ai',
-            label: 'Spatial AI Prompt',
+            label: 'AI Prompt',
             icon: IconSparkles,
             isAI: true,
             action: () => useCanvasStore.getState().setAIAssistantOpen(true),

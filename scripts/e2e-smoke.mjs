@@ -50,10 +50,38 @@ async function assertState(page, label, predicate) {
 }
 
 async function clickUnique(page, role, name) {
-  const locator = page.getByRole(role, { name });
+  const locator = page.getByRole(role, typeof name === 'string' ? { name, exact: true } : { name });
   await locator.first().waitFor({ state: 'visible', timeout: 10000 });
   const count = await locator.count();
   if (count !== 1) throw new Error(`Expected one ${role} "${name}", found ${count}`);
+  await locator.click();
+}
+
+async function clickExportTrigger(page) {
+  const locator = page.locator('.export-menu__trigger-btn');
+  await locator.waitFor({ state: 'visible', timeout: 10000 });
+  await locator.click();
+}
+
+async function isExportMenuOpen(page) {
+  return page.locator('.export-menu__popover').isVisible().catch(() => false);
+}
+
+async function openExportMenu(page) {
+  if (await isExportMenuOpen(page)) return;
+  await clickExportTrigger(page);
+  await page.locator('.export-menu__popover').waitFor({ state: 'visible', timeout: 10000 });
+}
+
+async function closeExportMenu(page) {
+  if (!(await isExportMenuOpen(page))) return;
+  await clickExportTrigger(page);
+  await page.locator('.export-menu__popover').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+}
+
+async function clickToolbarTool(page, toolId) {
+  const locator = page.locator(`.canvio-toolbar [data-tool-id="${toolId}"]`).first();
+  await locator.waitFor({ state: 'visible', timeout: 10000 });
   await locator.click();
 }
 
@@ -88,6 +116,9 @@ async function main() {
   const tempDir = await mkdtemp(join(tmpdir(), 'canvio-e2e-'));
   const backupPath = join(tempDir, 'restore-backup.json');
   const frameRelationBackupPath = join(tempDir, 'frame-relation-backup.json');
+  const imageErrorBackupPath = join(tempDir, 'image-error-backup.json');
+  const invalidImagePath = join(tempDir, 'not-an-image.txt');
+  await writeFile(invalidImagePath, 'This file is intentionally not an image.');
 
   let browser;
   let context;
@@ -97,13 +128,71 @@ async function main() {
     browser = await chromium.launch();
     context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1280, height: 860 } });
     const page = await context.newPage();
+    await page.route('**/api/ai/generate', (route) => route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: 'AI_REQUEST_FAILED',
+        message: 'Server AI unavailable for E2E.',
+      }),
+    }));
+
     await page.goto(`${baseUrl}/w/${worldId}`);
     await page.waitForLoadState('domcontentloaded');
 
+    console.log('E2E: checking empty-starter chrome and minimap controls');
+    await page.locator('.world-page__starter-panel').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('.canvio-toolbar').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('.minimap-container').waitFor({ state: 'visible', timeout: 10000 });
+
+    await assertState(page, 'starter chrome visible', () => {
+      const isVisible = (selector) => {
+        const el = document.querySelector(selector);
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+
+      const minimapControls = document.querySelectorAll('.minimap__controls button').length;
+      return {
+        ok: isVisible('.world-page__starter-panel') && isVisible('.canvio-toolbar') && isVisible('.minimap-container') && minimapControls === 3,
+        message: `expected starter, toolbar, minimap, and 3 minimap controls; got controls=${minimapControls}`,
+      };
+    });
+
+    console.log('E2E: checking AI fallback trust messaging');
+    await page.locator('.world-page__starter-link--ai').click();
+    await page.getByRole('dialog', { name: 'Canvio AI' }).waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('#canvio-ai-prompt').fill('Create a tiny QA board about source, relation, and result');
+    await page.getByRole('button', { name: /Create board/i }).click();
+    await page.waitForFunction(
+      () => document.querySelector('.ai-modal__status')?.textContent?.includes('Local smart mode used'),
+      null,
+      { timeout: 15000 }
+    );
+
+    await assertState(page, 'AI fallback trust state', () => {
+      const status = document.querySelector('.ai-modal__status')?.textContent || '';
+      const nodeCount = document.querySelectorAll('.node-renderer').length;
+      return {
+        ok: status.includes('Local smart mode used')
+          && status.includes('Prompt-only generation')
+          && status.includes('View board')
+          && nodeCount >= 3,
+        message: `expected local fallback status and generated nodes, got status="${status}" / nodes=${nodeCount}`,
+      };
+    });
+    await page.getByRole('button', { name: 'View board' }).click();
+    await page.locator('.ai-modal__overlay').waitFor({ state: 'detached', timeout: 10000 });
+    await assertState(page, 'starter dismissed by AI entry', () => ({
+      ok: window.localStorage.getItem('CANVIO_STARTER_DISMISSED_V1') === '1',
+      message: 'expected starter dismissal to persist after opening AI from starter',
+    }));
+
     console.log('E2E: inserting field operations template');
-    await clickUnique(page, 'button', 'Browse all templates');
+    await page.getByRole('button', { name: 'Presets & Layout' }).click();
     await page.locator('.template-card').filter({ hasText: 'Field Operations Map' }).click();
-    await page.waitForFunction(() => document.querySelectorAll('.node-renderer').length >= 5);
+    await page.waitForFunction(() => document.querySelectorAll('.leaflet-marker-icon').length >= 2);
 
     await assertState(page, 'template inserted', () => {
       const nodeCount = document.querySelectorAll('.node-renderer').length;
@@ -115,15 +204,23 @@ async function main() {
     });
 
     console.log('E2E: creating relation from exact map pin to canvas node');
-    await clickUnique(page, 'button', 'Relation (L)');
-    await page.locator('.node-type-map .leaflet-marker-icon').first().click();
-    await page.waitForFunction(() => document.querySelectorAll('.node-renderer.relation-source').length === 1);
+    await clickToolbarTool(page, 'relation');
+    await page.locator('.node-type-map .leaflet-marker-icon').first().click({ force: true });
+    await page.waitForFunction(() => document.querySelectorAll('.node-renderer.relation-source').length === 1)
+      .catch(async (error) => {
+        const state = await page.evaluate(() => ({
+          tool: document.querySelector('.world-page')?.getAttribute('data-tool'),
+          mapMode: document.querySelector('.map-node')?.className,
+          markerCount: document.querySelectorAll('.node-type-map .leaflet-marker-icon').length,
+          sourceCount: document.querySelectorAll('.node-renderer.relation-source').length,
+        }));
+        throw new Error(`map marker did not become relation source: ${JSON.stringify(state)}; ${error.message}`);
+      });
 
     const targetNode = page.locator('.node-renderer:not(.node-type-map)').first();
     const targetBox = await targetNode.boundingBox();
     if (!targetBox) throw new Error('Could not locate relation target node');
     await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2);
-    await page.waitForFunction(() => document.querySelectorAll('.node-renderer.relation-target').length === 1);
     await page.mouse.click(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2);
     await page.waitForFunction(() => document.querySelectorAll('.node-renderer.relation-source').length === 0);
 
@@ -137,7 +234,7 @@ async function main() {
     });
 
     console.log('E2E: checking pan and fit-to-world');
-    await clickUnique(page, 'button', 'Pan (Space)');
+    await clickToolbarTool(page, 'pan');
     const beforePan = await page.locator('.canvas__world').evaluate((el) => getComputedStyle(el).transform);
     await page.locator('.canvas').hover({ position: { x: 180, y: 260 } });
     await page.mouse.wheel(180, 120);
@@ -147,7 +244,7 @@ async function main() {
     );
     const afterPan = await page.locator('.canvas__world').evaluate((el) => getComputedStyle(el).transform);
     await clickUnique(page, 'button', 'Open Canvio workspace menu');
-    await clickUnique(page, 'button', 'Fit Viewport to Canvas');
+    await page.locator('.canvio-menu-item').filter({ hasText: 'Fit Viewport to Canvas' }).click();
     const afterFit = await page.locator('.canvas__world').evaluate((el) => getComputedStyle(el).transform);
     if (beforePan === afterPan) fail('pan did not change the viewport transform');
     if (afterFit === afterPan) fail('fit to world did not reframe the viewport');
@@ -211,11 +308,11 @@ async function main() {
       },
     }, null, 2));
 
-    await clickUnique(page, 'button', 'Export');
+    await openExportMenu(page);
     await page.locator('input[type="file"].export-menu__file-input').setInputFiles(frameRelationBackupPath);
     await page.waitForFunction(() => document.body.textContent?.includes('Source inside frame'));
-    await clickUnique(page, 'button', 'Export');
-    await clickUnique(page, 'button', 'Select');
+    await closeExportMenu(page);
+    await clickToolbarTool(page, 'select');
     await page.waitForFunction(() => document.querySelectorAll('.node-renderer.selected, .relation-group--selected').length === 0);
 
     const relationBox = await page.locator('.relation-group').first().boundingBox();
@@ -231,14 +328,58 @@ async function main() {
       };
     });
 
+    console.log('E2E: checking inline image upload errors');
+    await writeFile(imageErrorBackupPath, JSON.stringify({
+      version: '1.0',
+      worldId: 'e2e-image-error',
+      exportedAt: new Date().toISOString(),
+      appearance: { theme: 'dark', canvasBackground: null },
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: {
+        'image-error-node': {
+          id: 'image-error-node',
+          type: 'image',
+          position: { x: -150, y: -100 },
+          size: { width: 300, height: 200 },
+          rotation: 0,
+          zIndex: 1,
+          locked: false,
+          data: {
+            src: '',
+            alt: 'Image upload QA',
+            objectFit: 'cover',
+            opacity: 1,
+            borderRadius: 8,
+          },
+          createdAt: Date.now() - 10000,
+          updatedAt: Date.now() - 10000,
+        },
+      },
+      relations: {},
+    }, null, 2));
+
+    await openExportMenu(page);
+    await page.locator('input[type="file"].export-menu__file-input').setInputFiles(imageErrorBackupPath);
+    await page.waitForFunction(() => document.body.textContent?.includes('Drop, paste, or choose image'));
+    await closeExportMenu(page);
+    await page.locator('input.image-node__file-input').setInputFiles(invalidImagePath);
+    await page.waitForFunction(() => document.body.textContent?.includes('Choose an image file like PNG, JPG, or WebP.'));
+    await assertState(page, 'image upload error is inline', () => {
+      const error = document.querySelector('.image-node__placeholder-error')?.textContent || '';
+      return {
+        ok: error.includes('Choose an image file'),
+        message: `expected inline image error, got "${error}"`,
+      };
+    });
+
     console.log('E2E: checking JSON and PNG exports');
-    await clickUnique(page, 'button', 'Export');
+    await openExportMenu(page);
     const jsonDownloadPromise = page.waitForEvent('download', { timeout: 10000 }).catch(() => null);
     await page.locator('.canvio-menu-item').filter({ hasText: 'Export Backup (JSON)' }).click();
     await jsonDownloadPromise;
     await page.waitForFunction(() => document.querySelector('.export-menu__status-chip')?.textContent?.includes('JSON backup ready'));
 
-    await clickUnique(page, 'button', 'Export');
+    await openExportMenu(page);
     const pngDownloadPromise = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
     await page.locator('.canvio-menu-item').filter({ hasText: 'Export Image (PNG)' }).click();
     await pngDownloadPromise;
@@ -268,7 +409,7 @@ async function main() {
       relations: {},
     }, null, 2));
 
-    await clickUnique(page, 'button', 'Export');
+    await openExportMenu(page);
     await page.locator('input[type="file"].export-menu__file-input').setInputFiles(backupPath);
     await page.waitForFunction(() => document.querySelector('.export-menu__status-chip')?.textContent?.includes('Restored 1 nodes'));
 

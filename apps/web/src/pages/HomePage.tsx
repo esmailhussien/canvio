@@ -24,7 +24,7 @@ const PRODUCT_STEPS = [
 
 const START_OPTIONS = [
   { glyph: 'BL', title: 'Blank canvas', text: 'Start open-ended work from scratch.', action: 'create' as const },
-  { glyph: 'DE', title: 'Demo board', text: 'Explore the experience with sample content.', action: 'demo' as const },
+  { glyph: 'SA', title: 'Sample board', text: 'Explore a ready-made board with real content.', action: 'demo' as const },
   { glyph: 'HW', title: 'How it works', text: 'See the workflow before opening a board.', action: 'how' as const },
 ];
 
@@ -32,7 +32,7 @@ const USE_CASES = [
   { glyph: 'ED', title: 'Teaching', text: 'Plan lessons, explain relationships, focus attention, and export class artifacts.' },
   { glyph: 'ST', title: 'Studying', text: 'Map topics, examples, questions, mistakes, and review prompts visually.' },
   { glyph: 'PM', title: 'Planning', text: 'Turn project goals, dependencies, decisions, and risks into a shared workspace.' },
-  { glyph: 'RS', title: 'Research', text: 'Connect evidence, places, notes, papers, and conclusions on one canvas.' },
+  { glyph: 'RS', title: 'Research', text: 'Connect evidence, notes, papers, conclusions, and places when location matters.' },
 ];
 
 export function HomePage() {
@@ -53,13 +53,17 @@ export function HomePage() {
     navigate(`/w/${newId}`);
   };
 
+  const handleOpenSampleBoard = () => {
+    navigate(`/w/demo-${nanoid(8)}`);
+  };
+
   const handleStartOption = (action: 'create' | 'demo' | 'how') => {
     if (action === 'create') {
       handleCreateWorld();
       return;
     }
     if (action === 'demo') {
-      navigate(`/w/demo-${nanoid(6)}`);
+      handleOpenSampleBoard();
       return;
     }
     navigate('/how-it-works');
@@ -98,24 +102,34 @@ export function HomePage() {
           <div className="home-hero__copy">
             <div className="home-hero__badge">
               <span className="home-hero__badge-dot" />
-              <span>Visual knowledge workspace for learning, planning, and research</span>
+              <span>Connected whiteboard for learning, planning, and research</span>
             </div>
             <h1 className="home-hero__title">
-              A whiteboard that turns ideas into <span>connected work.</span>
+              A connected whiteboard for thinking, learning, and <span>research.</span>
             </h1>
             <p className="home-hero__subtitle">
-              Canvio combines an infinite online whiteboard, smart ink, living objects, concept mapping, spatial AI, presentation mode, and export-ready frames in one familiar workspace.
+              Canvio brings notes, relations, AI, frames, drawing, maps, presentation, and export into one familiar workspace. Use maps when location matters while the board stays centered on the idea.
             </p>
             <div className="home-hero__cta">
               <button className="home-btn-primary" onClick={handleCreateWorld} disabled={isCreating}>
                 <HomeGlyph value="GO" />
                 <span>{isCreating ? 'Opening board...' : 'Start a blank board'}</span>
               </button>
-              <button className="home-btn-secondary" onClick={() => navigate(`/w/demo-${nanoid(6)}`)}>
-                <HomeGlyph value="DE" />
-                <span>Open demo board</span>
+              <button className="home-btn-secondary" onClick={handleOpenSampleBoard}>
+                <HomeGlyph value="SA" />
+                <span>Open sample board</span>
               </button>
             </div>
+            <ul className="home-hero__trust" aria-label="Why Canvio is safe to try">
+              <li>No signup required</li>
+              <li>Private by default</li>
+              <li>Export your data anytime</li>
+              <li>
+                <a href="https://github.com/esmailhussien/canvio" target="_blank" rel="noopener noreferrer">
+                  Open source (AGPL-3.0)
+                </a>
+              </li>
+            </ul>
           </div>
 
           <div className="home-preview" aria-label="Canvio canvas preview">
@@ -185,7 +199,7 @@ export function HomePage() {
           <div className="home-section-heading">
             <span className="home-section-kicker">Built for real work</span>
             <h2>One canvas, many jobs.</h2>
-            <p>The landing page should not make Canvio feel like only a map tool or only an AI tool. It is a flexible workspace.</p>
+            <p>Use the same space for lessons, research, project plans, and place-based work with maps available when location matters.</p>
           </div>
           <div className="home-use-cases__grid">
             {USE_CASES.map((item) => (
@@ -219,7 +233,7 @@ export function HomePage() {
       <footer className="home-footer">
         <div className="home-footer__brand">
           <CanvioLogoIcon size={20} />
-          <span>Canvio - Connect ideas. Create knowledge.</span>
+          <span>Canvio — Connect ideas. Create knowledge.</span>
         </div>
         <div className="home-footer__links">
           <Link className="home-footer__link" to="/updates">Updates</Link>

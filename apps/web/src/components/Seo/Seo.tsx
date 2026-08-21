@@ -3,7 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { getUpdateArticle, UPDATE_ARTICLES } from '../../pages/updatesContent';
 
 const SITE_URL = 'https://canvio.space';
-const DEFAULT_IMAGE = `${SITE_URL}/logo.png`;
+const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`;
+const ORGANIZATION_LOGO = `${SITE_URL}/logo.png`;
+const SOCIAL_IMAGE_ALT = 'Canvio — a whiteboard where ideas stay connected. Free, no signup, private by default.';
 
 interface PageSeoConfig {
   title: string;
@@ -13,8 +15,8 @@ interface PageSeoConfig {
 
 const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
   '/': {
-    title: 'Canvio | Online Whiteboard for Learning, Planning and Research',
-    description: 'Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
+    title: 'Canvio | Connected Whiteboard for Learning, Planning and Research',
+    description: 'Canvio is a connected online whiteboard for learning, planning, research, AI-assisted boards, semantic relations, and maps when place matters.',
     jsonLd: {
       '@context': 'https://schema.org',
       '@graph': [
@@ -23,7 +25,7 @@ const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
           '@id': `${SITE_URL}/#organization`,
           name: 'Canvio',
           url: SITE_URL,
-          logo: DEFAULT_IMAGE,
+          logo: ORGANIZATION_LOGO,
           sameAs: ['https://github.com/esmailhussien/canvio'],
         },
         {
@@ -31,7 +33,7 @@ const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
           '@id': `${SITE_URL}/#website`,
           name: 'Canvio',
           url: SITE_URL,
-          description: 'Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
+          description: 'Canvio is a connected online whiteboard for learning, planning, research, AI-assisted boards, semantic relations, and maps when place matters.',
           publisher: { '@id': `${SITE_URL}/#organization` },
         },
         {
@@ -39,7 +41,7 @@ const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
           '@id': `${SITE_URL}/#application`,
           name: 'Canvio',
           url: SITE_URL,
-          description: 'Canvio is an online whiteboard and visual knowledge workspace for learning, planning, research, concept maps, connected notes, and shared ideas.',
+          description: 'Canvio is a connected online whiteboard for learning, planning, research, AI-assisted boards, semantic relations, and maps when place matters.',
           applicationCategory: 'EducationalApplication',
           operatingSystem: 'Web',
           browserRequirements: 'Requires a modern web browser',
@@ -59,7 +61,7 @@ const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
   },
   '/how-it-works': {
     title: 'How Canvio Works | Interactive Online Whiteboard for Visual Thinking',
-    description: 'Learn how Canvio turns notes, shapes, maps, relations, and AI drafts into one editable online whiteboard for visual thinking, learning, and planning.',
+    description: 'Learn how Canvio turns notes, relations, AI, frames, drawing, maps, and presentation into one editable online whiteboard for visual thinking.',
     jsonLd: {
       '@context': 'https://schema.org',
       '@graph': [
@@ -79,7 +81,7 @@ const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
               '@type': 'HowToStep',
               position: 1,
               name: 'Start Anywhere',
-              text: 'Open a blank canvas, choose a ready-made study model, or generate a structured board with Spatial AI.',
+              text: 'Open a blank canvas, choose a ready-made study model, or generate a structured board with AI Navigator.',
             },
             {
               '@type': 'HowToStep',
@@ -151,7 +153,7 @@ const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
   },
   '/updates': {
     title: 'Canvio Updates | Online Whiteboard Features, Releases & Guides',
-    description: 'Read Canvio product updates, design notes, guides, and releases about online whiteboard features, visual thinking, AI boards, relations, maps, and collaboration.',
+    description: 'Read Canvio updates about connected whiteboard design, visual thinking, AI boards, semantic relations, maps when place matters, and collaboration.',
     jsonLd: {
       '@context': 'https://schema.org',
       '@graph': [
@@ -244,7 +246,7 @@ export function Seo() {
             datePublished: article.datePublished,
             dateModified: article.datePublished,
             author: { '@type': 'Organization', name: 'Canvio', url: SITE_URL },
-            publisher: { '@type': 'Organization', name: 'Canvio', url: SITE_URL, logo: { '@type': 'ImageObject', url: DEFAULT_IMAGE } },
+            publisher: { '@type': 'Organization', name: 'Canvio', url: SITE_URL, logo: { '@type': 'ImageObject', url: ORGANIZATION_LOGO } },
             mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/updates/${article.slug}` },
           },
         ],
@@ -266,12 +268,14 @@ export function Seo() {
     upsertMeta('property', 'og:description', description);
     upsertMeta('property', 'og:url', canonicalUrl);
     upsertMeta('property', 'og:image', DEFAULT_IMAGE);
-    upsertMeta('property', 'og:image:alt', 'Canvio visual knowledge workspace logo');
+    upsertMeta('property', 'og:image:width', '1200');
+    upsertMeta('property', 'og:image:height', '630');
+    upsertMeta('property', 'og:image:alt', SOCIAL_IMAGE_ALT);
     upsertMeta('name', 'twitter:card', isPublicPage ? 'summary_large_image' : 'summary');
     upsertMeta('name', 'twitter:title', title);
     upsertMeta('name', 'twitter:description', description);
     upsertMeta('name', 'twitter:image', DEFAULT_IMAGE);
-    upsertMeta('name', 'twitter:image:alt', 'Canvio visual knowledge workspace logo');
+    upsertMeta('name', 'twitter:image:alt', SOCIAL_IMAGE_ALT);
     upsertCanonical(canonicalUrl);
 
     if (pageConfig?.jsonLd) {
@@ -283,4 +287,3 @@ export function Seo() {
 
   return null;
 }
-
