@@ -6,6 +6,7 @@ import {
   summarizeBoardWithAIAsync,
   organizeAndClusterWithAIAsync,
   generateSpatialBoard,
+  getPromptOutputLanguage,
 } from '../../utils/spatialAIEngine';
 import { nanoid } from 'nanoid';
 import { useCanvasStore, type LivingNode } from '../../store/canvasStore';
@@ -749,6 +750,7 @@ function getBounds(nodes: ReturnType<typeof generateSpatialBoard>['nodes']) {
 
 function buildIntentPrompt(intent: AIIntent, prompt: string) {
   const { nodes, relations } = useCanvasStore.getState();
+  const outputLanguage = getPromptOutputLanguage(prompt).aiName;
   const nodeCount = Object.keys(nodes).length;
   const relationCount = Object.keys(relations).length;
   const boardDigest = buildBoardPromptDigest();
@@ -759,6 +761,7 @@ function buildIntentPrompt(intent: AIIntent, prompt: string) {
   if (intent === 'study') {
     return [
       boardInstruction,
+      `Requested output language: ${outputLanguage}. All visible board text and relation labels must use this language.`,
       'Create a learner-friendly visual board with a clear core concept, definitions, examples, common mistakes, practice prompts, review questions, and labeled relations.',
       prompt,
     ].join('\n\n');
@@ -766,6 +769,7 @@ function buildIntentPrompt(intent: AIIntent, prompt: string) {
 
   return [
     boardInstruction,
+    `Requested output language: ${outputLanguage}. All visible board text and relation labels must use this language.`,
     'Create a useful visual board with varied element types, readable spacing, semantic relation labels, and a clear editable structure.',
     prompt,
   ].join('\n\n');

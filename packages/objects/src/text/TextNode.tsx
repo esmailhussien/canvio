@@ -9,6 +9,7 @@ export interface TextData {
   fontWeight: 'normal' | 'bold';
   textAlign: 'left' | 'center' | 'right';
   color: string;
+  direction?: 'ltr' | 'rtl' | 'auto';
 }
 
 interface TextNodeProps {
@@ -25,6 +26,7 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
     fontWeight: rawData.fontWeight === 'bold' ? 'bold' : 'normal',
     textAlign: rawData.textAlign === 'center' || rawData.textAlign === 'right' ? rawData.textAlign : 'left',
     color: typeof rawData.color === 'string' ? rawData.color : '',
+    direction: rawData.direction === 'rtl' || rawData.direction === 'auto' ? rawData.direction : 'ltr',
   };
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(data.content || '');
@@ -94,6 +96,7 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
         textAlign: data.textAlign || 'left',
         color: data.color || 'var(--text-primary)',
       }}
+      dir={data.direction || 'ltr'}
     >
       {isEditing ? (
         <textarea
@@ -103,6 +106,7 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
           onChange={(e) => setContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          dir={data.direction || 'ltr'}
           placeholder="Type something..."
         />
       ) : (

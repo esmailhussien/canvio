@@ -12,6 +12,8 @@ export interface ShapeData {
   strokeWidth: number;
   label: string;
   opacity: number;
+  direction?: 'ltr' | 'rtl' | 'auto';
+  textAlign?: 'left' | 'center' | 'right';
 }
 
 interface ShapeNodeProps {
@@ -92,6 +94,8 @@ export const ShapeNode: React.FC<ShapeNodeProps> = ({ node, selected, onChange }
     strokeWidth: typeof rawData.strokeWidth === 'number' ? rawData.strokeWidth : 2,
     label: typeof rawData.label === 'string' ? rawData.label : '',
     opacity: typeof rawData.opacity === 'number' ? rawData.opacity : 1,
+    direction: rawData.direction === 'rtl' || rawData.direction === 'auto' ? rawData.direction : 'ltr',
+    textAlign: rawData.textAlign === 'left' || rawData.textAlign === 'right' ? rawData.textAlign : 'center',
   };
   const shape = data.shape || 'rectangle';
   const fill = data.fill || 'rgba(99, 102, 241, 0.15)';
@@ -175,11 +179,15 @@ export const ShapeNode: React.FC<ShapeNodeProps> = ({ node, selected, onChange }
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
+          dir={data.direction || 'ltr'}
+          style={{ textAlign: data.textAlign || 'center' }}
           placeholder="Type text..."
         />
       ) : (
         <div
           className={`shape-node__label ${!label ? 'shape-node__label--empty' : ''}`}
+          dir={data.direction || 'ltr'}
+          style={{ textAlign: data.textAlign || 'center' }}
           onDoubleClick={(e) => {
             e.stopPropagation();
             setIsEditing(true);

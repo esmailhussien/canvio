@@ -38,6 +38,7 @@ interface AIContextRelation {
 
 interface AIRequestBody {
   prompt?: string;
+  language?: string;
   provider?: AIProvider;
   model?: string;
   output?: 'summary' | 'article';
@@ -119,8 +120,13 @@ export async function aiRoutes(fastify: FastifyInstance) {
     if (!prompt) return reply.code(400).send({ error: 'Prompt is required' });
 
     const primaryProvider = resolveProvider(request.body?.provider);
-    const systemPrompt = buildBoardSystemPrompt();
-    const userPrompt = `User request:\n${prompt}\n\n${buildGraphContext(request.body?.context)}`;
+    const outputLanguage = resolveOutputLanguage(request.body?.language, prompt, request.body?.context);
+    const systemPrompt = buildBoardSystemPrompt(outputLanguage);
+    const userPrompt = [
+      buildLanguageInstruction(outputLanguage),
+      `User request:\n${prompt}`,
+      buildGraphContext(request.body?.context),
+    ].join('\n\n');
 
     try {
       const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
@@ -145,9 +151,11 @@ export async function aiRoutes(fastify: FastifyInstance) {
   fastify.post('/summarize', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
     const primaryProvider = resolveProvider(request.body?.provider);
     const output = request.body?.output === 'article' ? 'article' : 'summary';
-    const systemPrompt = buildBoardSystemPrompt();
+    const outputLanguage = resolveOutputLanguage(request.body?.language, request.body?.prompt, request.body?.context);
+    const systemPrompt = buildBoardSystemPrompt(outputLanguage);
     const userPrompt = output === 'article'
       ? [
+        buildLanguageInstruction(outputLanguage),
         'Turn this completed Canvio whiteboard into a polished, editable article draft.',
         'Create one page-like frame, a text title, and 4 to 7 readable text sections: introduction, main ideas, how the ideas connect, evidence or examples, implications or next steps, and conclusion when supported.',
         'Use only information present in the board. Do not invent facts. Translate relation labels and types into clear prose about evidence, dependency, contradiction, sequence, and exact map locations.',
@@ -155,6 +163,7 @@ export async function aiRoutes(fastify: FastifyInstance) {
         buildGraphContext(request.body?.context),
       ].join('\n\n')
       : [
+        buildLanguageInstruction(outputLanguage),
         'Analyze this completed Canvio whiteboard graph and create a concise visual summary board.',
         'The summary must include: core idea, key points, meaningful connections, risks or open questions, and next actions when supported by the board.',
         'Use the relation labels and relationship types to infer importance, dependencies, contradictions, flow, and exact map locations. Do not invent facts.',
@@ -185,8 +194,10 @@ export async function aiRoutes(fastify: FastifyInstance) {
     const primaryProvider = resolveProvider(request.body?.provider);
     const nodes = (request.body?.context?.nodes || []).slice(0, 80);
     if (nodes.length === 0) return { source: 'server-ai', clusters: [] };
+    const outputLanguage = resolveOutputLanguage(request.body?.language, request.body?.prompt, request.body?.context);
 
     const systemPrompt = `You are Canvio Spatial AI. Cluster whiteboard nodes into 2 to 5 useful groups.
+Write cluster titles in ${outputLanguage}. Keep JSON keys and node IDs unchanged.
 Return ONLY raw JSON:
 {
   "clusters": [
@@ -194,7 +205,7 @@ Return ONLY raw JSON:
   ]
 }
 Every input node id should appear in exactly one cluster when possible.`;
-    const userPrompt = buildGraphContext(request.body?.context);
+    const userPrompt = [buildLanguageInstruction(outputLanguage), buildGraphContext(request.body?.context)].join('\n\n');
 
     try {
       const { parsed, provider, model } = await callAIWithFallback(primaryProvider, request.body?.model, systemPrompt, userPrompt);
@@ -216,8 +227,10 @@ Every input node id should appear in exactly one cluster when possible.`;
 
   fastify.post('/analyze-graph', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
     const primaryProvider = resolveProvider(request.body?.provider);
+    const outputLanguage = resolveOutputLanguage(request.body?.language, request.body?.prompt, request.body?.context);
     const systemPrompt = `You are the Canvio Visual Reasoning Engine & Thinking Partner.
 Your goal is to critically evaluate the user's spatial knowledge graph, analyze their mental model, identify logical inconsistencies or contradictions, find missing evidentiary links, and suggest high-value connections.
+Write critique, insight titles/descriptions, suggested relation labels, and reasons in ${outputLanguage}. Keep JSON keys, node IDs, and relationship enum values unchanged.
 Return ONLY raw JSON with this exact schema:
 {
   "critique": "A sharp, 2-3 sentence executive synthesis of the user's reasoning strengths and vulnerability points.",
@@ -244,6 +257,7 @@ Return ONLY raw JSON with this exact schema:
 }`;
 
     const userPrompt = [
+      buildLanguageInstruction(outputLanguage),
       'Analyze this spatial knowledge graph:',
       buildGraphContext(request.body?.context),
     ].join('\n\n');
@@ -271,8 +285,10 @@ Return ONLY raw JSON with this exact schema:
 
   fastify.post('/challenge', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
     const primaryProvider = resolveProvider(request.body?.provider);
+    const outputLanguage = resolveOutputLanguage(request.body?.language, request.body?.prompt, request.body?.context);
     const systemPrompt = `You are a Socratic Thinking Partner and Devil's Advocate for Canvio.
 Your job is NOT to blindly agree with the user's board, but to constructively stress-test their assumptions, expose blindspots, and provide steelmanned counter-arguments.
+Write the challenge summary, critiques, counter-perspectives, challenger note text, and relation labels in ${outputLanguage}. Keep JSON keys, node IDs, and relationship enum values unchanged.
 Return ONLY raw JSON with this schema:
 {
   "challengeSummary": "Sharp overview of what assumptions the board is taking for granted.",
@@ -306,6 +322,7 @@ Return ONLY raw JSON with this schema:
 }`;
 
     const userPrompt = [
+      buildLanguageInstruction(outputLanguage),
       'Stress-test and challenge this board reasoning:',
       buildGraphContext(request.body?.context),
     ].join('\n\n');
@@ -333,8 +350,10 @@ Return ONLY raw JSON with this schema:
 
   fastify.post('/socratic', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
     const primaryProvider = resolveProvider(request.body?.provider);
+    const outputLanguage = resolveOutputLanguage(request.body?.language, request.body?.prompt, request.body?.context);
     const systemPrompt = `You are a Socratic Inquirer for Canvio, assisting the user in learning and reasoning through mental model construction.
 Instead of giving direct answers or lecturing, formulate 3-5 deep, probing questions about the connections, causality, and mechanisms on their board.
+Write inquiry focus, questions, and learning goals in ${outputLanguage}. Keep JSON keys and node IDs unchanged.
 Return ONLY raw JSON:
 {
   "inquiryFocus": "Main theme being examined",
@@ -349,6 +368,7 @@ Return ONLY raw JSON:
 }`;
 
     const userPrompt = [
+      buildLanguageInstruction(outputLanguage),
       'Generate Socratic questions for active learning on this board:',
       buildGraphContext(request.body?.context),
     ].join('\n\n');
@@ -657,10 +677,15 @@ function formatProviderFailure(provider: AIProvider, model: string, error: Error
   return `${provider}:${model}: ${message}`;
 }
 
-function buildBoardSystemPrompt() {
+function buildBoardSystemPrompt(outputLanguage = 'the same language as the user request') {
   return `You are Spatial AI for Canvio, an infinite canvas visual thinking & knowledge workspace.
 Your mission is to generate deep, highly useful, structured spatial knowledge graphs.
 Avoid generic meta-placeholders (never write "Add your idea here" or "Worked example placeholder"). Instead, ALWAYS write real, concrete, high-value subject matter content: actual rules, formulas, realistic code/grammar examples, pitfalls, and actionable takeaways.
+
+Language Rule:
+- Write every human-visible string in ${outputLanguage}: title, node data.title, node data.text, node data.label, and relation.label.
+- Keep JSON property names, node types, sticky color names, shape names, relationship enums, IDs, sourceId, targetId, and hex colors in English exactly as required by the schema.
+- If the topic is a language itself, do not switch output language unless the user explicitly requested that language for the board text. For example, "teach English grammar in Arabic" must produce Arabic explanations with English examples only where useful.
 
 Content Guidelines:
 1. For Educational/Language/Math topics: Provide the real grammatical or mathematical formulas (e.g. "If + Present Simple, will + Verb"), real-world example sentences, common pitfalls to avoid (e.g. "❌ Incorrect vs ✅ Correct"), and a quick practice quiz node.
@@ -702,6 +727,63 @@ Return ONLY raw JSON with this exact schema:
 Allowed node types: sticky, shape, text, frame.
 Allowed sticky colors: blue (rules/concepts), green (examples/success), yellow (warm-up/overview), pink (pitfalls/risks), purple (exercises/deep dive), orange (actions/next steps).
 Keep the board focused, highly readable, visually clean, and typically between 5 to 14 nodes.`;
+}
+
+function buildLanguageInstruction(outputLanguage: string) {
+  return `Requested output language: ${outputLanguage}. Write all visible board content and relation labels in ${outputLanguage}. Keep JSON keys and enum values in English.`;
+}
+
+function resolveOutputLanguage(requestedLanguage?: string, prompt?: string, context?: AIRequestBody['context']) {
+  const explicit = normalizeRequestedLanguage(requestedLanguage) || normalizeRequestedLanguage(prompt);
+  if (explicit) return explicit;
+
+  const contextText = [
+    ...(context?.nodes || []).flatMap((node) => [node.title, node.text]),
+    ...(context?.relations || []).flatMap((relation) => [relation.label, relation.sourceLabel, relation.targetLabel]),
+  ].filter((value): value is string => typeof value === 'string').join('\n');
+
+  return inferLanguageFromScript(prompt || contextText) || 'the same language as the user request';
+}
+
+function normalizeRequestedLanguage(value?: string) {
+  const raw = cleanText(value, 500);
+  if (!raw) return '';
+  const lowered = raw.toLowerCase();
+
+  const languageAliases: Array<[string, RegExp[]]> = [
+    ['Arabic', [/\barabic\b/i, /\bin arabic\b/i, /باللغة العربية|بالعربي|عربي|العربية/]],
+    ['English', [/\benglish\b/i, /\bin english\b/i, /باللغة الإنجليزية|بالانجليزي|إنجليزي|انجليزي/]],
+    ['French', [/\bfrench\b/i, /\bfrançais\b/i, /\bfrancais\b/i]],
+    ['Spanish', [/\bspanish\b/i, /\bespañol\b/i, /\bespanol\b/i]],
+    ['German', [/\bgerman\b/i, /\bdeutsch\b/i]],
+    ['Italian', [/\bitalian\b/i, /\bitaliano\b/i]],
+    ['Portuguese', [/\bportuguese\b/i, /\bportuguês\b/i, /\bportugues\b/i]],
+    ['Turkish', [/\bturkish\b/i, /\btürkçe\b/i, /\bturkce\b/i]],
+    ['Persian', [/\bpersian\b/i, /\bfarsi\b/i, /فارسی/]],
+    ['Urdu', [/\burdu\b/i, /اردو/]],
+    ['Hindi', [/\bhindi\b/i, /हिन्दी|हिंदी/]],
+    ['Chinese', [/\bchinese\b/i, /中文|汉语|漢語/]],
+    ['Japanese', [/\bjapanese\b/i, /日本語/]],
+    ['Korean', [/\bkorean\b/i, /한국어/]],
+    ['Russian', [/\brussian\b/i, /\bрусский\b/i]],
+  ];
+
+  for (const [language, aliases] of languageAliases) {
+    if (aliases.some((alias) => alias.test(raw) || alias.test(lowered))) return language;
+  }
+
+  return inferLanguageFromScript(raw);
+}
+
+function inferLanguageFromScript(text?: string) {
+  const value = text || '';
+  if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(value)) return 'Arabic';
+  if (/[\u3040-\u30FF]/.test(value)) return 'Japanese';
+  if (/[\u4E00-\u9FFF]/.test(value)) return 'Chinese';
+  if (/[\uAC00-\uD7AF]/.test(value)) return 'Korean';
+  if (/[\u0400-\u04FF]/.test(value)) return 'Russian';
+  if (/[\u0900-\u097F]/.test(value)) return 'Hindi';
+  return '';
 }
 
 function buildGraphContext(context?: AIRequestBody['context']) {

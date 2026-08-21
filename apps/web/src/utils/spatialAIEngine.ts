@@ -35,9 +35,11 @@ export async function generateSpatialBoardAsync(
   _apiKey?: string,
   model?: string
 ): Promise<SpatialAIResult> {
+  const outputLanguage = getPromptOutputLanguage(prompt);
   try {
     const result = await generateAIBoard({
       prompt,
+      language: outputLanguage.aiName,
       provider: normalizeProvider(provider),
       model,
       context: buildAIContext(),
@@ -79,6 +81,7 @@ function normalizeServerBoardResult(
     const text = cleanText(data.text, 600) || cleanText(data.label, 180) || cleanText(data.title, 120);
     const label = cleanText(data.label, 180) || text.slice(0, 80);
     const titleText = cleanText(data.title, 120) || label || text.slice(0, 80);
+    const isRtlText = hasRtlScript(`${text} ${label} ${titleText}`);
 
     return {
       id,
@@ -104,6 +107,8 @@ function normalizeServerBoardResult(
         shape: normalizeShape(data.shape),
         fill: cleanText(data.fill, 80) || 'rgba(128, 131, 255, 0.12)',
         stroke: normalizeColor(data.stroke, '#8083ff'),
+        direction: cleanText(data.direction, 8) || (isRtlText ? 'rtl' : undefined),
+        textAlign: cleanText(data.textAlign, 12) || (isRtlText ? (type === 'shape' ? 'center' : 'right') : undefined),
       },
       createdAt,
       updatedAt: createdAt,
@@ -306,6 +311,51 @@ function getClientAIModel(): string | undefined {
   return cleanText(localStorage.getItem('CANVIO_AI_MODEL') || '', 80) || undefined;
 }
 
+type PromptOutputLanguage = {
+  code: 'ar' | 'other';
+  aiName: string;
+  direction: 'ltr' | 'rtl';
+};
+
+export function getPromptOutputLanguage(prompt: string): PromptOutputLanguage {
+  const value = prompt || '';
+  const lowered = value.toLowerCase();
+  const explicitLanguage = [
+    ['Arabic', /\barabic\b|باللغة العربية|بالعربي|عربي|العربية/i],
+    ['English', /\benglish\b|باللغة الإنجليزية|بالانجليزي|إنجليزي|انجليزي/i],
+    ['French', /\bfrench\b|français|francais/i],
+    ['Spanish', /\bspanish\b|español|espanol/i],
+    ['German', /\bgerman\b|deutsch/i],
+    ['Italian', /\bitalian\b|italiano/i],
+    ['Portuguese', /\bportuguese\b|português|portugues/i],
+    ['Turkish', /\bturkish\b|türkçe|turkce/i],
+    ['Persian', /\bpersian\b|\bfarsi\b|فارسی/i],
+    ['Urdu', /\burdu\b|اردو/i],
+    ['Hindi', /\bhindi\b|हिन्दी|हिंदी/i],
+    ['Chinese', /\bchinese\b|中文|汉语|漢語/i],
+    ['Japanese', /\bjapanese\b|日本語/i],
+    ['Korean', /\bkorean\b|한국어/i],
+    ['Russian', /\brussian\b|русский/i],
+  ] as const;
+
+  for (const [name, pattern] of explicitLanguage) {
+    if (pattern.test(lowered) || pattern.test(value)) {
+      return { code: name === 'Arabic' ? 'ar' : 'other', aiName: name, direction: name === 'Arabic' ? 'rtl' : 'ltr' };
+    }
+  }
+
+  if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(value)) {
+    return { code: 'ar', aiName: 'Arabic', direction: 'rtl' };
+  }
+  if (/[\u3040-\u30FF]/.test(value)) return { code: 'other', aiName: 'Japanese', direction: 'ltr' };
+  if (/[\u4E00-\u9FFF]/.test(value)) return { code: 'other', aiName: 'Chinese', direction: 'ltr' };
+  if (/[\uAC00-\uD7AF]/.test(value)) return { code: 'other', aiName: 'Korean', direction: 'ltr' };
+  if (/[\u0400-\u04FF]/.test(value)) return { code: 'other', aiName: 'Russian', direction: 'ltr' };
+  if (/[\u0900-\u097F]/.test(value)) return { code: 'other', aiName: 'Hindi', direction: 'ltr' };
+
+  return { code: 'other', aiName: 'the same language as the user request', direction: 'ltr' };
+}
+
 export function getAIFallbackMessage(error: unknown) {
   if (
     error instanceof ApiRequestError &&
@@ -394,6 +444,10 @@ function normalizeColor(value: unknown, fallback: string) {
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : '';
+}
+
+function hasRtlScript(value: string) {
+  return /[\u0590-\u08FF]/.test(value);
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -1131,11 +1185,254 @@ function relation(
   };
 }
 
+function rtlData<T extends LivingNode>(node: T): T {
+  const textAlign = node.type === 'shape' ? 'center' : 'right';
+  return {
+    ...node,
+    data: {
+      ...(node.data || {}),
+      direction: 'rtl',
+      textAlign,
+    },
+  };
+}
+
+function stickyRtl(id: string, x: number, y: number, width: number, height: number, text: string, color: string, zIndex: number): LivingNode {
+  return rtlData(sticky(id, x, y, width, height, text, color, zIndex));
+}
+
+function shapeRtl(id: string, x: number, y: number, width: number, height: number, label: string, fill: string, stroke: string, shapeType = 'rectangle', zIndex = 1): LivingNode {
+  return rtlData(shape(id, x, y, width, height, label, fill, stroke, shapeType, zIndex));
+}
+
+function textBlockRtl(
+  id: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  content: string,
+  zIndex: number,
+  fontSize = 20,
+  fontWeight: 'normal' | 'bold' = 'bold'
+): LivingNode {
+  return rtlData(textBlock(id, x, y, width, height, content, zIndex, fontSize, fontWeight));
+}
+
+function getArabicTopic(prompt: string, maxLength = 44) {
+  const paragraphs = prompt
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const userFacingPrompt = [...paragraphs].reverse().find((part) => hasRtlScript(part)) || paragraphs[paragraphs.length - 1] || prompt;
+  const topic = cleanText(
+    userFacingPrompt
+      .replace(/\b(in arabic|arabic)\b/gi, '')
+      .replace(/باللغة العربية|بالعربي|العربية|عربي/g, '')
+      .replace(/^(اصنع|اعمل|أنشئ|انشئ|اكتب|حوّل|حول|لخص|اشرح)\s+/i, '')
+      .replace(/\s+/g, ' '),
+    maxLength
+  );
+  return topic || 'موضوع جديد';
+}
+
+function generateArabicSpatialBoard(prompt: string, loweredPrompt: string, cx: number, cy: number): SpatialAIResult {
+  const raw = prompt || '';
+  const topic = getArabicTopic(raw);
+  const includesArabic = (pattern: RegExp) => pattern.test(raw);
+
+  if (
+    loweredPrompt.includes('pdf') ||
+    loweredPrompt.includes('report') ||
+    loweredPrompt.includes('article') ||
+    includesArabic(/تقرير|مستند|مقال|ملخص|صفحة|طباعة/)
+  ) {
+    const pageId = nanoid(10);
+    const titleId = nanoid(10);
+    const summaryId = nanoid(10);
+    const evidenceId = nanoid(10);
+    const actionsId = nanoid(10);
+
+    return {
+      title: `مسودة تقرير: ${topic}`,
+      nodes: [
+        frame(pageId, cx - 297, cy - 421, 595, 842, `تقرير قابل للتصدير: ${topic}`, '#6366f1'),
+        textBlockRtl(titleId, cx - 250, cy - 370, 500, 54, topic, 1, 24),
+        stickyRtl(summaryId, cx - 250, cy - 280, 230, 160, 'نظرة عامة\nالفكرة الرئيسية والهدف من هذا التقرير بشكل واضح ومختصر.', 'blue', 2),
+        stickyRtl(evidenceId, cx + 20, cy - 280, 230, 160, 'أدلة ونقاط مهمة\nمصادر، أمثلة، ملاحظات، أو بيانات تدعم الفكرة.', 'yellow', 3),
+        stickyRtl(actionsId, cx - 250, cy - 90, 500, 140, 'خطوات تالية\n1. مراجعة الروابط بين الأفكار\n2. إضافة الأدلة الناقصة\n3. تصدير النسخة النهائية', 'green', 4),
+      ],
+      relations: [
+        relation(summaryId, evidenceId, 'يدعمه', '#3b82f6', 'based_on'),
+        relation(evidenceId, actionsId, 'يقود إلى', '#22c55e', 'leads_to'),
+      ],
+    };
+  }
+
+  if (
+    loweredPrompt.includes('map') ||
+    loweredPrompt.includes('location') ||
+    loweredPrompt.includes('site') ||
+    includesArabic(/خريطة|موقع|مكان|زيارة|ميداني|طوارئ|رحلة|مدينة/)
+  ) {
+    const frameId = nanoid(10);
+    const mapId = nanoid(10);
+    const pinMain = nanoid(8);
+    const pinSupport = nanoid(8);
+    const contextId = nanoid(10);
+    const evidenceId = nanoid(10);
+    const riskId = nanoid(10);
+    const actionId = nanoid(10);
+
+    return {
+      title: `خريطة تفاعلية: ${topic}`,
+      nodes: [
+        frame(frameId, cx - 520, cy - 270, 1000, 560, `استكشاف مكاني: ${topic}`, '#22c55e'),
+        {
+          id: mapId,
+          type: 'map',
+          position: { x: cx - 480, y: cy - 210 },
+          size: { width: 440, height: 330 },
+          rotation: 0,
+          zIndex: 2,
+          locked: false,
+          data: {
+            center: [20, 0],
+            zoom: 2,
+            tileLayer: 'hybrid',
+            markers: [
+              { id: pinMain, label: 'النقطة الرئيسية', position: [30.0444, 31.2357] },
+              { id: pinSupport, label: 'نقطة مقارنة', position: [24.7136, 46.6753] },
+            ],
+            interactive: true,
+          },
+          createdAt: now(),
+          updatedAt: now(),
+        },
+        stickyRtl(contextId, cx + 10, cy - 210, 280, 130, 'سياق المكان\nما الذي نريد فهمه عن هذا الموقع؟', 'yellow', 3),
+        stickyRtl(evidenceId, cx + 320, cy - 210, 250, 130, 'ملاحظات ميدانية\nصور، قياسات، مقابلات، أو دلائل مرتبطة بالنقاط.', 'blue', 4),
+        stickyRtl(riskId, cx + 10, cy - 30, 280, 130, 'أسئلة أو مخاطر\nما الذي يحتاج تحققاً قبل القرار؟', 'pink', 5),
+        stickyRtl(actionId, cx + 320, cy - 30, 250, 130, 'خطوة عملية\nحدد زيارة، اجمع دليل، ثم اربط النتائج بالخريطة.', 'green', 6),
+      ],
+      relations: [
+        relation(mapId, contextId, 'يوضح الموقع', '#22c55e', 'based_on', markerPort(pinMain)),
+        relation(mapId, evidenceId, 'يرتبط بدليل', '#38bdf8', 'based_on', markerPort(pinSupport)),
+        relation(contextId, riskId, 'يكشف', '#ec4899', 'leads_to'),
+        relation(evidenceId, actionId, 'يدعم القرار', '#22c55e', 'enables'),
+      ],
+    };
+  }
+
+  if (
+    loweredPrompt.includes('architecture') ||
+    loweredPrompt.includes('system') ||
+    loweredPrompt.includes('api') ||
+    loweredPrompt.includes('database') ||
+    includesArabic(/نظام|معمارية|هندسة|تطبيق|قاعدة بيانات|خادم|واجهة/)
+  ) {
+    const frameId = nanoid(10);
+    const clientId = nanoid(10);
+    const apiId = nanoid(10);
+    const dataId = nanoid(10);
+    const riskId = nanoid(10);
+    const monitorId = nanoid(10);
+
+    return {
+      title: `تصميم نظام: ${topic}`,
+      nodes: [
+        frame(frameId, cx - 520, cy - 265, 1040, 530, `لوحة معمارية: ${topic}`, '#22c55e'),
+        shapeRtl(clientId, cx - 450, cy - 80, 220, 120, 'المستخدم / الواجهة', 'rgba(59, 130, 246, 0.16)', '#3b82f6', 'rectangle', 1),
+        shapeRtl(apiId, cx - 110, cy - 95, 240, 145, 'طبقة API\nالقواعد والصلاحيات', 'rgba(99, 102, 241, 0.18)', '#6366f1', 'hexagon', 2),
+        shapeRtl(dataId, cx + 250, cy - 80, 220, 120, 'البيانات\nتخزين ومزامنة', 'rgba(34, 197, 94, 0.16)', '#22c55e', 'rectangle', 3),
+        stickyRtl(riskId, cx - 450, cy + 110, 260, 130, 'نقاط فشل محتملة\nمصادقة، حدود استخدام، تأخير الشبكة، وتعارضات المزامنة.', 'pink', 4),
+        stickyRtl(monitorId, cx + 160, cy + 110, 300, 130, 'مراقبة وتحسين\nسجلات، مقاييس أداء، تنبيهات، واختبارات قبل الإطلاق.', 'blue', 5),
+      ],
+      relations: [
+        relation(clientId, apiId, 'يرسل طلبات', '#3b82f6', 'leads_to'),
+        relation(apiId, dataId, 'يقرأ ويكتب', '#22c55e', 'depends_on'),
+        relation(riskId, apiId, 'يحتاج حماية', '#ef4444', 'contradicts'),
+        relation(apiId, monitorId, 'ينتج مؤشرات', '#38bdf8', 'based_on'),
+      ],
+    };
+  }
+
+  if (
+    loweredPrompt.includes('decision') ||
+    loweredPrompt.includes('risk') ||
+    loweredPrompt.includes('strategy') ||
+    includesArabic(/قرار|مخاطر|خيارات|مقارنة|استراتيجية|أولوية|خطة/)
+  ) {
+    const frameId = nanoid(10);
+    const goalId = nanoid(10);
+    const evidenceId = nanoid(10);
+    const optionAId = nanoid(10);
+    const optionBId = nanoid(10);
+    const riskId = nanoid(10);
+    const actionId = nanoid(10);
+
+    return {
+      title: `لوحة قرار: ${topic}`,
+      nodes: [
+        frame(frameId, cx - 520, cy - 280, 1040, 560, `غرفة قرار: ${topic}`, '#f59e0b'),
+        shapeRtl(goalId, cx - 110, cy - 70, 220, 130, 'السؤال الأساسي\nما القرار المطلوب؟', 'rgba(245, 158, 11, 0.16)', '#f59e0b', 'diamond', 4),
+        stickyRtl(evidenceId, cx - 470, cy - 180, 270, 140, 'الأدلة\nبيانات، ملاحظات، تجارب، أو آراء أصحاب المصلحة.', 'blue', 1),
+        stickyRtl(optionAId, cx + 210, cy - 190, 260, 130, 'الخيار الأول\nمسار سريع مع نطاق واضح ومخاطر محددة.', 'yellow', 2),
+        stickyRtl(optionBId, cx + 210, cy + 10, 260, 130, 'الخيار الثاني\nتأجيل أو تعديل الخطة لرفع الجودة والثقة.', 'orange', 3),
+        stickyRtl(riskId, cx - 470, cy + 30, 270, 145, 'مخاطر مفتوحة\nما الافتراضات الضعيفة؟ وما الأدلة الناقصة؟', 'pink', 5),
+        stickyRtl(actionId, cx - 120, cy + 185, 270, 120, 'الخطوة التالية\nاختر مالكاً، موعد مراجعة، ودليل نجاح واضح.', 'green', 6),
+      ],
+      relations: [
+        relation(evidenceId, goalId, 'يدعم', '#38bdf8', 'based_on'),
+        relation(optionAId, goalId, 'خيار', '#f59e0b', 'part_of'),
+        relation(optionBId, goalId, 'خيار', '#f59e0b', 'part_of'),
+        relation(riskId, goalId, 'يقيّد', '#ef4444', 'contradicts'),
+        relation(goalId, actionId, 'يتحول إلى', '#22c55e', 'leads_to'),
+      ],
+    };
+  }
+
+  const frameId = nanoid(10);
+  const topicId = nanoid(10);
+  const definitionId = nanoid(10);
+  const exampleId = nanoid(10);
+  const factsId = nanoid(10);
+  const pitfallId = nanoid(10);
+  const practiceId = nanoid(10);
+  const questionId = nanoid(10);
+
+  return {
+    title: `لوحة تعلم: ${topic}`,
+    nodes: [
+      frame(frameId, cx - 560, cy - 315, 1120, 630, `نموذج تعلم: ${topic}`, '#38bdf8'),
+      shapeRtl(topicId, cx - 120, cy - 55, 240, 120, topic, 'rgba(56, 189, 248, 0.18)', '#38bdf8', 'hexagon', 5),
+      stickyRtl(definitionId, cx - 500, cy - 235, 260, 145, 'تعريف\nاكتب الفكرة الأساسية بكلمات واضحة ومباشرة.', 'yellow', 1),
+      stickyRtl(exampleId, cx + 240, cy - 235, 260, 145, 'مثال\nاستخدم حالة واقعية أو مثالاً بسيطاً يوضح المعنى.', 'green', 2),
+      stickyRtl(factsId, cx - 130, cy - 255, 260, 135, 'نقاط أساسية\nقواعد، مصطلحات، خطوات، أو معلومات يجب تذكرها.', 'blue', 3),
+      stickyRtl(pitfallId, cx - 500, cy + 80, 260, 145, 'خطأ شائع\nما الذي يلتبس عادة؟ وما التصحيح المناسب؟', 'pink', 4),
+      stickyRtl(practiceId, cx + 240, cy + 80, 260, 145, 'تدريب\nسؤال أو مهمة قصيرة لتطبيق الفكرة.', 'purple', 6),
+      stickyRtl(questionId, cx - 130, cy + 170, 260, 125, 'سؤال مفتوح\nما الجزء الذي يحتاج توضيحاً أو دليلاً إضافياً؟', 'orange', 7),
+    ],
+    relations: [
+      relation(topicId, definitionId, 'يُعرّف بواسطة', '#38bdf8', 'explains'),
+      relation(definitionId, exampleId, 'يتضح عبر', '#22c55e', 'example_of'),
+      relation(topicId, factsId, 'يتكون من', '#3b82f6', 'part_of'),
+      relation(topicId, pitfallId, 'انتبه إلى', '#ec4899', 'contradicts'),
+      relation(exampleId, practiceId, 'يُطبّق في', '#a855f7', 'leads_to'),
+      relation(practiceId, questionId, 'يكشف', '#f59e0b', 'leads_to'),
+    ],
+  };
+}
+
 export function generateSpatialBoard(prompt: string): SpatialAIResult {
   const p = prompt.toLowerCase();
+  const language = getPromptOutputLanguage(prompt);
   const store = useCanvasStore.getState();
   const cx = Math.round(-store.viewport.x);
   const cy = Math.round(-store.viewport.y);
+
+  if (language.code === 'ar') {
+    return generateArabicSpatialBoard(prompt, p, cx, cy);
+  }
 
   if (p.includes('pdf') || p.includes('report') || p.includes('document') || p.includes('page') || p.includes('print')) {
     const pageId = nanoid(10);

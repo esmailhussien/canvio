@@ -112,8 +112,10 @@ const {
 const {
   analyzeGraphWithAIAsync,
   challengeBoardWithAIAsync,
+  generateSpatialBoard,
   generateSpatialBoardAsync,
   getAIFallbackMessage,
+  getPromptOutputLanguage,
   organizeAndClusterWithAIAsync,
   socraticInquiryWithAIAsync,
   summarizeBoardWithAIAsync,
@@ -389,19 +391,45 @@ test('AI server error classifier identifies production failure modes', () => {
   assert.equal(friendly, 'AI quota is temporarily exhausted. Canvio used local smart mode.');
 });
 
+test('AI board generation preserves requested Arabic language in local fallback', () => {
+  resetStore();
+
+  const explicitArabic = getPromptOutputLanguage('Create a board in Arabic about the water cycle');
+  assert.equal(explicitArabic.aiName, 'Arabic');
+  assert.equal(explicitArabic.direction, 'rtl');
+
+  const generated = generateSpatialBoard([
+    'No existing board context is available, so create a useful standalone board from the user prompt.',
+    'Requested output language: Arabic. All visible board text and relation labels must use this language.',
+    'Create a learner-friendly visual board with a clear core concept.',
+    'اصنع لوحة تعلم عن دورة المياه بالعربي',
+  ].join('\n\n'));
+  const visibleText = generated.nodes
+    .map((node) => `${node.data?.title || ''} ${node.data?.text || ''} ${node.data?.label || ''}`)
+    .join(' ');
+
+  assert.match(generated.title, /[\u0600-\u06FF]/);
+  assert.doesNotMatch(generated.title, /No existing board/i);
+  assert.match(visibleText, /[\u0600-\u06FF]/);
+  assert.ok(generated.relations.some((relation) => /[\u0600-\u06FF]/.test(relation.label || '')));
+  assert.ok(generated.nodes.some((node) => node.data?.direction === 'rtl'));
+});
+
 test('AI client paths use editable local fallbacks for provider failures', async () => {
   resetStore();
   const originalFetch = globalThis.fetch;
   const requestedPaths: string[] = [];
+  const requestedBodies: string[] = [];
   const fallbackMessage = 'AI quota is temporarily exhausted. Canvio used local smart mode.';
   const jsonResponse = (payload: unknown) => new Response(JSON.stringify(payload), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
 
-  globalThis.fetch = async (input: RequestInfo | URL) => {
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     requestedPaths.push(url);
+    if (typeof init?.body === 'string') requestedBodies.push(init.body);
 
     if (url.includes('/api/ai/generate') || url.includes('/api/ai/summarize')) {
       return jsonResponse({
@@ -481,6 +509,13 @@ test('AI client paths use editable local fallbacks for provider failures', async
     assert.equal(generated.source, 'local');
     assert.match(generated.message || '', /quota/i);
     assert.ok(generated.nodes.length > 0);
+
+    const arabicGenerated = await generateSpatialBoardAsync('Create a board in Arabic about photosynthesis');
+    assert.equal(arabicGenerated.source, 'local');
+    const generateBodies = requestedBodies
+      .filter((body) => body.includes('photosynthesis'))
+      .map((body) => JSON.parse(body) as { language?: string });
+    assert.ok(generateBodies.some((body) => body.language === 'Arabic'));
 
     const summary = await summarizeBoardWithAIAsync(boardNodes, boardRelations, 'summary');
     assert.equal(summary.source, 'local');

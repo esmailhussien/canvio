@@ -283,6 +283,7 @@ export async function createBoardShareLink(id: string, isPublic = false) {
 
 export async function generateAIBoard(request: {
   prompt: string;
+  language?: string;
   provider?: AIProvider;
   model?: string;
   context?: { nodes?: AIContextNode[]; relations?: AIContextRelation[] };

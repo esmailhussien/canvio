@@ -7,6 +7,8 @@ export interface StickyData {
   text: string;
   color: string;
   fontSize: number;
+  direction?: 'ltr' | 'rtl' | 'auto';
+  textAlign?: 'left' | 'center' | 'right';
 }
 
 interface StickyNoteProps {
@@ -31,6 +33,8 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     text: typeof rawData.text === 'string' ? rawData.text : '',
     color: typeof rawData.color === 'string' ? rawData.color : 'yellow',
     fontSize: typeof rawData.fontSize === 'number' ? rawData.fontSize : 16,
+    direction: rawData.direction === 'rtl' || rawData.direction === 'auto' ? rawData.direction : 'ltr',
+    textAlign: rawData.textAlign === 'center' || rawData.textAlign === 'right' ? rawData.textAlign : 'left',
   };
   const textRef = useRef<HTMLTextAreaElement>(null);
   const lastPointerTypeRef = useRef<string>('mouse');
@@ -129,7 +133,11 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onMouseDown={handleMouseDown}
-        style={{ fontSize: `${data.fontSize || 16}px` }}
+        dir={data.direction || 'ltr'}
+        style={{
+          fontSize: `${data.fontSize || 16}px`,
+          textAlign: data.textAlign || 'left',
+        }}
         placeholder="Type something..."
       />
     </div>
