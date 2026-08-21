@@ -39,6 +39,10 @@ interface AIRequestBody {
   };
 }
 
+interface AIStatusQuery {
+  provider?: string;
+}
+
 interface RawAINode {
   id?: unknown;
   type?: unknown;
@@ -70,6 +74,18 @@ export async function aiRoutes(fastify: FastifyInstance) {
     max: readPositiveIntEnv('CANVIO_AI_RATE_LIMIT', 20, 1, 1_000),
   }));
   fastify.addHook('onRequest', createAuthHook({ requiredEnv: 'CANVIO_REQUIRE_AI_AUTH' }));
+
+  fastify.get('/status', async (request: FastifyRequest<{ Querystring: AIStatusQuery }>) => {
+    const primaryProvider = resolveProvider(request.query?.provider);
+    const fallbackProvider = resolveFallbackProvider(primaryProvider);
+
+    return {
+      status: 'ok',
+      primary: providerStatus(primaryProvider),
+      fallback: fallbackProvider !== primaryProvider ? providerStatus(fallbackProvider) : null,
+      availableProviders: PROVIDERS.map(providerStatus),
+    };
+  });
 
   fastify.post('/generate', async (request: FastifyRequest<{ Body: AIRequestBody }>, reply: FastifyReply) => {
     const prompt = cleanText(request.body?.prompt, 4000);
@@ -198,8 +214,19 @@ Return ONLY raw JSON with this exact schema:
         ...parsed,
       };
     } catch (err: any) {
-      fastify.log.error({ err }, 'AI graph analysis failed');
-      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+      const error = err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED';
+      fastify.log.warn({ err, error }, 'AI graph analysis unavailable; client should use local reasoning fallback');
+      return reply.send({
+        source: 'local-fallback',
+        provider: primaryProvider,
+        model: resolveModel(primaryProvider, request.body?.model),
+        critique: '',
+        healthScore: 0,
+        insights: [],
+        suggestedRelations: [],
+        error,
+        details: err?.message,
+      });
     }
   });
 
@@ -301,6 +328,20 @@ function resolveProvider(provider?: string): AIProvider {
   return PROVIDERS.includes(envProvider as AIProvider) ? envProvider as AIProvider : 'groq';
 }
 
+function resolveFallbackProvider(primaryProvider: AIProvider): AIProvider {
+  const defaultFallback: AIProvider = primaryProvider === 'groq' ? 'gemini' : 'groq';
+  const configuredFallback = process.env.CANVIO_AI_FALLBACK_PROVIDER as AIProvider | undefined;
+  return configuredFallback && PROVIDERS.includes(configuredFallback) ? configuredFallback : defaultFallback;
+}
+
+function providerStatus(provider: AIProvider) {
+  return {
+    provider,
+    configured: Boolean(resolveApiKey(provider)),
+    model: resolveModel(provider, undefined),
+  };
+}
+
 function resolveModel(provider: AIProvider, model?: string) {
   const cleaned = cleanText(model, 80);
   if (provider === 'groq') return cleaned || process.env.CANVIO_GROQ_MODEL || DEFAULT_GROQ_MODEL;
@@ -327,10 +368,9 @@ async function callAIWithFallback(
   userPrompt: string
 ): Promise<{ parsed: any; provider: AIProvider; model: string }> {
   const candidateProviders: AIProvider[] = [primaryProvider];
-  const defaultFallback: AIProvider = primaryProvider === 'groq' ? 'gemini' : 'groq';
-  const configuredFallback = (process.env.CANVIO_AI_FALLBACK_PROVIDER || defaultFallback) as AIProvider;
+  const configuredFallback = resolveFallbackProvider(primaryProvider);
 
-  if (PROVIDERS.includes(configuredFallback) && !candidateProviders.includes(configuredFallback)) {
+  if (!candidateProviders.includes(configuredFallback)) {
     candidateProviders.push(configuredFallback);
   }
 

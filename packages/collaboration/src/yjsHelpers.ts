@@ -76,6 +76,22 @@ function syncTextValue(dataMap: Y.Map<unknown>, key: string, value: string): voi
   applyTextDiff(ytext, value);
 }
 
+function textToYText(value: string): Y.Text {
+  const ytext = new Y.Text();
+  if (value) {
+    ytext.insert(0, value);
+  }
+  return ytext;
+}
+
+function dataToYMap(data: Record<string, unknown>): Y.Map<unknown> {
+  const dataMap = new Y.Map<unknown>();
+  Object.entries(data).forEach(([key, value]) => {
+    dataMap.set(key, isCollaborativeTextDataField(key, value) ? textToYText(value) : value);
+  });
+  return dataMap;
+}
+
 function syncDataToYMap(dataMap: Y.Map<unknown>, data: Record<string, unknown>): void {
   const activeKeys = new Set<string>();
 
@@ -137,7 +153,13 @@ export function syncNodeToYMap(ymap: Y.Map<unknown>, node: LivingNode): void {
  */
 export function nodeToYMap(node: LivingNode): Y.Map<unknown> {
   const ymap = new Y.Map<unknown>();
-  syncNodeToYMap(ymap, node);
+  Object.entries(node as unknown as Record<string, unknown>).forEach(([key, value]) => {
+    if (key === 'data') {
+      ymap.set(key, dataToYMap((value ?? {}) as Record<string, unknown>));
+      return;
+    }
+    ymap.set(key, value);
+  });
   return ymap;
 }
 
@@ -169,7 +191,9 @@ export function syncRelationToYMap(ymap: Y.Map<unknown>, relation: Relation): vo
  */
 export function relationToYMap(relation: Relation): Y.Map<unknown> {
   const ymap = new Y.Map<unknown>();
-  syncRelationToYMap(ymap, relation);
+  Object.entries(relation as unknown as Record<string, unknown>).forEach(([key, value]) => {
+    ymap.set(key, relationValueToYMap(value));
+  });
   return ymap;
 }
 

@@ -93,6 +93,8 @@ async function main(): Promise<void> {
 const { storage, attrs } = installBrowserMocks();
 const { useCanvasStore } = await import('../../apps/web/src/store/canvasStore');
 const {
+  nodeToYMap,
+  relationToYMap,
   syncNodeToYMap,
   syncRelationToYMap,
   yMapToNode,
@@ -307,6 +309,36 @@ test('Yjs helpers preserve legacy node data and relation style compatibility', (
   const updatedRelation = yMapToRelation(relationMap);
   assert.equal(updatedRelation.style.color, '#ef4444');
   assert.equal(updatedRelation.style.width, 6);
+});
+
+test('Yjs helper creation does not read detached maps', () => {
+  const node = makeNode('detached-node', {
+    data: { text: 'Detached text', title: 'Detached title', color: 'green' },
+  });
+  const relation = makeRelation('detached-relation');
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map(String).join(' '));
+  };
+
+  try {
+    const nodeMap = nodeToYMap(node);
+    const relationMap = relationToYMap(relation);
+    const doc = new Y.Doc();
+    const nodesMap = doc.getMap<any>('nodes');
+    const relationsMap = doc.getMap<any>('relations');
+
+    nodesMap.set(node.id, nodeMap);
+    relationsMap.set(relation.id, relationMap);
+
+    assert.equal(yMapToNode(nodesMap.get(node.id)!).data.text, 'Detached text');
+    assert.equal(yMapToRelation(relationsMap.get(relation.id)!).style.color, '#6366f1');
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.filter((warning) => warning.includes('Invalid access')).length, 0);
 });
 
 let passed = 0;

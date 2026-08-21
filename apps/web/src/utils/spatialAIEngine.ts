@@ -290,11 +290,27 @@ function normalizeProvider(provider?: string): AIProvider | undefined {
   return provider === 'openai' || provider === 'anthropic' || provider === 'gemini' || provider === 'groq' ? provider : undefined;
 }
 
+function getClientAIProvider(): AIProvider | undefined {
+  return normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '');
+}
+
+function getClientAIModel(): string | undefined {
+  return cleanText(localStorage.getItem('CANVIO_AI_MODEL') || '', 80) || undefined;
+}
+
 function getAIFallbackMessage(error: unknown) {
   if (error instanceof ApiRequestError && error.code === 'AI_NOT_CONFIGURED') {
     return 'Server AI is not configured yet, so Canvio used the local smart board generator.';
   }
   return 'Server AI was unavailable, so Canvio used the local smart board generator.';
+}
+
+function isExpectedAIFallback(error: unknown) {
+  return (
+    error instanceof ApiRequestError &&
+    error.status === 503 &&
+    (error.code === 'AI_NOT_CONFIGURED' || error.code === 'AI_REQUEST_FAILED')
+  );
 }
 
 function normalizeNodeType(type: unknown) {
@@ -342,8 +358,8 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 export async function expandNodeWithAIAsync(
   targetNode: LivingNode,
 ): Promise<SpatialAIResult> {
-  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
-  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+  const provider = getClientAIProvider();
+  const model = getClientAIModel();
 
   const targetData = targetNode.data as Record<string, any> | undefined;
   const nodeContent = String(targetData?.text || targetData?.content || targetData?.title || targetData?.label || 'Concept');
@@ -399,8 +415,8 @@ export async function summarizeBoardWithAIAsync(
   relations: Relation[],
   output: BoardDocumentFormat = 'summary'
 ): Promise<SpatialAIResult> {
-  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
-  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+  const provider = getClientAIProvider();
+  const model = getClientAIModel();
 
   try {
     const result = await summarizeAIBoard({
@@ -561,8 +577,8 @@ export async function organizeAndClusterWithAIAsync(
     { title: '⚡ Execution & Tasks', color: '#22c55e', stickyColor: 'green' },
     { title: '🚨 Risks & Review', color: '#f59e0b', stickyColor: 'orange' },
   ];
-  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
-  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+  const provider = getClientAIProvider();
+  const model = getClientAIModel();
 
   try {
     const result = await organizeAIClusters({
@@ -616,8 +632,8 @@ export async function analyzeGraphWithAIAsync(
   const relationsRecord = Object.fromEntries(relations.map((r) => [r.id, r]));
   const localAnalysis = analyzeGraphStructure(nodesRecord, relationsRecord);
 
-  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
-  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+  const provider = getClientAIProvider();
+  const model = getClientAIModel();
 
   try {
     const result = await analyzeAIGraph({
@@ -626,7 +642,7 @@ export async function analyzeGraphWithAIAsync(
       context: buildAIContext(nodes, relations),
     });
 
-    if (result && result.critique) {
+    if (result?.source === 'server-ai' && result.critique) {
       const serverInsights: GraphInsight[] = (result.insights || []).map((ins, idx) => ({
         id: ins.id || `ai_ins_${idx}`,
         type: ins.type || 'suggestion',
@@ -653,7 +669,9 @@ export async function analyzeGraphWithAIAsync(
       };
     }
   } catch (err) {
-    console.warn('Server AI graph analysis unavailable. Using local reasoning engine.', err);
+    if (!isExpectedAIFallback(err)) {
+      console.warn('Server AI graph analysis unavailable. Using local reasoning engine.', err);
+    }
   }
 
   // Local Reasoning Synthesis
@@ -710,8 +728,8 @@ export async function challengeBoardWithAIAsync(
   challengerRelations: Relation[];
   source: 'server' | 'local';
 }> {
-  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
-  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+  const provider = getClientAIProvider();
+  const model = getClientAIModel();
 
   try {
     const result = await challengeAIBoard({
@@ -784,8 +802,8 @@ export async function socraticInquiryWithAIAsync(
   questions: Array<{ id: string; question: string; relatedNodeIds?: string[]; learningGoal?: string }>;
   source: 'server' | 'local';
 }> {
-  const provider = normalizeProvider(localStorage.getItem('CANVIO_AI_PROVIDER') || '') || 'gemini';
-  const model = localStorage.getItem('CANVIO_AI_MODEL') || '';
+  const provider = getClientAIProvider();
+  const model = getClientAIModel();
 
   try {
     const result = await socraticInquiryAI({

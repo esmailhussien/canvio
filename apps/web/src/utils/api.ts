@@ -119,13 +119,15 @@ export interface AISuggestedRelation {
 }
 
 export interface AIGraphAnalysisResponse {
-  source: 'server-ai';
-  provider: AIProvider;
-  model: string;
+  source: 'server-ai' | 'local-fallback';
+  provider?: AIProvider;
+  model?: string;
   critique: string;
   healthScore: number;
   insights: AIGraphInsight[];
   suggestedRelations: AISuggestedRelation[];
+  error?: 'AI_NOT_CONFIGURED' | 'AI_REQUEST_FAILED';
+  details?: string;
 }
 
 export interface AIChallengeResponse {
