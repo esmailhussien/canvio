@@ -153,6 +153,19 @@ function getSchemaVersion(payload: Record<string, unknown>) {
   return CANVIO_BACKUP_SCHEMA_VERSION + 1;
 }
 
+// Ephemeral UI state (e.g. viewport-derived map marker anchors) is recomputed
+// at runtime and must not bloat backups.
+const EPHEMERAL_NODE_DATA_KEYS = new Set(['markerAnchors']);
+
+function sanitizeNodeData(data: Record<string, unknown>) {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (EPHEMERAL_NODE_DATA_KEYS.has(key)) continue;
+    cleaned[key] = value;
+  }
+  return cleaned;
+}
+
 function normalizeNodeRecord(value: unknown): Record<string, LivingNode> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const result: Record<string, LivingNode> = {};
@@ -174,7 +187,9 @@ function normalizeNodeRecord(value: unknown): Record<string, LivingNode> | null 
       rotation: Number.isFinite(node.rotation) ? Number(node.rotation) : 0,
       zIndex: Number.isFinite(node.zIndex) ? Number(node.zIndex) : 0,
       locked: typeof node.locked === 'boolean' ? node.locked : false,
-      data: node.data && typeof node.data === 'object' && !Array.isArray(node.data) ? node.data : {},
+      data: sanitizeNodeData(
+        node.data && typeof node.data === 'object' && !Array.isArray(node.data) ? node.data : {}
+      ),
       createdAt: Number.isFinite(node.createdAt) ? Number(node.createdAt) : Date.now(),
       updatedAt: Number.isFinite(node.updatedAt) ? Number(node.updatedAt) : Date.now(),
     };

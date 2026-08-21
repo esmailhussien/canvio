@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http';
-import { canOwnerAccessBoard, getOwnerIdFromHeaders, getShareTokenFromRequestHeaders, isOriginAllowed, isValidSocketAuth } from './security.js';
+import { canOwnerAccessBoard, envBool, getOwnerIdFromHeaders, getShareTokenFromRequestHeaders, isOriginAllowed, isValidSocketAuth } from './security.js';
 import { getBoard, saveBoard, upsertBoard } from './storage/boards.js';
+import { isSafeBoardId } from './storage/paths.js';
 
 export function getBoardIdFromWsRequest(req: IncomingMessage) {
   try {
@@ -13,13 +14,24 @@ export function getBoardIdFromWsRequest(req: IncomingMessage) {
 }
 
 export async function authorizeWebSocketBoard(req: IncomingMessage, boardId: string) {
-  const origin = req.headers.origin;
-  if (!isOriginAllowed(origin)) {
+  // Browsers always send an Origin header. Absent origin means a scripted
+  // client; allow it only when explicitly opted in.
+  if (!req.headers.origin && !envBool('CANVIO_ALLOW_NO_ORIGIN_WS', false)) {
+    return { ok: false as const, code: 1008, reason: 'Origin required' };
+  }
+
+  if (!isOriginAllowed(req.headers.origin)) {
     return { ok: false as const, code: 1008, reason: 'Origin not allowed' };
   }
 
   if (!isValidSocketAuth(req.headers, req.url)) {
     return { ok: false as const, code: 1008, reason: 'Authentication required' };
+  }
+
+  // Reject identifiers that only survive sanitization by mutation — those
+  // would alias another board's file on disk.
+  if (!isSafeBoardId(boardId)) {
+    return { ok: false as const, code: 1008, reason: 'Invalid board id' };
   }
 
   const ownerId = getOwnerIdFromHeaders(req.headers, req.socket.remoteAddress || 'unknown', req.url);

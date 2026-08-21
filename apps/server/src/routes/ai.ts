@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { createAuthHook, createRateLimitHook, readPositiveIntEnv } from '../security.js';
+import { createAuthHook, createGlobalRateLimitHook, createRateLimitHook, readPositiveIntEnv } from '../security.js';
 
 type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'groq';
 type RelationshipType = 'related_to' | 'leads_to' | 'based_on' | 'part_of' | 'depends_on' | 'contradicts' | 'enables' | 'explains' | 'causes' | 'example_of' | 'mitigates' | 'inspired_by' | 'same_as' | 'custom';
@@ -92,6 +92,13 @@ export async function aiRoutes(fastify: FastifyInstance) {
     namespace: 'ai',
     windowMs: readPositiveIntEnv('CANVIO_AI_RATE_WINDOW_MS', 60000, 1000, 3_600_000),
     max: readPositiveIntEnv('CANVIO_AI_RATE_LIMIT', 20, 1, 1_000),
+  }));
+  // Identity-independent ceiling so spoofing per-identity keys cannot scale
+  // abuse of the configured provider keys.
+  fastify.addHook('onRequest', createGlobalRateLimitHook({
+    namespace: 'ai-global',
+    windowMs: readPositiveIntEnv('CANVIO_AI_GLOBAL_RATE_WINDOW_MS', 60000, 1000, 3_600_000),
+    max: readPositiveIntEnv('CANVIO_AI_GLOBAL_RATE_LIMIT', 120, 1, 100_000),
   }));
   fastify.addHook('onRequest', createAuthHook({ requiredEnv: 'CANVIO_REQUIRE_AI_AUTH' }));
 
@@ -457,7 +464,8 @@ function parseRetryAfterSeconds(message: string) {
 }
 
 function sanitizeAIErrorDetails(error: unknown) {
-  return getErrorMessage(error).replace(/\s+/g, ' ').trim().slice(0, 700);
+  // Bound what upstream provider errors reveal to anonymous callers.
+  return getErrorMessage(error).replace(/\s+/g, ' ').trim().slice(0, 240);
 }
 
 function resolveProvider(provider?: string): AIProvider {
@@ -480,16 +488,17 @@ function providerStatus(provider: AIProvider) {
   };
 }
 
-function resolveModel(provider: AIProvider, model?: string) {
-  const cleaned = cleanText(model, 80);
-  if (provider === 'groq') return cleaned || process.env.CANVIO_GROQ_MODEL || DEFAULT_GROQ_MODEL;
-  if (provider === 'openai') return cleaned || process.env.CANVIO_OPENAI_MODEL || 'gpt-4o-mini';
-  if (provider === 'anthropic') return cleaned || process.env.CANVIO_ANTHROPIC_MODEL || 'claude-3-5-sonnet';
+function resolveModel(provider: AIProvider, _model?: string) {
+  // Models are pinned server-side. A caller-controlled model string would let
+  // anonymous users steer spend to premium models on the configured keys.
+  void _model;
+  if (provider === 'groq') return process.env.CANVIO_GROQ_MODEL || DEFAULT_GROQ_MODEL;
+  if (provider === 'openai') return process.env.CANVIO_OPENAI_MODEL || 'gpt-4o-mini';
+  if (provider === 'anthropic') return process.env.CANVIO_ANTHROPIC_MODEL || 'claude-3-5-sonnet';
 
   // Keep the browser on the configured Gemini model. This prevents an anonymous
   // caller from switching a free-tier deployment to a more expensive model.
-  const configuredModel = cleanText(process.env.CANVIO_GEMINI_MODEL, 80) || DEFAULT_GEMINI_MODEL;
-  return cleaned === configuredModel ? cleaned : configuredModel;
+  return cleanText(process.env.CANVIO_GEMINI_MODEL, 80) || DEFAULT_GEMINI_MODEL;
 }
 
 function resolveApiKey(provider: AIProvider) {
@@ -512,12 +521,8 @@ async function callAIWithFallback(
     candidateProviders.push(configuredFallback);
   }
 
-  // Also try any other provider with a valid key as a second safety net
-  for (const p of PROVIDERS) {
-    if (!candidateProviders.includes(p) && resolveApiKey(p)) {
-      candidateProviders.push(p);
-    }
-  }
+  // Fan-out is capped at primary + one fallback. Trying every provider with a
+  // key multiplies quota burn and worst-case latency on a single request.
 
   let lastError: Error | null = null;
   const providerErrors: string[] = [];
@@ -525,9 +530,8 @@ async function callAIWithFallback(
     const key = resolveApiKey(prov);
     if (!key) continue;
 
-    const requestedProviderModel = prov === primaryProvider ? requestedModel : undefined;
-    let mod = resolveModel(prov, requestedProviderModel);
-    const cachedGroqModel = prov === 'groq' && !requestedProviderModel ? getCachedWorkingGroqModel() : null;
+    let mod = resolveModel(prov, requestedModel);
+    const cachedGroqModel = prov === 'groq' ? getCachedWorkingGroqModel() : null;
     if (cachedGroqModel) {
       mod = cachedGroqModel;
     }

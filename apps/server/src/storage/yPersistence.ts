@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import * as Y from 'yjs';
-import { ensureDataDir, safeId } from './paths.js';
+import { ensureDataDir, safeId, writeFileAtomic } from './paths.js';
 
 type SharedDoc = Y.Doc & {
   name?: string;
@@ -24,7 +24,7 @@ async function readUpdate(docName: string) {
 
 async function writeSnapshot(docName: string, doc: Y.Doc) {
   const update = Y.encodeStateAsUpdate(doc);
-  await fs.writeFile(await documentPath(docName), update);
+  await writeFileAtomic(await documentPath(docName), update);
 }
 
 export function createFilePersistence() {

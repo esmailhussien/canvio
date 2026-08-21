@@ -204,7 +204,7 @@ async function main() {
           id: 'frame-relation-link',
           sourceId: 'frame-relation-source',
           targetId: 'frame-relation-target',
-          relationship: 'relates_to',
+          relationship: 'related_to',
           label: 'inside frame',
           style: { type: 'orthogonal', color: '#6366f1', width: 2, endArrow: 'arrow' },
         },

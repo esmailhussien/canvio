@@ -125,8 +125,6 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
   const selectedRelationId = useCanvasStore((s) => s.selectedRelationId);
   const selectRelation = useCanvasStore((s) => s.selectRelation);
   const removeRelation = useCanvasStore((s) => s.removeRelation);
-  const updateRelation = useCanvasStore((s) => s.updateRelation);
-  const snapshot = useCanvasStore((s) => s.snapshot);
   const [hoveredRelationId, setHoveredRelationId] = useState<string | null>(null);
   const [recentRelationId, setRecentRelationId] = useState<string | null>(null);
   const previousRelationIdsRef = useRef<Set<string>>(new Set(Object.keys(relations)));
@@ -375,12 +373,12 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
             onDoubleClick={(e) => {
               if (!isSelectTool || presentationMode) return;
               e.stopPropagation();
-              const nextLabel = window.prompt('Relation label', rel.label || '');
-              if (nextLabel !== null) {
-                snapshot();
-                updateRelation(rel.id, { label: nextLabel.trim() });
-                selectRelation(rel.id);
-              }
+              // Inline editing via the floating inspector instead of a
+              // blocking window.prompt (product principle: no dialogs).
+              selectRelation(rel.id);
+              window.dispatchEvent(new CustomEvent('canvio:focus-relation-label', {
+                detail: { id: rel.id },
+              }));
             }}
           >
             {/* Thick transparent hit area line for easier clicking */}

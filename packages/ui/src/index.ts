@@ -50,6 +50,7 @@ export {
   IconLeadsTo,
   IconInspiredBy,
   IconRelatedTo,
+  IconCode,
   type IconProps
 } from './icons';
 export { Tooltip } from './components/Tooltip';

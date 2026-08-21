@@ -3,6 +3,15 @@ import type { LivingNode, Relation } from '@canvio/core';
 
 const COLLABORATIVE_TEXT_DATA_KEYS = new Set(['code', 'filename', 'label', 'text', 'title']);
 
+// Viewport-derived UI state must not enter the collaborative document: it is
+// meaningless to other peers, churns the CRDT on every pan/zoom, and bloats
+// persisted snapshots. Each client recomputes these locally.
+const EPHEMERAL_DATA_KEYS = new Set(['markerAnchors']);
+
+function isEphemeralDataField(key: string): boolean {
+  return EPHEMERAL_DATA_KEYS.has(key);
+}
+
 function relationValueToYMap(value: unknown): unknown {
   return typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
 }
@@ -87,6 +96,7 @@ function textToYText(value: string): Y.Text {
 function dataToYMap(data: Record<string, unknown>): Y.Map<unknown> {
   const dataMap = new Y.Map<unknown>();
   Object.entries(data).forEach(([key, value]) => {
+    if (isEphemeralDataField(key)) return;
     dataMap.set(key, isCollaborativeTextDataField(key, value) ? textToYText(value) : value);
   });
   return dataMap;
@@ -96,6 +106,7 @@ function syncDataToYMap(dataMap: Y.Map<unknown>, data: Record<string, unknown>):
   const activeKeys = new Set<string>();
 
   Object.entries(data).forEach(([key, value]) => {
+    if (isEphemeralDataField(key)) return;
     activeKeys.add(key);
     if (isCollaborativeTextDataField(key, value)) {
       syncTextValue(dataMap, key, value);

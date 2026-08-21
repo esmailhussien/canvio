@@ -39,6 +39,9 @@ function getPointerPressure(event: PointerEvent | React.PointerEvent<HTMLDivElem
   };
 }
 
+// Shared hit radius so pointerdown and pointermove erasing behave identically.
+const ERASER_RADIUS = 22;
+
 export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = false, focusNodeId = null }: CanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -181,7 +184,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       }
 
       if (activeTool === 'eraser') {
-        eraseInkAt(worldPos, 22);
+        eraseInkAt(worldPos, ERASER_RADIUS);
         return;
       }
 
@@ -271,8 +274,10 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
         updateStrokePoints(samples, nativeEvent.pointerType === 'pen');
       }
 
-      if (activeTool === 'eraser' && (e.buttons === 1 || e.pressure > 0)) {
-        eraseInkAt(worldPos, 20);
+      // buttons === 1 only: some pens report pressure > 0 while hovering,
+      // which would erase without touching the surface.
+      if (activeTool === 'eraser' && e.buttons === 1) {
+        eraseInkAt(worldPos, ERASER_RADIUS);
       }
 
       if (isMarqueeActive) {
@@ -386,7 +391,17 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
     touchPanStartRef.current = null;
     setIsPanning(false);
     setLastMousePos(null);
-  }, [cancelDrawing, setIsPanning, setLastMousePos]);
+    // A canceled gesture must abort in-progress marquee/frame-drawing too,
+    // otherwise the ghost selection keeps following later hover moves.
+    if (isMarqueeActive) {
+      finishMarquee();
+    }
+    if (isDrawingFrame) {
+      setIsDrawingFrame(false);
+      setFrameStartPos(null);
+      setFrameCurrentPos(null);
+    }
+  }, [cancelDrawing, finishMarquee, isDrawingFrame, isMarqueeActive, setIsPanning, setFrameCurrentPos, setFrameStartPos, setIsDrawingFrame, setLastMousePos]);
 
   const handleCanvasTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (e.touches.length === 2 && isDrawing) {

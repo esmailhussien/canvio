@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, type CSSProperties } from 'react';
+import { useState, useCallback, useRef, useEffect, memo, type CSSProperties } from 'react';
 import { LivingNode } from '../../store/canvasStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { DrawingNode, StickyNote, MapNode, TextNode, ImageNode, ShapeNode, FrameNode, CodeNode } from '@canvio/objects';
@@ -13,7 +13,7 @@ interface Props {
   focusNodeId?: string | null;
 }
 
-export function NodeRenderer({ node, presentationMode = false, focusNodeId = null }: Props) {
+function NodeRendererComponent({ node, presentationMode = false, focusNodeId = null }: Props) {
   const updateNode = useCanvasStore(s => s.updateNode);
   const snapshot = useCanvasStore(s => s.snapshot);
   const isSelected = useCanvasStore(useCallback(s => s.selectedNodeIds.includes(node.id), [node.id]));
@@ -31,7 +31,8 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   const setRelationSource = useCanvasStore(s => s.setRelationSource);
   const setRelationTarget = useCanvasStore(s => s.setRelationTarget);
   const addRelation = useCanvasStore(s => s.addRelation);
-  const relations = useCanvasStore(s => s.relations);
+  // NOTE: intentionally not subscribing to the relations record here — any
+  // relation edit would re-render every mounted node. Read on demand instead.
   const selectRelation = useCanvasStore(s => s.selectRelation);
   const removeNode = useCanvasStore(s => s.removeNode);
 
@@ -87,6 +88,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     }
 
     if (relationSourceId === node.id && relationSourcePort === targetPort) return;
+    const relations = useCanvasStore.getState().relations;
     const duplicate = Object.values(relations).find((relation) => (
       relation.sourceId === relationSourceId &&
       relation.targetId === node.id &&
@@ -118,7 +120,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
       }
     });
     setRelationSourceId(null);
-  }, [addRelation, node.id, relationSourceId, relationSourcePort, relations, selectRelation, setRelationSourceId]);
+  }, [addRelation, node.id, relationSourceId, relationSourcePort, selectRelation, setRelationSourceId]);
 
   // Dragging handlers
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -744,3 +746,7 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
     </div>
   );
 }
+
+// Memoized: during pan frames the parent re-renders but node props are stable
+// references, so skipping unchanged subtrees is what keeps large boards smooth.
+export const NodeRenderer = memo(NodeRendererComponent);

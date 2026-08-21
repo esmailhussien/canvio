@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { IconCopy, IconShare, IconX } from '@canvio/ui';
 import { ApiRequestError, createBoardShareLink } from '../../utils/api';
+import { useDialogA11y } from '../../hooks/useDialogA11y';
 import './ShareButton.css';
 
 type ShareStatus = 'idle' | 'loading' | 'ready' | 'copied' | 'error';
@@ -20,6 +21,8 @@ export function ShareButton({ worldId }: { worldId: string }) {
   const [name, setName] = useState(getSavedName);
   const [isPublic, setIsPublic] = useState(false);
   const [errorText, setErrorText] = useState('Unable to create a share link.');
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogA11y(dialogRef, isOpen, () => setIsOpen(false));
 
   const openShare = async (forcePublic = isPublic) => {
     setIsOpen(true);
@@ -52,15 +55,6 @@ export function ShareButton({ worldId }: { worldId: string }) {
     setIsPublic(nextPublic);
     await openShare(nextPublic);
   };
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
 
   const qrUrl = useMemo(() => (
     shareUrl
@@ -129,6 +123,8 @@ export function ShareButton({ worldId }: { worldId: string }) {
         <div className="share-dialog__overlay" role="presentation" onClick={() => setIsOpen(false)}>
           <section
             className="share-dialog"
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="share-dialog-title"

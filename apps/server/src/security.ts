@@ -22,6 +22,8 @@ function envBool(name: string, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(value);
 }
 
+export { envBool };
+
 function hashValue(value: string) {
   return crypto.createHash('sha256').update(value).digest('hex').slice(0, 24);
 }
@@ -52,17 +54,9 @@ function getConfiguredTokens() {
   ];
 }
 
-function getClientIpFromHeaders(headers: IncomingHttpHeaders, fallback = 'unknown') {
-  const forwarded = headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim();
-  }
-  return fallback;
-}
-
 function getClientIp(request: FastifyRequest) {
-  // Fastify owns proxy handling through trustProxy. Avoid trusting a raw
-  // forwarded header here, otherwise a caller can rotate rate-limit buckets.
+  // Fastify owns proxy handling through trustProxy. Never read x-forwarded-for
+  // directly here: callers can rotate that header to escape rate limiting.
   return request.ip || 'unknown';
 }
 
@@ -90,8 +84,7 @@ export function createRateLimitHook(options: {
   max: number;
 }) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    const ownerId = getRequestOwnerId(request);
-    const key = `${options.namespace}:${ownerId || getClientIp(request)}`;
+    const key = `${options.namespace}:${getRequestRateLimitKey(request)}`;
     const now = Date.now();
 
     // Keep this process-local limiter bounded on long-lived Render instances.
@@ -124,6 +117,16 @@ export function createRateLimitHook(options: {
   };
 }
 
+// Identity-independent backstop: even if per-identity keys are spoofed, this
+// caps total abuse per process within each window.
+export function createGlobalRateLimitHook(options: {
+  namespace: string;
+  windowMs: number;
+  max: number;
+}) {
+  return createRateLimitHook(options);
+}
+
 export function readPositiveIntEnv(name: string, fallback: number, min = 1, max = 1_000_000) {
   const parsed = Number.parseInt(process.env[name] || '', 10);
   if (!Number.isFinite(parsed)) return fallback;
@@ -151,6 +154,15 @@ export function getRequestOwnerId(request: FastifyRequest) {
   return getOwnerIdFromHeaders(request.headers, request.ip || 'unknown', request.url);
 }
 
+// Rate-limit identity must never be client-chosen. A caller can rotate
+// x-canvio-client-id or x-forwarded-for freely, so the limiter only keys on a
+// configured bearer token or the proxy-resolved connection IP.
+export function getRequestRateLimitKey(request: FastifyRequest) {
+  const token = getBearerTokenFromHeaders(request.headers, request.url);
+  if (token && isConfiguredToken(token)) return `auth:${hashValue(token)}`;
+  return `ip:${getClientIp(request)}`;
+}
+
 export function getOwnerIdFromHeaders(headers: IncomingHttpHeaders, ipFallback = 'unknown', url?: string) {
   const token = getBearerTokenFromHeaders(headers, url);
   if (token && isConfiguredToken(token)) return `auth:${hashValue(token)}`;
@@ -158,7 +170,7 @@ export function getOwnerIdFromHeaders(headers: IncomingHttpHeaders, ipFallback =
   const clientId = cleanClientId(headers['x-canvio-client-id']) || cleanClientId(getQueryValue(url, 'clientId'));
   if (clientId) return `anon:${clientId}`;
 
-  return `anon:${hashValue(`${getClientIpFromHeaders(headers, ipFallback)}:${headers['user-agent'] || ''}`)}`;
+  return `anon:${hashValue(`${ipFallback}:${headers['user-agent'] || ''}`)}`;
 }
 
 export function getRequestShareToken(request: FastifyRequest) {
@@ -181,7 +193,18 @@ export function canOwnerAccessBoard(
 ) {
   if (!boardOwnerId) return true;
   if (boardOwnerId === ownerId) return true;
-  return Boolean(boardShareToken && requestShareToken && boardShareToken === requestShareToken);
+  return Boolean(
+    boardShareToken &&
+    requestShareToken &&
+    safeEqual(boardShareToken, requestShareToken)
+  );
+}
+
+function safeEqual(a: string, b: string) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 export function isAuthRequired(requiredEnv?: string) {
@@ -203,7 +226,13 @@ function isValidApiToken(headers: IncomingHttpHeaders, url?: string) {
 
 function isConfiguredToken(token: string) {
   const tokens = getConfiguredTokens();
-  return tokens.length > 0 && tokens.includes(token);
+  if (tokens.length === 0) return false;
+  const provided = Buffer.from(token);
+  return tokens.some((candidate) => {
+    const expected = Buffer.from(candidate);
+    if (expected.length !== provided.length) return false;
+    return crypto.timingSafeEqual(expected, provided);
+  });
 }
 
 function isLocalOrigin(origin: string) {

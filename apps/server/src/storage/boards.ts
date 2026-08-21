@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { ensureDataDir, safeId } from './paths.js';
+import { ensureDataDir, safeId, writeFileAtomic } from './paths.js';
 
 export interface BoardRecord {
   id: string;
@@ -31,7 +31,7 @@ async function absoluteBoardPath(id: string) {
 
 export async function saveBoard(board: BoardRecord) {
   const filePath = await absoluteBoardPath(board.id);
-  await fs.writeFile(filePath, JSON.stringify(board, null, 2), 'utf8');
+  await writeFileAtomic(filePath, JSON.stringify(board, null, 2));
   return board;
 }
 

@@ -1,11 +1,58 @@
 import type { FastifyInstance } from 'fastify';
 
+function readPositiveIntEnv(name: string, fallback: number) {
+  const parsed = Number.parseInt(process.env[name] || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+// In production we sit behind exactly one proxy hop (Render). Trusting the
+// whole chain (`true`) would let clients spoof their IP via x-forwarded-for.
+const TRUST_PROXY_HOPS = readPositiveIntEnv('CANVIO_TRUST_PROXY_HOPS', 1);
+
+// Strip query strings before logging: share/API tokens travel in URLs.
+function serializeRequestForLog(req: { method?: string; url?: string }) {
+  let pathname = req.url || '';
+  const queryIndex = pathname.indexOf('?');
+  if (queryIndex !== -1) pathname = pathname.slice(0, queryIndex);
+  return { method: req.method, url: pathname };
+}
+
 export const FASTIFY_OPTIONS = {
-  logger: true,
+  logger: {
+    redact: {
+      paths: [
+        'req.headers.authorization',
+        'req.headers["x-canvio-api-key"]',
+        'req.headers["x-canvio-share-token"]',
+        'req.headers.cookie',
+      ],
+      censor: '[REDACTED]',
+    },
+    serializers: {
+      req: serializeRequestForLog,
+    },
+  },
   bodyLimit: 256 * 1024,
   requestTimeout: 30_000,
-  trustProxy: process.env.NODE_ENV === 'production',
+  trustProxy: process.env.NODE_ENV === 'production' ? TRUST_PROXY_HOPS : false,
 };
+
+export function registerSecurityHeaders(app: FastifyInstance) {
+  app.addHook('onRequest', async (_request, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    reply.header(
+      'Content-Security-Policy',
+      "default-src 'none'; frame-ancestors 'none'; form-action 'none'"
+    );
+    if (process.env.NODE_ENV === 'production') {
+      reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+  });
+}
 
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request, reply) => {

@@ -24,7 +24,9 @@
   -webkit-backdrop-filter: blur(16px);
 }
 
-.canvio-tooltip-wrapper:hover .canvio-tooltip {
+/* Visible on hover AND keyboard focus so shortcut hints are not mouse-only. */
+.canvio-tooltip-wrapper:hover .canvio-tooltip,
+.canvio-tooltip-wrapper:focus-within .canvio-tooltip {
   opacity: 1;
 }
 
@@ -35,7 +37,8 @@
   margin-bottom: 8px;
 }
 
-.canvio-tooltip-wrapper:hover .canvio-tooltip-top {
+.canvio-tooltip-wrapper:hover .canvio-tooltip-top,
+.canvio-tooltip-wrapper:focus-within .canvio-tooltip-top {
   transform: translateX(-50%) translateY(0) scale(1);
 }
 
@@ -46,7 +49,8 @@
   margin-top: 8px;
 }
 
-.canvio-tooltip-wrapper:hover .canvio-tooltip-bottom {
+.canvio-tooltip-wrapper:hover .canvio-tooltip-bottom,
+.canvio-tooltip-wrapper:focus-within .canvio-tooltip-bottom {
   transform: translateX(-50%) translateY(0) scale(1);
 }
 
@@ -57,7 +61,8 @@
   margin-right: 8px;
 }
 
-.canvio-tooltip-wrapper:hover .canvio-tooltip-left {
+.canvio-tooltip-wrapper:hover .canvio-tooltip-left,
+.canvio-tooltip-wrapper:focus-within .canvio-tooltip-left {
   transform: translateY(-50%) translateX(0) scale(1);
 }
 
@@ -68,6 +73,7 @@
   margin-left: 8px;
 }
 
-.canvio-tooltip-wrapper:hover .canvio-tooltip-right {
+.canvio-tooltip-wrapper:hover .canvio-tooltip-right,
+.canvio-tooltip-wrapper:focus-within .canvio-tooltip-right {
   transform: translateY(-50%) translateX(0) scale(1);
 }

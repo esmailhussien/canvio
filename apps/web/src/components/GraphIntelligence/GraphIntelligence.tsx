@@ -48,12 +48,15 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
     questions: Array<{ id: string; question: string; relatedNodeIds?: string[]; learningGoal?: string }>;
   } | null>(null);
 
-  // Real-time Local Semantic Graph Analysis
+  // Real-time Local Semantic Graph Analysis.
+  // Skipped entirely while the panel is closed: otherwise this expensive
+  // traversal runs on every drag frame for boards the user isn't inspecting.
   const localAnalysis = useMemo(() => {
+    if (!isOpen) return null;
     return analyzeGraphStructure(nodes, relations);
-  }, [nodes, relations]);
+  }, [isOpen, nodes, relations]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !localAnalysis) return null;
 
   const handleFocus = (nodeIds: string[]) => {
     const uniqueNodeIds = Array.from(new Set(nodeIds));

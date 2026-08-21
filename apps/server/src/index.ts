@@ -4,13 +4,14 @@ import dotenv from 'dotenv';
 import { boardRoutes } from './routes/boards.js';
 import { aiRoutes } from './routes/ai.js';
 import { createCorsOriginGuard } from './security.js';
-import { FASTIFY_OPTIONS, registerErrorHandler } from './http.js';
+import { FASTIFY_OPTIONS, registerErrorHandler, registerSecurityHeaders } from './http.js';
 import { getReadiness } from './health.js';
 
 dotenv.config();
 
 const app = Fastify(FASTIFY_OPTIONS);
 registerErrorHandler(app);
+registerSecurityHeaders(app);
 
 app.register(cors, {
   origin: createCorsOriginGuard(),

@@ -73,6 +73,10 @@ export interface FreeInkStroke {
   width: number;
   opacity?: number;
   highlighter?: boolean;
+  // True when the input device reported real pressure. When set, renderers
+  // must honor the stored per-point pressure instead of simulating it from
+  // stroke velocity, so the committed stroke matches the live preview.
+  pressureSensitive?: boolean;
   createdAt: number;
 }
 

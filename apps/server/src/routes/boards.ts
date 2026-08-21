@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { nanoid } from 'nanoid';
 import { getBoard, listBoards, saveBoard, upsertBoard } from '../storage/boards.js';
+import { isSafeBoardId } from '../storage/paths.js';
 import { canAccessBoard, createRateLimitHook, getRequestOwnerId, isRequestAuthorized, readPositiveIntEnv } from '../security.js';
 
 export async function boardRoutes(fastify: FastifyInstance) {
@@ -9,6 +10,13 @@ export async function boardRoutes(fastify: FastifyInstance) {
     windowMs: readPositiveIntEnv('CANVIO_BOARD_RATE_WINDOW_MS', 60000, 1000, 3_600_000),
     max: readPositiveIntEnv('CANVIO_BOARD_RATE_LIMIT', 120, 1, 10_000),
   }));
+
+  const rejectUnsafeId = (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!isSafeBoardId(request.params.id)) {
+      return reply.code(400).send({ error: 'INVALID_BOARD_ID' });
+    }
+    return undefined;
+  };
 
   fastify.get('/', async (request) => {
     if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
@@ -46,10 +54,19 @@ export async function boardRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
     }
 
+    const invalidId = rejectUnsafeId(request, reply);
+    if (invalidId) return invalidId;
+
     const { id } = request.params;
     const sourceBoard = await getBoard(id);
     if (!sourceBoard) {
       return reply.code(404).send({ error: 'SOURCE_BOARD_NOT_FOUND' });
+    }
+
+    // Forking is a read of the source board: private boards require ownership
+    // or a valid share token, otherwise anyone could exfiltrate metadata.
+    if (!sourceBoard.isPublic && !canAccessBoard(sourceBoard.ownerId, request, sourceBoard.shareToken)) {
+      return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
     }
 
     // Increment source fork count
@@ -80,6 +97,9 @@ export async function boardRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
     }
 
+    const invalidId = rejectUnsafeId(request, reply);
+    if (invalidId) return invalidId;
+
     const { id } = request.params;
     const existing = await getBoard(id);
     const board = existing || await upsertBoard(id, `Board ${id}`, getRequestOwnerId(request));
@@ -109,6 +129,9 @@ export async function boardRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
     }
 
+    const invalidId = rejectUnsafeId(request, reply);
+    if (invalidId) return invalidId;
+
     const { id } = request.params;
     const existing = await getBoard(id);
     if (existing) {
@@ -128,6 +151,9 @@ export async function boardRoutes(fastify: FastifyInstance) {
     if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH', allowShareToken: true })) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
     }
+
+    const invalidId = rejectUnsafeId(request, reply);
+    if (invalidId) return invalidId;
 
     const { id } = request.params;
     const existing = await getBoard(id);

@@ -219,6 +219,16 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* Every marker stays reachable; the panel scrolls instead of hiding older pins. */
+.map-node__marker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .map-node__marker-row {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) minmax(68px, auto) 28px 28px;

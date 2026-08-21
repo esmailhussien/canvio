@@ -86,14 +86,20 @@ interface MapNodeProps {
   onRequestRelationMode?: () => void;
 }
 
+// Licensed, free tile sources. Google's mt*.google.com endpoints are
+// undocumented and against Google's ToS — do not use them.
+const ESRI_IMAGERY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const ESRI_REFERENCE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
+const ESRI_ATTRIBUTION = 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
+
 const TILE_LAYERS: Record<TileLayerType, { url: string; attribution: string }> = {
   satellite: {
-    url: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    attribution: '&copy; Google Maps'
+    url: ESRI_IMAGERY_URL,
+    attribution: ESRI_ATTRIBUTION
   },
   hybrid: {
-    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    attribution: '&copy; Google Maps'
+    url: ESRI_IMAGERY_URL,
+    attribution: ESRI_ATTRIBUTION
   }
 };
 
@@ -409,28 +415,35 @@ export const MapNode: React.FC<MapNodeProps> = ({
         onWheel={stopMapGesture}
         onDoubleClick={stopMapGesture}
       >
-        <MapContainer
-          key={mapKey}
-          center={data.center || WORLD_MAP_CENTER}
-          zoom={data.zoom || 4}
-          style={{ width: '100%', height: '100%' }}
-          zoomControl={true}
-          dragging={true}
-          touchZoom={true}
-          scrollWheelZoom={true}
-          attributionControl={false}
-        >
-          <TileLayer
-            url={TILE_LAYERS[layer].url}
-            attribution={TILE_LAYERS[layer].attribution}
-          />
-          <MapResizer width={node.size.width} height={node.size.height} />
-          <MapController center={data.center} zoom={data.zoom} markers={data.markers} onChangeCenterZoom={handleCenterZoomChange} />
-          <MarkerAnchorTracker markers={data.markers} onAnchorsChange={updateMarkerAnchors} />
-          <MapClickEvents enabled={true} onAddMarker={addMarker} />
+          <MapContainer
+            key={mapKey}
+            center={data.center || WORLD_MAP_CENTER}
+            zoom={data.zoom || 4}
+            style={{ width: '100%', height: '100%' }}
+            zoomControl={true}
+            dragging={true}
+            touchZoom={true}
+            scrollWheelZoom={true}
+          >
+            <TileLayer
+              url={TILE_LAYERS[layer].url}
+              attribution={TILE_LAYERS[layer].attribution}
+              maxZoom={19}
+            />
+            {layer === 'hybrid' && (
+              <TileLayer
+                url={ESRI_REFERENCE_URL}
+                attribution=""
+                maxZoom={19}
+              />
+            )}
+            <MapResizer width={node.size.width} height={node.size.height} />
+            <MapController center={data.center} zoom={data.zoom} markers={data.markers} onChangeCenterZoom={handleCenterZoomChange} />
+            <MarkerAnchorTracker markers={data.markers} onAnchorsChange={updateMarkerAnchors} />
+            <MapClickEvents enabled={true} onAddMarker={addMarker} />
 
-          {data.markers?.map(marker => (
-            <Marker
+            {data.markers?.map(marker => (
+              <Marker
               key={marker.id}
               position={marker.position}
               draggable={!relationMode}
@@ -460,8 +473,8 @@ export const MapNode: React.FC<MapNodeProps> = ({
                 <Popup>{marker.label}</Popup>
               )}
             </Marker>
-          ))}
-        </MapContainer>
+            ))}
+          </MapContainer>
       </div>
 
       {data.markers.length === 0 && (
@@ -479,38 +492,46 @@ export const MapNode: React.FC<MapNodeProps> = ({
       )}
 
       {data.markers.length > 0 && (
-        <div className="map-node__marker-panel" onMouseDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-          {data.markers.slice(-4).map((marker, index) => (
-            <div
-              className={`map-node__marker-row ${relationSourcePort === `marker:${marker.id}` ? 'active-anchor' : ''}`}
-              key={marker.id}
-              onMouseEnter={() => relationMode && onMarkerRelationHover?.(marker.id)}
-              onMouseLeave={() => relationMode && onMarkerRelationHover?.(null)}
-            >
-              <span className="map-node__marker-dot">{index + 1}</span>
-              <div className="map-node__marker-main">
-                <input
-                  value={marker.label || ''}
-                  onChange={(e) => renameMarker(marker.id, e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                  title="Marker label"
-                />
-                <span className="map-node__marker-position">
-                  {marker.position[0].toFixed(4)}, {marker.position[1].toFixed(4)}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="map-node__marker-connect"
-                onClick={() => handleStartPinRelation(marker.id)}
-                title={relationMode ? 'Use marker as relation anchor' : 'Start a relation from this pin'}
+        <div
+          className="map-node__marker-panel"
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Scrollable so every marker stays reachable, not just the newest few. */}
+          <div className="map-node__marker-list">
+            {data.markers.map((marker, index) => (
+              <div
+                className={`map-node__marker-row ${relationSourcePort === `marker:${marker.id}` ? 'active-anchor' : ''}`}
+                key={marker.id}
+                onMouseEnter={() => relationMode && onMarkerRelationHover?.(marker.id)}
+                onMouseLeave={() => relationMode && onMarkerRelationHover?.(null)}
               >
-                {relationSourcePort === `marker:${marker.id}` ? 'Start' : relationMode ? 'Use pin' : 'Connect'}
-              </button>
-              <button type="button" onClick={() => centerOnMarker(marker)} title="Center map on marker">⌖</button>
-              <button type="button" onClick={() => removeMarker(marker.id)} title="Remove marker">×</button>
-            </div>
-          ))}
+                <span className="map-node__marker-dot">{index + 1}</span>
+                <div className="map-node__marker-main">
+                  <input
+                    value={marker.label || ''}
+                    onChange={(e) => renameMarker(marker.id, e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    title="Marker label"
+                  />
+                  <span className="map-node__marker-position">
+                    {marker.position[0].toFixed(4)}, {marker.position[1].toFixed(4)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="map-node__marker-connect"
+                  onClick={() => handleStartPinRelation(marker.id)}
+                  title={relationMode ? 'Use marker as relation anchor' : 'Start a relation from this pin'}
+                >
+                  {relationSourcePort === `marker:${marker.id}` ? 'Start' : relationMode ? 'Use pin' : 'Connect'}
+                </button>
+                <button type="button" onClick={() => centerOnMarker(marker)} title="Center map on marker">⌖</button>
+                <button type="button" onClick={() => removeMarker(marker.id)} title="Remove marker">×</button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

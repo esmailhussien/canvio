@@ -446,6 +446,24 @@ export function WorldPage() {
   };
 
   useEffect(() => {
+    if (!worldId) return;
+    // Ensure a server-side board record exists for this world and unlock the
+    // appearance autosave effect below once the initial load settles.
+    let cancelled = false;
+    touchBoard(worldId)
+      .then(() => {
+        if (!cancelled) boardAppearanceLoadedRef.current = true;
+      })
+      .catch(() => {
+        // Offline or server unreachable: keep autosave disabled so theme
+        // changes remain local-only instead of erroring in the background.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [worldId]);
+
+  useEffect(() => {
     if (!worldId || !boardAppearanceLoadedRef.current) return;
     if (saveAppearanceTimerRef.current !== null) {
       window.clearTimeout(saveAppearanceTimerRef.current);

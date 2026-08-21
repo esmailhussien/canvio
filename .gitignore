@@ -9,3 +9,6 @@ Thumbs.db
 coverage/
 .vite/
 data/
+*.patch
+%SystemDrive%*/
+*.tsbuildinfo

@@ -17,6 +17,76 @@ interface ImageNodeProps {
   onChange?: (id: string, updates: Partial<LivingNode>) => void;
 }
 
+// Images are stored as data URLs inside the collaborative document, so an
+// oversized upload would bloat Yjs updates, backups, and every peer's memory.
+// Large inputs are downscaled to fit within this budget before storing.
+const MAX_IMAGE_DIMENSION = 2048;
+const MAX_STORED_BYTES = 3 * 1024 * 1024;
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function normalizeImageFile(file: File): Promise<string> {
+  const original = await readAsDataUrl(file);
+
+  // Small enough already — keep the original bytes untouched.
+  if (file.size <= MAX_STORED_BYTES) {
+    try {
+      const img = await loadImage(original);
+      if (img.naturalWidth <= MAX_IMAGE_DIMENSION && img.naturalHeight <= MAX_IMAGE_DIMENSION) {
+        return original;
+      }
+      return await downscaleImage(img);
+    } catch {
+      return original;
+    }
+  }
+
+  try {
+    const img = await loadImage(original);
+    return await downscaleImage(img);
+  } catch {
+    throw new Error('Image could not be processed. Try a smaller file.');
+  }
+}
+
+async function downscaleImage(img: HTMLImageElement): Promise<string> {
+  const scale = Math.min(
+    MAX_IMAGE_DIMENSION / Math.max(1, img.naturalWidth),
+    MAX_IMAGE_DIMENSION / Math.max(1, img.naturalHeight),
+    1
+  );
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas unavailable');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  let quality = 0.85;
+  let output = canvas.toDataURL('image/jpeg', quality);
+  while (output.length * 0.75 > MAX_STORED_BYTES && quality > 0.4) {
+    quality -= 0.15;
+    output = canvas.toDataURL('image/jpeg', quality);
+  }
+  return output;
+}
+
 export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }) => {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const rawData = node.data as Partial<ImageData>;
@@ -41,27 +111,29 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
   };
 
   React.useEffect(() => {
-    if (!src && Date.now() - node.createdAt < 1000 && inputRef.current) {
+    // Auto-open the picker right after a fresh node is created locally.
+    // The focus guard prevents a remotely-created node syncing in quickly
+    // from hijacking the file dialog on this client.
+    if (!src && Date.now() - node.createdAt < 1000 && inputRef.current && document.hasFocus()) {
       inputRef.current.click();
     }
   }, [src, node.createdAt]);
 
   const applyFile = (file?: File | null) => {
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (onChange) {
-          onChange(node.id, {
-            data: {
-              ...data,
-              src: reader.result as string,
-              alt: file.name || data.alt,
-            }
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file || !file.type.startsWith('image/')) return;
+    normalizeImageFile(file)
+      .then((normalizedSrc) => {
+        onChange?.(node.id, {
+          data: {
+            ...data,
+            src: normalizedSrc,
+            alt: file.name || data.alt,
+          }
+        });
+      })
+      .catch((err: Error) => {
+        window.alert(err.message || 'Image could not be added.');
+      });
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -106,6 +178,12 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ node, selected, onChange }
       }}
       onDoubleClick={(e) => {
         triggerFileInput(e);
+      }}
+      onKeyDown={(e) => {
+        if (!src && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          triggerFileInput();
+        }
       }}
       tabIndex={0}
     >

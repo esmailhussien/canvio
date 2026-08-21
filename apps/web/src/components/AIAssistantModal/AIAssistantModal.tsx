@@ -10,6 +10,7 @@ import {
 import { nanoid } from 'nanoid';
 import { useCanvasStore, type LivingNode } from '../../store/canvasStore';
 import { fitTemplateToViewport, fitViewportToNodes } from '../../utils/viewportFit';
+import { useDialogA11y } from '../../hooks/useDialogA11y';
 import './AIAssistantModal.css';
 
 interface AIAssistantModalProps {
@@ -94,17 +95,9 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       : 'AI can read the visible elements now. Add labeled relations to make answers more precise.'
     : 'Start with a prompt, or add notes and relations so AI can work from your board.';
 
-  // Close on Escape key press
-  React.useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  // Escape-to-close, focus trap, and focus restore via the shared dialog hook.
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  useDialogA11y(dialogRef, isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -448,7 +441,15 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   return (
     <div className="ai-modal__overlay" onClick={onClose}>
-      <div className="ai-modal__content" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="ai-modal__content"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Canvio AI"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="ai-modal__topbar">
           <div className="ai-modal__title-wrap">
             <span className="ai-modal__sparkle" title="Canvio AI"><span className="material-symbols-outlined">auto_awesome</span></span>

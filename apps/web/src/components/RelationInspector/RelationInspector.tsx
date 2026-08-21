@@ -61,9 +61,23 @@ export function RelationInspector() {
   const removeRelation = useCanvasStore((s) => s.removeRelation);
   const selectRelation = useCanvasStore((s) => s.selectRelation);
   const relationSnapshotTakenRef = useRef<string | null>(null);
+  const labelInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     relationSnapshotTakenRef.current = null;
+  }, [selectedRelationId]);
+
+  // Double-clicking a relation on the canvas selects it and asks the
+  // inspector to focus its label field for inline editing.
+  useEffect(() => {
+    const handleFocusLabel = (event: Event) => {
+      const detail = (event as CustomEvent<{ id?: string }>).detail;
+      if (detail?.id && detail.id === selectedRelationId) {
+        window.setTimeout(() => labelInputRef.current?.select(), 0);
+      }
+    };
+    window.addEventListener('canvio:focus-relation-label', handleFocusLabel);
+    return () => window.removeEventListener('canvio:focus-relation-label', handleFocusLabel);
   }, [selectedRelationId]);
 
   // Keyboard shortcut listener (1-8 to pick relationship type instantly)
@@ -224,6 +238,7 @@ export function RelationInspector() {
         <label className="relation-inspector__label">Assertion / Label</label>
         <input
           type="text"
+          ref={labelInputRef}
           className="relation-inspector__input"
           placeholder="e.g. blocks rollout, requires review"
           value={relation.label || ''}

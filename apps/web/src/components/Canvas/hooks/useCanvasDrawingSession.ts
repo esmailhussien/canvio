@@ -145,6 +145,7 @@ export function useCanvasDrawingSession({
           width: Math.max(14, strokeWidth * 3.5),
           opacity: 0.34,
           highlighter: true,
+          pressureSensitive: pressureSensitiveRef.current,
           createdAt: Date.now(),
         });
       }
@@ -212,6 +213,7 @@ export function useCanvasDrawingSession({
         width: strokeWidth || 3,
         opacity: 1,
         highlighter: false,
+        pressureSensitive: pressureSensitiveRef.current,
         createdAt: Date.now(),
       });
     }

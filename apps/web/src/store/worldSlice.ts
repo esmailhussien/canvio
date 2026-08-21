@@ -1,6 +1,5 @@
 import type { StateCreator } from 'zustand';
 import { getSystemTheme, persistCanvasBackground } from './appearanceSlice';
-import { recordUndoSnapshot } from './historySlice';
 import type { CanvasStore } from './canvasStoreTypes';
 
 type WorldSlice = Pick<CanvasStore, 'replaceWorld'>;
@@ -23,8 +22,16 @@ export function createWorldSlice(set: StoreSet): WorldSlice {
       applyDocumentTheme(theme);
       persistCanvasBackground(canvasBackground);
 
+      // A world replacement is a board switch, not an editable step: carrying
+      // the previous board's content into this board's undo stack would let
+      // Ctrl+Z resurrect foreign nodes here (offline mode never attaches a
+      // collaboration adapter to wipe history).
+      const historyReset = state.historyAdapter
+        ? { past: state.past, future: [] as typeof state.future, canUndo: state.historyAdapter.canUndo(), canRedo: false }
+        : { past: [] as typeof state.past, future: [] as typeof state.future, canUndo: false, canRedo: false };
+
       return {
-        ...recordUndoSnapshot(state),
+        ...historyReset,
         nodes,
         relations,
         inkStrokes: inkStrokes || [],

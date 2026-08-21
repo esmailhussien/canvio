@@ -251,7 +251,7 @@ const PAGES = [
               <span style="color: #22c55e; font-weight: 700; font-size: 14px;">STEP 02</span>
               <h2 style="font-size: 24px; margin: 8px 0 12px;">Build with Living Canvas Objects</h2>
               <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">
-                Every item is an interactive object. Write notes, draw with pressure-sensitive stylus ink, create geometric shapes, group sections with frames, drop syntax-highlighted code blocks, and embed interactive Leaflet satellite maps.
+                Every item is an interactive object. Write notes, draw with pressure-sensitive stylus ink, create geometric shapes, group sections with frames, add code blocks, and embed interactive Leaflet satellite maps.
               </p>
             </article>
 

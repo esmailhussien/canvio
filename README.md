@@ -20,8 +20,8 @@ Canvio is an infinite canvas built for structured visual work. Every element is 
 
 ### Semantic Relations
 - **Quick-Connect drag** — drag from any node edge port to connect to an existing note, or drop on empty canvas to auto-spawn a connected sticky
-- **8 relationship types** — Contradicts, Depends on, Enables, Based on, Part of, Leads to, Inspired by, Related to
-- **Keyboard hotkeys** — press `1`–`8` while a relation is selected to assign its type instantly
+- **10 relationship types** — Related to, Leads to, Based on, Part of, Depends on, Contradicts, Enables, Explains, Causes, Inspired by (plus `same_as`, `example_of`, `mitigates`, `custom` in the data model)
+- **Keyboard hotkeys** — press `1`–`9`/`0` while a relation is selected to assign its type instantly
 - **Custom vector icons** — each type has a distinct color, dash pattern, animation, and SVG icon rendered directly on the canvas
 
 ### Graph Intelligence
@@ -65,20 +65,26 @@ docker compose up
 
 ### Server-side AI Configuration
 
-Canvio uses Gemini 2.5 Flash through the API server. The provider key stays on
-the server only — never add it to the web app, a `VITE_*` variable, localStorage,
-the URL, or a committed file. Copy `apps/server/.env.example` as a reference
-and configure these as server environment variables:
+Canvio uses **Groq** (`openai/gpt-oss-20b` by default, with automatic model
+discovery and fallback) through the API server, with Gemini/OpenAI/Anthropic
+as optional fallback providers. Models are pinned server-side — clients cannot
+select models. The provider key stays on the server only — never add it to the
+web app, a `VITE_*` variable, localStorage, the URL, or a committed file.
+Copy `apps/server/.env.example` as a reference and configure these as server
+environment variables:
 
 ```text
-CANVIO_AI_PROVIDER=gemini
-CANVIO_GEMINI_MODEL=gemini-2.5-flash
-CANVIO_GEMINI_API_KEY=<rotated-secret>
+CANVIO_AI_PROVIDER=groq
+CANVIO_GROQ_MODEL=openai/gpt-oss-20b
+CANVIO_GROQ_API_KEY=<rotated-secret>
 CANVIO_ALLOWED_ORIGINS=https://canvio.space,https://www.canvio.space
 CANVIO_ALLOW_LOCAL_ORIGINS=false
 CANVIO_AI_RATE_LIMIT=10
 CANVIO_AI_RATE_WINDOW_MS=60000
 ```
+
+For Gemini instead, set `CANVIO_AI_PROVIDER=gemini`, `CANVIO_GEMINI_MODEL`,
+and `CANVIO_GEMINI_API_KEY`.
 
 For a public deployment, add real user/session authentication before enabling
 `CANVIO_REQUIRE_AI_AUTH=true`. Origin checks and rate limits reduce abuse but do
@@ -116,7 +122,7 @@ canvio/
 
 ### Tech Stack
 
-React 19 · TypeScript · Vite · Zustand · Yjs · Leaflet · perfect-freehand · Fastify · PostgreSQL
+React 19 · TypeScript · Vite · Zustand · Yjs · Leaflet · perfect-freehand · Fastify · filesystem JSON persistence
 
 ---
 
@@ -128,7 +134,7 @@ React 19 · TypeScript · Vite · Zustand · Yjs · Leaflet · perfect-freehand 
 | `P` | Freehand pen |
 | `E` | Stroke eraser |
 | `Q` | Laser pointer |
-| `1` – `8` | Assign semantic relation type |
+| `1` – `9`, `0` | Assign semantic relation type |
 | `Ctrl + K` | AI Navigator |
 | `Ctrl + Shift + R` | Reasoning Partner |
 | `Space + drag` | Pan canvas |

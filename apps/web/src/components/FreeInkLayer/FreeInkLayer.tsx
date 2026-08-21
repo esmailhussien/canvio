@@ -1,11 +1,39 @@
 import React, { useMemo } from 'react';
 import { getStroke } from 'perfect-freehand';
+import type { FreeInkStroke } from '@canvio/core';
 import { useCanvasStore } from '../../store/canvasStore';
 import { getSvgPathFromStroke } from '../DrawingLayer/DrawingLayer';
 import './FreeInkLayer.css';
 
 interface FreeInkLayerProps {
   presentationMode?: boolean;
+}
+
+// Stroke objects are immutable once committed, so outlines can be cached per
+// object reference. Without this, adding stroke N recomputes the geometry of
+// all N-1 previous strokes (and again on every undo/redo/remote sync).
+const outlineCache = new WeakMap<object, { pathData: string }>();
+
+function getStrokePath(stroke: FreeInkStroke): string {
+  const cached = outlineCache.get(stroke);
+  if (cached) return cached.pathData;
+
+  const isHighlighter = Boolean(stroke.highlighter);
+  const strokeWidth = stroke.width || (isHighlighter ? 18 : 3);
+  // Honor real device pressure when we recorded it; simulate only for mouse
+  // input so the committed stroke matches what the user saw while drawing.
+  const outline = getStroke(stroke.points as [number, number, number][], {
+    size: strokeWidth,
+    thinning: isHighlighter ? 0 : 0.45,
+    smoothing: 0.65,
+    streamline: 0.55,
+    simulatePressure: !stroke.pressureSensitive,
+    last: true,
+  });
+
+  const entry = { pathData: getSvgPathFromStroke(outline) };
+  outlineCache.set(stroke, entry);
+  return entry.pathData;
 }
 
 export const FreeInkLayer: React.FC<FreeInkLayerProps> = ({ presentationMode = false }) => {
@@ -19,19 +47,9 @@ export const FreeInkLayer: React.FC<FreeInkLayerProps> = ({ presentationMode = f
     return inkStrokes.map((stroke) => {
       const isHighlighter = Boolean(stroke.highlighter);
       const strokeWidth = stroke.width || (isHighlighter ? 18 : 3);
-      const outline = getStroke(stroke.points, {
-        size: strokeWidth,
-        thinning: isHighlighter ? 0 : 0.45,
-        smoothing: 0.65,
-        streamline: 0.55,
-        simulatePressure: true,
-        last: true,
-      });
-
-      const pathData = getSvgPathFromStroke(outline);
       return {
         id: stroke.id,
-        pathData,
+        pathData: getStrokePath(stroke),
         color: stroke.color || '#f0f0f5',
         opacity: stroke.opacity !== undefined ? stroke.opacity : (isHighlighter ? 0.35 : 1),
         isHighlighter,

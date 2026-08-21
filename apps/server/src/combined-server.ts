@@ -12,9 +12,9 @@ import dotenv from 'dotenv';
 import { boardRoutes } from './routes/boards.js';
 import { aiRoutes } from './routes/ai.js';
 import { createFilePersistence } from './storage/yPersistence.js';
-import { createCorsOriginGuard } from './security.js';
+import { createCorsOriginGuard, readPositiveIntEnv } from './security.js';
 import { authorizeWebSocketBoard, getBoardIdFromWsRequest } from './wsAccess.js';
-import { FASTIFY_OPTIONS, registerErrorHandler } from './http.js';
+import { FASTIFY_OPTIONS, registerErrorHandler, registerSecurityHeaders } from './http.js';
 import { getReadiness } from './health.js';
 
 dotenv.config();
@@ -26,6 +26,7 @@ const PORT = parseInt(process.env.PORT || '4001', 10);
 
 const app = Fastify(FASTIFY_OPTIONS);
 registerErrorHandler(app);
+registerSecurityHeaders(app);
 
 app.register(cors, {
   origin: createCorsOriginGuard(),
@@ -57,9 +58,30 @@ app.get('/health/ready', async (_request, reply) => {
 app.register(boardRoutes, { prefix: '/api/boards' });
 app.register(aiRoutes, { prefix: '/api/ai' });
 
-const wss = new WebSocketServer({ server: app.server });
+// WebSocket hardening: bound message size and connection counts so a single
+// client cannot exhaust memory on a small instance.
+const WS_MAX_PAYLOAD = readPositiveIntEnv('CANVIO_WS_MAX_PAYLOAD_KB', 2048, 64, 16_384) * 1024;
+const WS_MAX_CONNECTIONS = readPositiveIntEnv('CANVIO_WS_MAX_CONNECTIONS', 200, 10, 10_000);
+const WS_MAX_PER_IP = readPositiveIntEnv('CANVIO_WS_MAX_PER_IP', 20, 1, 1_000);
+
+const wss = new WebSocketServer({ server: app.server, maxPayload: WS_MAX_PAYLOAD });
+
+let activeConnections = 0;
+const connectionsPerIp = new Map<string, number>();
 
 wss.on('connection', async (conn, req) => {
+  if (activeConnections >= WS_MAX_CONNECTIONS) {
+    conn.close(1013, 'Server at connection capacity');
+    return;
+  }
+
+  const peerIp = req.socket.remoteAddress || 'unknown';
+  const currentForIp = connectionsPerIp.get(peerIp) || 0;
+  if (currentForIp >= WS_MAX_PER_IP) {
+    conn.close(1013, 'Too many connections from this address');
+    return;
+  }
+
   const boardId = getBoardIdFromWsRequest(req);
 
   try {
@@ -68,6 +90,20 @@ wss.on('connection', async (conn, req) => {
       conn.close(access.code, access.reason);
       return;
     }
+
+    activeConnections += 1;
+    connectionsPerIp.set(peerIp, currentForIp + 1);
+    let released = false;
+    const releaseConnection = () => {
+      if (released) return;
+      released = true;
+      activeConnections -= 1;
+      const remaining = (connectionsPerIp.get(peerIp) || 1) - 1;
+      if (remaining <= 0) connectionsPerIp.delete(peerIp);
+      else connectionsPerIp.set(peerIp, remaining);
+    };
+    conn.on('close', releaseConnection);
+    conn.on('error', releaseConnection);
 
     console.log(`[WS] Client connected → board: ${boardId}`);
     setupWSConnection(conn, req, { docName: boardId });

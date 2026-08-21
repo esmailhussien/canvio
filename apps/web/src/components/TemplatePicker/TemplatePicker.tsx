@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { TEMPLATES, applyTemplate } from '../../utils/templates';
 import { tidyGrid, tidyFlow } from '../../utils/autoLayout';
+import { useDialogA11y } from '../../hooks/useDialogA11y';
 import { CanvioLogoIcon } from '../CanvioLogo/CanvioLogo';
 import { IconX } from '@canvio/ui';
 import './TemplatePicker.css';
@@ -24,6 +25,8 @@ const CATEGORIES = [
 export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose, onStartBlank }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(dialogRef, isOpen, onClose);
 
   const filteredTemplates = useMemo(() => {
     return TEMPLATES.filter((t) => {
@@ -67,7 +70,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
 
   return (
     <div className="template-modal__overlay" role="dialog" aria-modal="true" aria-label="Template library" onClick={onClose}>
-      <div className="template-modal__dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="template-modal__dialog" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         {/* Sidebar Navigation */}
         <aside className="template-sidebar">
           <div className="template-sidebar__brand">
