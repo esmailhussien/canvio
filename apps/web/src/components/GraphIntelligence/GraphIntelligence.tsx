@@ -206,6 +206,8 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         </div>
       </div>
 
+      {activeTab === 'overview' && (
+        <>
       {/* Health Score Gauge */}
       <div className="gi-health-card">
         <div className="gi-health-top">
@@ -312,11 +314,15 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* Tabs */}
-      <div className="gi-tabs">
+      <div className="gi-tabs" role="tablist" aria-label="Reasoning partner modes">
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'overview'}
           className={`gi-tab ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
@@ -325,6 +331,8 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'challenge'}
           className={`gi-tab ${activeTab === 'challenge' ? 'active' : ''}`}
           onClick={() => setActiveTab('challenge')}
         >
@@ -333,6 +341,8 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'socratic'}
           className={`gi-tab ${activeTab === 'socratic' ? 'active' : ''}`}
           onClick={() => setActiveTab('socratic')}
         >

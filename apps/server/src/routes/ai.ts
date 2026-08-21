@@ -65,7 +65,7 @@ const PROVIDERS: AIProvider[] = ['gemini', 'openai', 'anthropic', 'groq'];
 const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'enables', 'explains', 'causes', 'example_of', 'mitigates', 'inspired_by'];
 const NODE_TYPES = ['sticky', 'shape', 'text', 'frame'];
 const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
 
 export async function aiRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', createRateLimitHook({
@@ -382,6 +382,7 @@ async function callAIWithFallback(
   }
 
   let lastError: Error | null = null;
+  const providerErrors: string[] = [];
   for (const prov of candidateProviders) {
     const key = resolveApiKey(prov);
     if (!key) continue;
@@ -393,10 +394,36 @@ async function callAIWithFallback(
     } catch (err: any) {
       console.warn(`[Canvio AI Fallback Agent] Provider "${prov}" failed:`, err?.message || err);
       lastError = err instanceof Error ? err : new Error(String(err));
+      providerErrors.push(formatProviderFailure(prov, mod, lastError));
+
+      if (prov === 'groq' && mod !== DEFAULT_GROQ_MODEL && isModelUnavailableError(lastError)) {
+        try {
+          console.warn(`[Canvio AI Fallback Agent] Retrying Groq with default model "${DEFAULT_GROQ_MODEL}".`);
+          const parsed = await callProviderForJson(prov, key, DEFAULT_GROQ_MODEL, systemPrompt, userPrompt);
+          return { parsed, provider: prov, model: DEFAULT_GROQ_MODEL };
+        } catch (fallbackErr: any) {
+          console.warn(`[Canvio AI Fallback Agent] Groq default model "${DEFAULT_GROQ_MODEL}" failed:`, fallbackErr?.message || fallbackErr);
+          lastError = fallbackErr instanceof Error ? fallbackErr : new Error(String(fallbackErr));
+          providerErrors.push(formatProviderFailure(prov, DEFAULT_GROQ_MODEL, lastError));
+        }
+      }
     }
   }
 
+  if (providerErrors.length > 0) {
+    throw new Error(`AI_REQUEST_FAILED: ${providerErrors.join(' | ')}`);
+  }
+
   throw lastError || new Error('AI_NOT_CONFIGURED');
+}
+
+function isModelUnavailableError(error: Error) {
+  return /model_not_found|does not exist|do not have access/i.test(error.message);
+}
+
+function formatProviderFailure(provider: AIProvider, model: string, error: Error) {
+  const message = error.message.replace(/\s+/g, ' ').trim().slice(0, 700);
+  return `${provider}:${model}: ${message}`;
 }
 
 function buildBoardSystemPrompt() {
@@ -490,9 +517,8 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
   let text = '';
 
   if (provider === 'openai' || provider === 'groq') {
-    const endpoint = provider === 'groq'
-      ? 'https://api.groq.com/openai/v1/chat/completions'
-      : 'https://api.openai.com/v1/chat/completions';
+    const endpoint = getOpenAICompatibleEndpoint(provider);
+    const jsonSystemPrompt = `${stripJsonLineComments(systemPrompt)}\n\nReturn one valid JSON object only. Do not include markdown, comments, trailing commas, or prose outside JSON.`;
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -503,10 +529,12 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: jsonSystemPrompt },
           { role: 'user', content: userPrompt },
         ],
         response_format: { type: 'json_object' },
+        temperature: 0.2,
+        max_tokens: 3500,
       }),
       signal: AbortSignal.timeout(25_000),
     });
@@ -562,7 +590,56 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
     text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
 
-  return JSON.parse(stripJsonFence(text));
+  try {
+    return parseProviderJson(text, provider, model);
+  } catch (err) {
+    if (provider !== 'openai' && provider !== 'groq') throw err;
+
+    console.warn(`[Canvio AI Fallback Agent] Provider "${provider}" returned malformed JSON; attempting same-provider repair.`);
+    const repairedText = await repairOpenAICompatibleJson(provider, apiKey, model, text);
+    return parseProviderJson(repairedText, provider, `${model}:repair`);
+  }
+}
+
+function getOpenAICompatibleEndpoint(provider: AIProvider) {
+  return provider === 'groq'
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions';
+}
+
+async function repairOpenAICompatibleJson(provider: AIProvider, apiKey: string, model: string, rawText: string) {
+  const response = await fetch(getOpenAICompatibleEndpoint(provider), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You repair malformed JSON. Return exactly one valid JSON object. Preserve the original keys and useful content. Do not include markdown or explanations.',
+        },
+        {
+          role: 'user',
+          content: rawText.slice(0, 12000),
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0,
+      max_tokens: 3500,
+    }),
+    signal: AbortSignal.timeout(25_000),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    throw new Error(`${provider.toUpperCase()} JSON repair HTTP ${response.status}: ${errBody}`);
+  }
+
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content || '';
 }
 
 function normalizeBoardPayload(raw: unknown, fallbackTitle: string) {
@@ -678,6 +755,61 @@ function normalizeColor(value: unknown) {
 
 function stripJsonFence(value: string) {
   return value.replace(/```json/gi, '').replace(/```/g, '').trim();
+}
+
+function stripJsonLineComments(value: string) {
+  return value.replace(/[ \t]+\/\/[^\n\r]*/g, '');
+}
+
+function parseProviderJson(value: string, provider: AIProvider, model: string) {
+  const candidate = extractJsonObject(stripJsonFence(value));
+  try {
+    return JSON.parse(candidate);
+  } catch (err: any) {
+    const preview = candidate
+      .slice(0, 600)
+      .replace(/\s+/g, ' ')
+      .trim();
+    throw new Error(`${provider.toUpperCase()} ${model} returned invalid JSON: ${err?.message || err}. Preview: ${preview}`);
+  }
+}
+
+function extractJsonObject(value: string) {
+  const start = value.indexOf('{');
+  if (start === -1) return value.trim();
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = inString;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return value.slice(start, index + 1).trim();
+    }
+  }
+
+  return value.slice(start).trim();
 }
 
 function cleanText(value: unknown, maxLength: number) {
