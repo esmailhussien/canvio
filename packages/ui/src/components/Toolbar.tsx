@@ -103,6 +103,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
           setIsMoreOpen(false);
         }}
         aria-label={tool.label}
+        aria-pressed={compact ? undefined : activeTool === tool.id}
+        aria-checked={compact ? activeTool === tool.id : undefined}
+        role={compact ? 'menuitemradio' : undefined}
         type="button"
       >
         <tool.icon size={20} />

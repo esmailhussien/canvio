@@ -351,9 +351,9 @@
     left: 50% !important;
     top: auto !important;
     bottom: calc(94px + env(safe-area-inset-bottom, 0px));
-    width: min(356px, calc(100vw - 24px));
+    width: min(324px, calc(100vw - 24px));
     height: auto;
-    max-height: calc(100dvh - 178px);
+    max-height: calc(100dvh - 154px);
     padding: 12px;
     border: 1px solid var(--toolbar-border);
     border-radius: 16px;
@@ -365,8 +365,9 @@
     pointer-events: auto;
     animation: mobileQuickAddIn 0.18s ease-out both;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    overflow: hidden;
   }
 
   @keyframes mobileQuickAddIn {
@@ -403,12 +404,12 @@
     position: static;
     width: 100%;
     min-width: 0;
-    height: 52px;
-    padding: 0 12px;
+    height: 46px;
+    padding: 0 14px;
     border-radius: 10px;
     transform: none !important;
     justify-content: flex-start;
-    gap: 10px;
+    gap: 12px;
     box-shadow: none;
     opacity: 1;
     scale: 1;
@@ -430,7 +431,8 @@
     background: transparent;
     box-shadow: none;
     color: currentColor;
-    font-size: 0.76rem;
+    font-size: 0.82rem;
+    font-weight: 800;
     text-overflow: ellipsis;
     transform: none;
     white-space: nowrap;

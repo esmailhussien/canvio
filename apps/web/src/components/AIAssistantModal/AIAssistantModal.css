@@ -97,6 +97,75 @@
   line-height: 1.4;
 }
 
+.ai-modal__context-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+}
+
+.ai-modal__context-strip.is-ready {
+  border-color: color-mix(in srgb, #34d399 34%, var(--border-default));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #10b981 12%, transparent), transparent 62%),
+    color-mix(in srgb, var(--bg-surface) 76%, transparent);
+}
+
+.ai-modal__context-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #a78bfa;
+  background: rgba(139, 92, 246, 0.14);
+  flex: 0 0 auto;
+}
+
+.ai-modal__context-strip.is-ready .ai-modal__context-icon {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.ai-modal__context-strip > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.ai-modal__context-strip strong {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.ai-modal__context-strip span:not(.material-symbols-outlined) {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.ai-modal__context-count {
+  justify-self: end;
+  max-width: 220px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border-default));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-primary) 9%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 750;
+  line-height: 1.2;
+  text-align: right;
+}
+
 
 
 @media (max-width: 768px) {
@@ -301,8 +370,12 @@
 
 .ai-modal__quick-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
+}
+
+.ai-modal__quick-actions--primary {
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
 }
 
 .ai-modal__board-intent-card {
@@ -375,7 +448,7 @@
 }
 
 .ai-action-btn:disabled {
-  opacity: 0.48;
+  opacity: 0.68;
   cursor: not-allowed;
 }
 
@@ -402,6 +475,26 @@
 .ai-action-btn__icon--blue {
   color: #38bdf8;
   background: rgba(14, 165, 233, 0.14);
+}
+
+.ai-action-btn__icon--orange {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.ai-action-btn__icon--teal {
+  color: #2dd4bf;
+  background: rgba(20, 184, 166, 0.14);
+}
+
+.ai-action-btn__icon--yellow {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.15);
+}
+
+.ai-action-btn__icon--pink {
+  color: #f472b6;
+  background: rgba(236, 72, 153, 0.14);
 }
 
 .ai-action-btn__copy {
@@ -566,14 +659,19 @@
 
 @media (max-width: 720px) {
   .ai-modal__overlay {
-    align-items: flex-start;
-    padding-top: 10px;
+    align-items: flex-end;
+    padding: 0;
   }
 
   .ai-modal__content {
-    width: calc(100vw - 24px);
-    max-height: calc(100dvh - 24px);
+    width: 100vw;
+    max-width: 100vw;
+    max-height: calc(100dvh - 10px);
     padding: 18px;
+    border-radius: 18px 18px 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
   }
 
   .ai-modal__topbar {
@@ -598,7 +696,22 @@
   }
 
   .ai-modal__intent-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .ai-modal__intent-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ai-modal__intent {
+    flex: 0 0 92px;
+    min-width: 92px;
+    min-height: 42px;
+    scroll-snap-align: start;
   }
 
   .ai-modal__intent-help strong {
@@ -608,6 +721,18 @@
 
   .ai-modal__intent-help {
     min-height: 64px;
+  }
+
+  .ai-modal__context-strip {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: flex-start;
+  }
+
+  .ai-modal__context-count {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    max-width: none;
+    text-align: left;
   }
 
   .ai-modal__board-intent-card {
@@ -628,6 +753,10 @@
   }
 
   .ai-modal__quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-modal__quick-actions--primary {
     grid-template-columns: 1fr;
   }
 

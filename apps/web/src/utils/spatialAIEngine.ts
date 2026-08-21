@@ -14,6 +14,7 @@ import {
   AIGraphAnalysisResponse,
   AIChallengeResponse,
   AISocraticResponse,
+  type AIErrorCode,
 } from './api';
 import { analyzeGraphStructure, getNodeTitle } from './graphQueries';
 import type { GraphInsight } from '@canvio/core';
@@ -47,7 +48,7 @@ export async function generateSpatialBoardAsync(
     return {
       ...generateSpatialBoard(prompt),
       source: 'local',
-      message: getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
+      message: result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
     };
   } catch (err) {
     console.warn('Server AI generation unavailable. Falling back to local spatial template.', err);
@@ -305,18 +306,57 @@ function getClientAIModel(): string | undefined {
   return cleanText(localStorage.getItem('CANVIO_AI_MODEL') || '', 80) || undefined;
 }
 
-function getAIFallbackMessage(error: unknown) {
-  if (error instanceof ApiRequestError && error.code === 'AI_NOT_CONFIGURED') {
-    return 'Server AI is not configured yet, so Canvio used the local smart board generator.';
+export function getAIFallbackMessage(error: unknown) {
+  if (
+    error instanceof ApiRequestError &&
+    isAIErrorCode(error.code) &&
+    error.message &&
+    !error.message.startsWith('AI_')
+  ) {
+    return error.message;
   }
-  return 'Server AI was unavailable, so Canvio used the local smart board generator.';
+
+  const code = error instanceof ApiRequestError
+    ? error.code
+    : typeof error === 'string'
+      ? error
+      : undefined;
+
+  switch (code as AIErrorCode | undefined) {
+    case 'AI_NOT_CONFIGURED':
+      return 'Server AI is not configured yet, so Canvio used local smart mode.';
+    case 'AI_QUOTA_EXCEEDED':
+      return 'AI quota is temporarily exhausted, so Canvio used local smart mode.';
+    case 'AI_RATE_LIMITED':
+      return 'AI is busy right now, so Canvio used local smart mode.';
+    case 'AI_MODEL_UNAVAILABLE':
+      return 'The configured AI model is unavailable, so Canvio used local smart mode.';
+    case 'AI_TIMEOUT':
+      return 'AI took too long to respond, so Canvio used local smart mode.';
+    case 'AI_INVALID_RESPONSE':
+      return 'AI returned an unreadable response, so Canvio used local smart mode.';
+    default:
+      return 'Server AI was unavailable, so Canvio used local smart mode.';
+  }
 }
 
-function isExpectedAIFallback(error: unknown) {
+export function isExpectedAIFallback(error: unknown) {
   return (
     error instanceof ApiRequestError &&
-    error.status === 503 &&
-    (error.code === 'AI_NOT_CONFIGURED' || error.code === 'AI_REQUEST_FAILED')
+    (error.status === 503 || error.status === 200) &&
+    isAIErrorCode(error.code)
+  );
+}
+
+function isAIErrorCode(code: string | undefined): code is AIErrorCode {
+  return (
+    code === 'AI_NOT_CONFIGURED' ||
+    code === 'AI_QUOTA_EXCEEDED' ||
+    code === 'AI_RATE_LIMITED' ||
+    code === 'AI_MODEL_UNAVAILABLE' ||
+    code === 'AI_TIMEOUT' ||
+    code === 'AI_INVALID_RESPONSE' ||
+    code === 'AI_REQUEST_FAILED'
   );
 }
 
@@ -424,6 +464,7 @@ export async function summarizeBoardWithAIAsync(
 ): Promise<SpatialAIResult> {
   const provider = getClientAIProvider();
   const model = getClientAIModel();
+  let fallbackMessage = getAIFallbackMessage('AI_REQUEST_FAILED');
 
   try {
     const result = await summarizeAIBoard({
@@ -434,7 +475,11 @@ export async function summarizeBoardWithAIAsync(
     });
     if (result.source !== 'server-ai') {
       const localResult = createLocalBoardDocument(nodes, relations, output);
-      return output === 'article' ? composeArticlePage(localResult) : localResult;
+      const withMessage = {
+        ...localResult,
+        message: result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
+      };
+      return output === 'article' ? composeArticlePage(withMessage) : withMessage;
     }
     const normalized = normalizeServerBoardResult(
       result.title,
@@ -445,11 +490,15 @@ export async function summarizeBoardWithAIAsync(
     );
     return output === 'article' ? composeArticlePage(normalized) : normalized;
   } catch (err) {
-    console.warn(`Server AI ${output} unavailable. Falling back to local board analysis.`, err);
+    fallbackMessage = getAIFallbackMessage(err);
+    if (!isExpectedAIFallback(err)) {
+      console.warn(`Server AI ${output} unavailable. Falling back to local board analysis.`, err);
+    }
   }
 
   const localResult = createLocalBoardDocument(nodes, relations, output);
-  return output === 'article' ? composeArticlePage(localResult) : localResult;
+  const withMessage = { ...localResult, message: fallbackMessage };
+  return output === 'article' ? composeArticlePage(withMessage) : withMessage;
 }
 
 function composeArticlePage(result: SpatialAIResult): SpatialAIResult {
@@ -590,6 +639,7 @@ export async function organizeAndClusterWithAIAsync(
   ];
   const provider = getClientAIProvider();
   const model = getClientAIModel();
+  let fallbackMessage = 'Canvio used the local organizer to keep the board editable.';
 
   try {
     const result = await organizeAIClusters({
@@ -611,8 +661,19 @@ export async function organizeAndClusterWithAIAsync(
       );
       return { clustersCount: result.clusters.length, source: 'server' };
     }
+    if (result.source === 'local-fallback') {
+      throw new ApiRequestError(
+        result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
+        200,
+        result.error,
+        result.retryAfterSeconds
+      );
+    }
   } catch (err) {
-    console.warn('Server AI clustering unavailable. Falling back to local clustering.', err);
+    fallbackMessage = getAIFallbackMessage(err);
+    if (!isExpectedAIFallback(err)) {
+      console.warn('Server AI clustering unavailable. Falling back to local clustering.', err);
+    }
   }
 
   const nodesPerCluster = Math.ceil(nodes.length / CLUSTER_PRESETS.length);
@@ -625,7 +686,7 @@ export async function organizeAndClusterWithAIAsync(
   return {
     clustersCount: localClusters.length,
     source: 'local',
-    message: 'Server AI is not configured yet, so Canvio used the local organizer.',
+    message: fallbackMessage,
   };
 }
 
@@ -638,6 +699,7 @@ export async function analyzeGraphWithAIAsync(
   insights: GraphInsight[];
   suggestedRelations: Array<{ sourceId: string; targetId: string; relationship: Relation['relationship']; label: string; reason?: string }>;
   source: 'server' | 'local';
+  message?: string;
 }> {
   const nodesRecord = Object.fromEntries(nodes.map((n) => [n.id, n]));
   const relationsRecord = Object.fromEntries(relations.map((r) => [r.id, r]));
@@ -645,6 +707,7 @@ export async function analyzeGraphWithAIAsync(
 
   const provider = getClientAIProvider();
   const model = getClientAIModel();
+  let fallbackMessage = getAIFallbackMessage('AI_REQUEST_FAILED');
 
   try {
     const result = await analyzeAIGraph({
@@ -679,7 +742,16 @@ export async function analyzeGraphWithAIAsync(
         source: 'server',
       };
     }
+    if (result?.source === 'local-fallback') {
+      throw new ApiRequestError(
+        result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
+        200,
+        result.error,
+        result.retryAfterSeconds
+      );
+    }
   } catch (err) {
+    fallbackMessage = getAIFallbackMessage(err);
     if (!isExpectedAIFallback(err)) {
       console.warn('Server AI graph analysis unavailable. Using local reasoning engine.', err);
     }
@@ -726,6 +798,7 @@ export async function analyzeGraphWithAIAsync(
     insights: localAnalysis.insights,
     suggestedRelations,
     source: 'local',
+    message: fallbackMessage,
   };
 }
 
@@ -738,9 +811,11 @@ export async function challengeBoardWithAIAsync(
   challengerNodes: LivingNode[];
   challengerRelations: Relation[];
   source: 'server' | 'local';
+  message?: string;
 }> {
   const provider = getClientAIProvider();
   const model = getClientAIModel();
+  let fallbackMessage = 'Canvio used the local challenge mode so you can keep reasoning without waiting for server AI.';
 
   try {
     const result = await challengeAIBoard({
@@ -748,6 +823,15 @@ export async function challengeBoardWithAIAsync(
       model,
       context: buildAIContext(nodes, relations),
     });
+
+    if (result.source === 'local-fallback') {
+      throw new ApiRequestError(
+        result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
+        200,
+        result.error,
+        result.retryAfterSeconds
+      );
+    }
 
     if (result && result.challengeSummary) {
       const normalizedResult = normalizeServerBoardResult(
@@ -767,7 +851,10 @@ export async function challengeBoardWithAIAsync(
       };
     }
   } catch (err) {
-    console.warn('Server AI challenge unavailable. Using local devil advocate.', err);
+    fallbackMessage = getAIFallbackMessage(err);
+    if (!isExpectedAIFallback(err)) {
+      console.warn('Server AI challenge unavailable. Using local devil advocate.', err);
+    }
   }
 
   // Local Devil's Advocate heuristic
@@ -802,6 +889,7 @@ export async function challengeBoardWithAIAsync(
       relation(challengerId, targetNode.id, 'challenges', '#ef4444', 'contradicts'),
     ] : [],
     source: 'local',
+    message: fallbackMessage,
   };
 }
 
@@ -812,9 +900,11 @@ export async function socraticInquiryWithAIAsync(
   inquiryFocus: string;
   questions: Array<{ id: string; question: string; relatedNodeIds?: string[]; learningGoal?: string }>;
   source: 'server' | 'local';
+  message?: string;
 }> {
   const provider = getClientAIProvider();
   const model = getClientAIModel();
+  let fallbackMessage = 'Canvio used the local Socratic mode so you can keep learning without waiting for server AI.';
 
   try {
     const result = await socraticInquiryAI({
@@ -822,6 +912,15 @@ export async function socraticInquiryWithAIAsync(
       model,
       context: buildAIContext(nodes, relations),
     });
+
+    if (result.source === 'local-fallback') {
+      throw new ApiRequestError(
+        result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
+        200,
+        result.error,
+        result.retryAfterSeconds
+      );
+    }
 
     if (result && result.questions && result.questions.length > 0) {
       return {
@@ -831,7 +930,10 @@ export async function socraticInquiryWithAIAsync(
       };
     }
   } catch (err) {
-    console.warn('Server Socratic inquiry unavailable. Using local questioning engine.', err);
+    fallbackMessage = getAIFallbackMessage(err);
+    if (!isExpectedAIFallback(err)) {
+      console.warn('Server Socratic inquiry unavailable. Using local questioning engine.', err);
+    }
   }
 
   // Local Socratic Questioning Heuristic
@@ -883,6 +985,7 @@ export async function socraticInquiryWithAIAsync(
     inquiryFocus: 'Mental Model & First Principles Examination',
     questions,
     source: 'local',
+    message: fallbackMessage,
   };
 }
 

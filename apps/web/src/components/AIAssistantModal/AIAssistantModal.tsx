@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
+  analyzeGraphWithAIAsync,
   generateSpatialBoardAsync,
   BoardDocumentFormat,
   summarizeBoardWithAIAsync,
   organizeAndClusterWithAIAsync,
   generateSpatialBoard,
 } from '../../utils/spatialAIEngine';
-import { useCanvasStore } from '../../store/canvasStore';
+import { nanoid } from 'nanoid';
+import { useCanvasStore, type LivingNode } from '../../store/canvasStore';
 import { fitTemplateToViewport, fitViewportToNodes } from '../../utils/viewportFit';
 import './AIAssistantModal.css';
 
@@ -16,6 +18,7 @@ interface AIAssistantModalProps {
 }
 
 type AIIntent = 'create' | 'study' | 'summary' | 'article' | 'organize';
+type BoardActionIntent = 'summary' | 'article' | 'quiz' | 'presentation' | 'organize' | 'gaps' | 'next';
 
 const AI_INTENTS: Array<{
   id: AIIntent;
@@ -75,11 +78,21 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const addNode = useCanvasStore((s) => s.addNode);
   const addRelation = useCanvasStore((s) => s.addRelation);
+  const selectNodes = useCanvasStore((s) => s.selectNodes);
   const nodeCount = useCanvasStore((s) => Object.keys(s.nodes).length);
   const relationCount = useCanvasStore((s) => Object.keys(s.relations).length);
+  const mapPinCount = useCanvasStore((s) => countMapPins(Object.values(s.nodes)));
   const hasBoardContent = nodeCount > 0;
   const activeIntentConfig = AI_INTENTS.find((intent) => intent.id === activeIntent) || AI_INTENTS[0];
   const isPromptIntent = activeIntent === 'create' || activeIntent === 'study';
+  const boardContextText = hasBoardContent
+    ? `${nodeCount} ${nodeCount === 1 ? 'element' : 'elements'} · ${relationCount} ${relationCount === 1 ? 'connection' : 'connections'}${mapPinCount > 0 ? ` · ${mapPinCount} map ${mapPinCount === 1 ? 'pin' : 'pins'}` : ''}`
+    : 'No board content yet';
+  const boardContextHint = hasBoardContent
+    ? relationCount > 0
+      ? 'AI will use node text, relation labels, relationship types, and map pins as source material.'
+      : 'AI can read the visible elements now. Add labeled relations to make answers more precise.'
+    : 'Start with a prompt, or add notes and relations so AI can work from your board.';
 
   // Close on Escape key press
   React.useEffect(() => {
@@ -206,6 +219,12 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   };
 
   const handleBoardIntentAction = (intent: AIIntent) => {
+    if (intent === 'summary' || intent === 'article' || intent === 'organize') {
+      handleBoardAction(intent);
+    }
+  };
+
+  const handleBoardAction = (intent: BoardActionIntent) => {
     if (!hasBoardContent) {
       setAIStatus({ kind: 'info', text: 'Add a note, shape, map pin, or relation first. Then Canvio can use the board.' });
       return;
@@ -223,6 +242,116 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
     if (intent === 'organize') {
       void handleOrganizeCluster();
+      return;
+    }
+
+    if (intent === 'quiz' || intent === 'presentation') {
+      void handleBoardGenerationAction(intent);
+      return;
+    }
+
+    if (intent === 'gaps' || intent === 'next') {
+      void handleReasoningAssist(intent);
+    }
+  };
+
+  const handleBoardGenerationAction = async (intent: 'quiz' | 'presentation') => {
+    const allNodes = Object.values(useCanvasStore.getState().nodes);
+    if (allNodes.length === 0) return;
+
+    setIsGenerating(true);
+    setAIStatus({
+      kind: 'info',
+      text: intent === 'quiz'
+        ? 'Reading the board and creating an editable quiz...'
+        : 'Reading the board and creating a presentation outline...',
+    });
+
+    try {
+      const result = await generateSpatialBoardAsync(buildBoardActionPrompt(intent));
+      const timestamp = Date.now();
+      const taggedNodes = result.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          aiGenerated: true,
+          aiPrompt: intent === 'quiz' ? 'Board quiz' : 'Presentation outline',
+          aiWorldTitle: result.title,
+        },
+        updatedAt: timestamp,
+      }));
+      const placedNodes = placeBoardAwayFromExisting(taggedNodes, allNodes);
+
+      placedNodes.forEach((node) => addNode(node));
+      result.relations.forEach((rel) => addRelation(rel));
+      selectNodes(placedNodes.map((node) => node.id));
+      fitViewportToNodes(placedNodes, { maxZoom: 0.95, minZoom: 0.42, paddingX: 220, paddingY: 240 });
+      closeWithAIStatus({
+        source: result.source,
+        message: intent === 'quiz'
+          ? 'Created an editable quiz from the board.'
+          : 'Created an editable presentation outline from the board.',
+      });
+    } catch (err) {
+      console.error(`Board ${intent} generation failed:`, err);
+      setAIStatus({ kind: 'error', text: intent === 'quiz' ? 'Quiz failed. Please try again.' : 'Presentation outline failed. Please try again.' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleReasoningAssist = async (intent: 'gaps' | 'next') => {
+    const allNodes = Object.values(useCanvasStore.getState().nodes);
+    const allRelations = Object.values(useCanvasStore.getState().relations);
+    if (allNodes.length === 0) return;
+
+    setIsGenerating(true);
+    setAIStatus({
+      kind: 'info',
+      text: intent === 'gaps'
+        ? 'Checking the board for missing links and weak spots...'
+        : 'Reading the board and choosing one useful next move...',
+    });
+
+    try {
+      const result = await analyzeGraphWithAIAsync(allNodes, allRelations);
+      const createdNodes = intent === 'gaps'
+        ? createGapNotes(result, allNodes)
+        : createNextStepNote(result, allNodes);
+
+      createdNodes.forEach((node) => addNode(node));
+      result.suggestedRelations.slice(0, intent === 'next' ? 1 : 2).forEach((suggestion) => {
+        if (!useCanvasStore.getState().nodes[suggestion.sourceId] || !useCanvasStore.getState().nodes[suggestion.targetId]) return;
+        addRelation({
+          id: nanoid(10),
+          sourceId: suggestion.sourceId,
+          targetId: suggestion.targetId,
+          relationship: suggestion.relationship,
+          label: suggestion.label,
+          style: {
+            color: '#a78bfa',
+            width: 2.5,
+            type: 'orthogonal',
+            startArrow: 'none',
+            endArrow: 'arrow',
+            animated: true,
+          },
+        });
+      });
+      selectNodes(createdNodes.map((node) => node.id));
+      fitViewportToNodes(createdNodes, { maxZoom: 0.95, minZoom: 0.5, paddingX: 180, paddingY: 220 });
+      setAIStatus({
+        kind: result.source === 'local' ? 'info' : 'success',
+        text: intent === 'gaps'
+          ? 'Added editable gap notes beside the board.'
+          : 'Added one editable next-step note beside the board.',
+      });
+      window.setTimeout(onClose, result.source === 'local' ? 1300 : 900);
+    } catch (err) {
+      console.error(`AI ${intent} assist failed:`, err);
+      setAIStatus({ kind: 'error', text: 'Could not analyze the board. Try again after simplifying the selection.' });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -259,24 +388,58 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 
   const quickPrompts = isPromptIntent ? QUICK_PROMPTS[activeIntent] : [];
 
-  const BOARD_ACTIONS = [
+  const BOARD_ACTIONS: Array<{
+    intent: BoardActionIntent;
+    title: string;
+    detail: string;
+    icon: string;
+    iconClass: string;
+  }> = [
     {
-      intent: 'summary' as AIIntent,
+      intent: 'summary',
       title: 'Summarize',
-      detail: 'Key ideas, connections, and next steps',
+      detail: 'Key ideas and connections',
       icon: 'summarize',
       iconClass: 'ai-action-btn__icon--purple',
     },
     {
-      intent: 'article' as AIIntent,
+      intent: 'gaps',
+      title: 'Find gaps',
+      detail: 'Weak links and missing evidence',
+      icon: 'travel_explore',
+      iconClass: 'ai-action-btn__icon--orange',
+    },
+    {
+      intent: 'quiz',
+      title: 'Make quiz',
+      detail: 'Questions from the board',
+      icon: 'quiz',
+      iconClass: 'ai-action-btn__icon--yellow',
+    },
+    {
+      intent: 'next',
+      title: 'Suggest next',
+      detail: 'One useful move from the board',
+      icon: 'alt_route',
+      iconClass: 'ai-action-btn__icon--teal',
+    },
+    {
+      intent: 'article',
       title: 'Write article',
-      detail: 'Build a structured draft from the board',
+      detail: 'Structured draft from the board',
       icon: 'article',
       iconClass: 'ai-action-btn__icon--blue',
     },
     {
-      intent: 'organize' as AIIntent,
-      title: 'Tidy',
+      intent: 'presentation',
+      title: 'Presentation outline',
+      detail: 'Slides and speaking flow',
+      icon: 'co_present',
+      iconClass: 'ai-action-btn__icon--pink',
+    },
+    {
+      intent: 'organize',
+      title: 'Organize ideas',
       detail: 'Group related ideas together',
       icon: 'grid_view',
       iconClass: 'ai-action-btn__icon--green',
@@ -291,14 +454,53 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
             <span className="ai-modal__sparkle" title="Canvio AI"><span className="material-symbols-outlined">auto_awesome</span></span>
             <div>
               <div className="ai-modal__eyebrow">Canvio AI</div>
-              <h2 className="ai-modal__title">What are you working on?</h2>
-              <p className="ai-modal__subtitle">Describe it naturally. Canvio builds structured nodes and relations for you.</p>
+              <h2 className="ai-modal__title">{hasBoardContent ? 'What should AI do with this board?' : 'What are you working on?'}</h2>
+              <p className="ai-modal__subtitle">
+                {hasBoardContent
+                  ? 'Choose a board-aware action or ask Canvio to extend your current thinking.'
+                  : 'Describe it naturally. Canvio builds structured nodes and relations for you.'}
+              </p>
             </div>
           </div>
           <div className="ai-modal__header-actions">
             <button type="button" className="ai-modal__close" onClick={onClose} title="Close (Esc)" aria-label="Close AI modal">✕</button>
           </div>
         </div>
+
+        <div className={`ai-modal__context-strip ${hasBoardContent ? 'is-ready' : ''}`}>
+          <span className="ai-modal__context-icon material-symbols-outlined" aria-hidden="true">
+            {hasBoardContent ? 'account_tree' : 'edit_note'}
+          </span>
+          <div>
+            <strong>{hasBoardContent ? 'Using current board' : 'Start with a board or prompt'}</strong>
+            <span>{boardContextHint}</span>
+          </div>
+          <span className="ai-modal__context-count">{boardContextText}</span>
+        </div>
+
+        {hasBoardContent && (
+          <>
+            <div className="ai-modal__section-heading">
+              <span>Board-aware actions</span>
+              <span className="ai-modal__count">Uses notes, relations, labels, and pins</span>
+            </div>
+            <div className="ai-modal__quick-actions ai-modal__quick-actions--primary">
+              {BOARD_ACTIONS.map((action) => (
+                <button
+                  key={action.intent}
+                  type="button"
+                  className={`ai-action-btn ${activeIntent === action.intent ? 'active' : ''}`}
+                  onClick={() => handleBoardAction(action.intent)}
+                  disabled={isGenerating}
+                  title={action.detail}
+                >
+                  <span className={`ai-action-btn__icon ${action.iconClass}`}><span className="material-symbols-outlined" aria-hidden="true">{action.icon}</span></span>
+                  <span className="ai-action-btn__copy"><strong>{action.title}</strong><small>{action.detail}</small></span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="ai-modal__intent-grid" role="tablist" aria-label="Choose AI action">
           {AI_INTENTS.map((intent) => (
@@ -361,25 +563,29 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
           </div>
         )}
 
-        <div className="ai-modal__section-heading">
-          <span>Work with this board</span>
-          <span className="ai-modal__count">{hasBoardContent ? `${nodeCount} ${nodeCount === 1 ? 'element' : 'elements'} · ${relationCount} ${relationCount === 1 ? 'connection' : 'connections'}` : 'Nothing here yet'}</span>
-        </div>
-        <div className="ai-modal__quick-actions">
-          {BOARD_ACTIONS.map((action) => (
-            <button
-              key={action.intent}
-              type="button"
-              className={`ai-action-btn ${activeIntent === action.intent ? 'active' : ''}`}
-              onClick={() => handleBoardIntentAction(action.intent)}
-              disabled={isGenerating || !hasBoardContent}
-              title={hasBoardContent ? action.detail : 'Add something to the board first'}
-            >
-              <span className={`ai-action-btn__icon ${action.iconClass}`}><span className="material-symbols-outlined" aria-hidden="true">{action.icon}</span></span>
-              <span className="ai-action-btn__copy"><strong>{action.title}</strong><small>{action.detail}</small></span>
-            </button>
-          ))}
-        </div>
+        {!hasBoardContent && (
+          <>
+            <div className="ai-modal__section-heading">
+              <span>Board-aware actions</span>
+              <span className="ai-modal__count">Add content first</span>
+            </div>
+            <div className="ai-modal__quick-actions">
+              {BOARD_ACTIONS.map((action) => (
+                <button
+                  key={action.intent}
+                  type="button"
+                  className="ai-action-btn"
+                  onClick={() => handleBoardAction(action.intent)}
+                  disabled
+                  title="Add something to the board first"
+                >
+                  <span className={`ai-action-btn__icon ${action.iconClass}`}><span className="material-symbols-outlined" aria-hidden="true">{action.icon}</span></span>
+                  <span className="ai-action-btn__copy"><strong>{action.title}</strong><small>{action.detail}</small></span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {!hasBoardContent && (
           <div className="ai-modal__board-note">
@@ -419,6 +625,87 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
     </div>
   );
 };
+
+type BoardAnalysisResult = Awaited<ReturnType<typeof analyzeGraphWithAIAsync>>;
+
+function createGapNotes(result: BoardAnalysisResult, existingNodes: LivingNode[]): LivingNode[] {
+  const bounds = getBounds(existingNodes);
+  const startX = Number.isFinite(bounds.maxX) ? bounds.maxX + 180 : 0;
+  const startY = Number.isFinite(bounds.minY) ? bounds.minY : 0;
+  const timestamp = Date.now();
+  const zIndex = useCanvasStore.getState().nextZIndex();
+  const usefulInsights = result.insights
+    .filter((insight) => insight.severity !== 'info' || insight.type !== 'suggestion')
+    .slice(0, 3);
+  const insights = usefulInsights.length > 0
+    ? usefulInsights
+    : [{
+      title: 'Make the reasoning stronger',
+      description: result.critique || 'Add evidence, labels, or a clear next consequence to make the board easier to follow.',
+    }];
+
+  return insights.map((insight, index) => createAISticky({
+    x: startX,
+    y: startY + index * 170,
+    zIndex: zIndex + index,
+    color: index === 0 ? 'pink' : index === 1 ? 'yellow' : 'purple',
+    text: `Gap ${index + 1}: ${insight.title}\n${insight.description}`,
+    timestamp,
+  }));
+}
+
+function createNextStepNote(result: BoardAnalysisResult, existingNodes: LivingNode[]): LivingNode[] {
+  const bounds = getBounds(existingNodes);
+  const startX = Number.isFinite(bounds.maxX) ? bounds.maxX + 180 : 0;
+  const startY = Number.isFinite(bounds.minY) ? bounds.minY : 0;
+  const timestamp = Date.now();
+  const zIndex = useCanvasStore.getState().nextZIndex();
+  const bridge = result.suggestedRelations[0];
+  const nextMove = bridge?.reason || result.critique || 'Add one clear consequence, example, or decision that moves this board forward.';
+
+  return [createAISticky({
+    x: startX,
+    y: startY,
+    zIndex,
+    color: 'green',
+    text: `Next useful move\n${nextMove}`,
+    timestamp,
+  })];
+}
+
+function createAISticky({
+  x,
+  y,
+  zIndex,
+  color,
+  text,
+  timestamp,
+}: {
+  x: number;
+  y: number;
+  zIndex: number;
+  color: string;
+  text: string;
+  timestamp: number;
+}): LivingNode {
+  return {
+    id: nanoid(10),
+    type: 'sticky',
+    position: { x, y },
+    size: { width: 300, height: 148 },
+    rotation: 0,
+    zIndex,
+    locked: false,
+    data: {
+      text: text.slice(0, 420),
+      color,
+      aiGenerated: true,
+      aiWorldTitle: 'Board assistant',
+    },
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
 
 function placeBoardAwayFromExisting(generatedNodes: ReturnType<typeof generateSpatialBoard>['nodes'], existingNodes: ReturnType<typeof generateSpatialBoard>['nodes']) {
   if (generatedNodes.length === 0 || existingNodes.length === 0) return generatedNodes;
@@ -483,6 +770,30 @@ function buildIntentPrompt(intent: AIIntent, prompt: string) {
   ].join('\n\n');
 }
 
+function buildBoardActionPrompt(intent: 'quiz' | 'presentation') {
+  const { nodes, relations } = useCanvasStore.getState();
+  const nodeCount = Object.keys(nodes).length;
+  const relationCount = Object.keys(relations).length;
+  const boardDigest = buildBoardPromptDigest();
+  const baseInstruction = [
+    `Use the current Canvio board as the only source material. It has ${nodeCount} elements and ${relationCount} connections.`,
+    'Respect node text, relation labels, relationship types, map pins, and evidence structure. Do not invent unsupported facts.',
+    `Board digest:\n${boardDigest}`,
+  ].join('\n\n');
+
+  if (intent === 'quiz') {
+    return [
+      baseInstruction,
+      'Create an editable quiz board from this material. Include 5-7 questions, answer checks, misconception notes, difficulty levels, and a short review plan. Connect each question to the idea or evidence it tests.',
+    ].join('\n\n');
+  }
+
+  return [
+    baseInstruction,
+    'Create an editable presentation outline from this board. Include opening context, main sections, evidence or examples, risks/open questions, final takeaway, and next action. Use clear slide-like nodes and labeled relations that follow the story flow.',
+  ].join('\n\n');
+}
+
 function buildBoardPromptDigest() {
   const { nodes, relations } = useCanvasStore.getState();
   const nodeList = Object.values(nodes).slice(0, 10);
@@ -525,4 +836,13 @@ function getMapPinDigest(node: ReturnType<typeof generateSpatialBoard>['nodes'][
     return [String(value.label || 'map pin').replace(/\s+/g, ' ').trim().slice(0, 50)];
   });
   return labels.length > 0 ? `pins: ${labels.join(', ')}` : '';
+}
+
+function countMapPins(nodes: LivingNode[]) {
+  return nodes.reduce((total, node) => {
+    if (node.type !== 'map') return total;
+    const data = node.data as Record<string, unknown> | undefined;
+    const markers = Array.isArray(data?.markers) ? data.markers : [];
+    return total + markers.length;
+  }, 0);
 }

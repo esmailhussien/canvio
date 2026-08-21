@@ -33,6 +33,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const [activeTab, setActiveTab] = useState<TabMode>('overview');
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [aiCritique, setAiCritique] = useState<string | null>(null);
   const [aiInsights, setAiInsights] = useState<GraphInsight[]>([]);
   const [suggestedBridges, setSuggestedBridges] = useState<Array<{ sourceId: string; targetId: string; relationship: string; label: string; reason?: string }>>([]);
@@ -77,6 +78,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const handleDeepAudit = async () => {
     setIsLoadingAI(true);
+    setAiNotice(null);
     try {
       const allNodes = Object.values(nodes);
       const allRelations = Object.values(relations);
@@ -84,8 +86,10 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
       setAiCritique(res.critique);
       setAiInsights(res.insights);
       setSuggestedBridges(res.suggestedRelations);
+      setAiNotice(res.source === 'local' ? res.message || 'Canvio used local reasoning mode for this audit.' : null);
     } catch (err) {
       console.error('Deep AI audit failed:', err);
+      setAiNotice('Canvio could not finish the audit. Try again after simplifying the board.');
     } finally {
       setIsLoadingAI(false);
     }
@@ -93,6 +97,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const handleRunChallenge = async () => {
     setIsLoadingAI(true);
+    setAiNotice(null);
     try {
       const allNodes = Object.values(nodes);
       const allRelations = Object.values(relations);
@@ -103,8 +108,10 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         nodes: res.challengerNodes,
         relations: res.challengerRelations,
       });
+      setAiNotice(res.source === 'local' ? res.message || 'Canvio used local challenge mode.' : null);
     } catch (err) {
       console.error('AI challenge failed:', err);
+      setAiNotice('Canvio could not finish the challenge. Try again after simplifying the board.');
     } finally {
       setIsLoadingAI(false);
     }
@@ -112,6 +119,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
   const handleRunSocratic = async () => {
     setIsLoadingAI(true);
+    setAiNotice(null);
     try {
       const allNodes = Object.values(nodes);
       const allRelations = Object.values(relations);
@@ -120,8 +128,10 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
         focus: res.inquiryFocus,
         questions: res.questions,
       });
+      setAiNotice(res.source === 'local' ? res.message || 'Canvio used local Socratic mode.' : null);
     } catch (err) {
       console.error('AI Socratic inquiry failed:', err);
+      setAiNotice('Canvio could not finish Socratic questions. Try again after simplifying the board.');
     } finally {
       setIsLoadingAI(false);
     }
@@ -353,6 +363,13 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
 
       {/* Body Content */}
       <div className="gi-body">
+        {aiNotice && (
+          <div className="gi-ai-notice" role="status">
+            <span className="material-symbols-outlined" aria-hidden="true">offline_bolt</span>
+            <span>{aiNotice}</span>
+          </div>
+        )}
+
         {activeTab === 'overview' && (
           <>
             <button

@@ -20,16 +20,20 @@ function test(name: string, run: TestCase['run']): void {
 function installBrowserMocks(preferLight = false): BrowserMocks {
   const storage = new Map<string, string>();
   const attrs = new Map<string, string>();
+  const localStorageMock = {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
+    clear: () => storage.clear(),
+  };
 
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
-      localStorage: {
-        getItem: (key: string) => storage.get(key) ?? null,
-        setItem: (key: string, value: string) => storage.set(key, value),
-        removeItem: (key: string) => storage.delete(key),
-        clear: () => storage.clear(),
-      },
+      CANVIO_CONFIG: {},
+      localStorage: localStorageMock,
+      location: { search: '', hostname: '127.0.0.1' },
+      crypto: { randomUUID: () => 'unit-client-id' },
       matchMedia: () => ({
         matches: preferLight,
         media: '(prefers-color-scheme: light)',
@@ -41,6 +45,11 @@ function installBrowserMocks(preferLight = false): BrowserMocks {
         dispatchEvent: () => false,
       }),
     },
+  });
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: localStorageMock,
   });
 
   Object.defineProperty(globalThis, 'document', {
@@ -100,6 +109,17 @@ const {
   yMapToNode,
   yMapToRelation,
 } = await import('../../packages/collaboration/src/yjsHelpers');
+const {
+  analyzeGraphWithAIAsync,
+  challengeBoardWithAIAsync,
+  generateSpatialBoardAsync,
+  getAIFallbackMessage,
+  organizeAndClusterWithAIAsync,
+  socraticInquiryWithAIAsync,
+  summarizeBoardWithAIAsync,
+} = await import('../../apps/web/src/utils/spatialAIEngine');
+const { ApiRequestError } = await import('../../apps/web/src/utils/api');
+const { classifyAIError } = await import('../../apps/server/src/routes/ai');
 const Y = await import('yjs');
 
 function resetStore(): void {
@@ -339,6 +359,156 @@ test('Yjs helper creation does not read detached maps', () => {
   }
 
   assert.equal(warnings.filter((warning) => warning.includes('Invalid access')).length, 0);
+});
+
+test('AI server error classifier identifies production failure modes', () => {
+  const quota = classifyAIError(new Error('Gemini API HTTP 429: Quota exceeded for metric. Please retry in 10.615s.'));
+  assert.equal(quota.error, 'AI_QUOTA_EXCEEDED');
+  assert.equal(quota.retryAfterSeconds, 11);
+
+  const model = classifyAIError(new Error('GROQ API HTTP 404: model `llama-3.1-8b-instant` does not exist or you do not have access to it.'));
+  assert.equal(model.error, 'AI_MODEL_UNAVAILABLE');
+
+  const invalid = classifyAIError(new Error("GROQ openai/gpt-oss-20b returned invalid JSON: Expected ',' or '}' after property value."));
+  assert.equal(invalid.error, 'AI_INVALID_RESPONSE');
+
+  const friendly = getAIFallbackMessage(new ApiRequestError('AI quota is temporarily exhausted. Canvio used local smart mode.', 200, 'AI_QUOTA_EXCEEDED'));
+  assert.equal(friendly, 'AI quota is temporarily exhausted. Canvio used local smart mode.');
+});
+
+test('AI client paths use editable local fallbacks for provider failures', async () => {
+  resetStore();
+  const originalFetch = globalThis.fetch;
+  const requestedPaths: string[] = [];
+  const fallbackMessage = 'AI quota is temporarily exhausted. Canvio used local smart mode.';
+  const jsonResponse = (payload: unknown) => new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  globalThis.fetch = async (input: RequestInfo | URL) => {
+    const url = String(input);
+    requestedPaths.push(url);
+
+    if (url.includes('/api/ai/generate') || url.includes('/api/ai/summarize')) {
+      return jsonResponse({
+        source: 'local-fallback',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        title: '',
+        nodes: [],
+        relations: [],
+        error: 'AI_QUOTA_EXCEEDED',
+        message: fallbackMessage,
+      });
+    }
+
+    if (url.includes('/api/ai/analyze-graph')) {
+      return jsonResponse({
+        source: 'local-fallback',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        critique: '',
+        healthScore: 0,
+        insights: [],
+        suggestedRelations: [],
+        error: 'AI_QUOTA_EXCEEDED',
+        message: fallbackMessage,
+      });
+    }
+
+    if (url.includes('/api/ai/challenge')) {
+      return jsonResponse({
+        source: 'local-fallback',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        challengeSummary: '',
+        challenges: [],
+        challengerNodes: [],
+        challengerRelations: [],
+        error: 'AI_QUOTA_EXCEEDED',
+        message: fallbackMessage,
+      });
+    }
+
+    if (url.includes('/api/ai/socratic')) {
+      return jsonResponse({
+        source: 'local-fallback',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        inquiryFocus: '',
+        questions: [],
+        error: 'AI_QUOTA_EXCEEDED',
+        message: fallbackMessage,
+      });
+    }
+
+    if (url.includes('/api/ai/organize')) {
+      return jsonResponse({
+        source: 'local-fallback',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        clusters: [],
+        error: 'AI_QUOTA_EXCEEDED',
+        message: fallbackMessage,
+      });
+    }
+
+    return jsonResponse({});
+  };
+
+  try {
+    const claim = makeNode('claim', { data: { text: 'Claim: practice improves recall', color: 'yellow' } });
+    const evidence = makeNode('evidence', { position: { x: 320, y: 0 }, data: { text: 'Evidence: spaced repetition examples', color: 'green' } });
+    const relation = makeRelation('reason', 'claim', 'evidence', { relationship: 'based_on', label: 'supported by' });
+    const boardNodes = [claim, evidence];
+    const boardRelations = [relation];
+
+    const generated = await generateSpatialBoardAsync('Create a study board about memory');
+    assert.equal(generated.source, 'local');
+    assert.match(generated.message || '', /quota/i);
+    assert.ok(generated.nodes.length > 0);
+
+    const summary = await summarizeBoardWithAIAsync(boardNodes, boardRelations, 'summary');
+    assert.equal(summary.source, 'local');
+    assert.match(summary.message || '', /quota/i);
+    assert.ok(summary.nodes.length > 0);
+
+    const analysis = await analyzeGraphWithAIAsync(boardNodes, boardRelations);
+    assert.equal(analysis.source, 'local');
+    assert.match(analysis.message || '', /quota/i);
+    assert.ok(analysis.critique.length > 0);
+
+    const challenge = await challengeBoardWithAIAsync(boardNodes, boardRelations);
+    assert.equal(challenge.source, 'local');
+    assert.match(challenge.message || '', /quota/i);
+    assert.ok(challenge.challenges.length > 0);
+
+    const socratic = await socraticInquiryWithAIAsync(boardNodes, boardRelations);
+    assert.equal(socratic.source, 'local');
+    assert.match(socratic.message || '', /quota/i);
+    assert.ok(socratic.questions.length > 0);
+
+    const updatedPositions: Record<string, LivingNode['position']> = {};
+    const addedNodes: LivingNode[] = [];
+    const organized = await organizeAndClusterWithAIAsync(
+      boardNodes,
+      (id, patch) => {
+        if (patch.position) updatedPositions[id] = patch.position;
+      },
+      (node) => addedNodes.push(node)
+    );
+    assert.equal(organized.source, 'local');
+    assert.match(organized.message || '', /quota/i);
+    assert.ok(Object.keys(updatedPositions).length > 0);
+    assert.ok(addedNodes.some((node) => node.type === 'frame'));
+
+    for (const path of ['generate', 'summarize', 'analyze-graph', 'challenge', 'socratic', 'organize']) {
+      assert.ok(requestedPaths.some((url) => url.includes(`/api/ai/${path}`)), `expected /api/ai/${path} request`);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 let passed = 0;

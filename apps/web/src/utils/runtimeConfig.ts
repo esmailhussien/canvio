@@ -14,12 +14,17 @@ export function getRuntimeConfig() {
   return window.CANVIO_CONFIG || {};
 }
 
+function getViteEnv() {
+  return (import.meta as ImportMeta & { env?: Record<string, string | boolean | undefined> }).env || {};
+}
+
 export function getApiBaseUrl() {
+  const env = getViteEnv();
   return (
     getRuntimeConfig().apiUrl ||
-    import.meta.env.VITE_API_URL ||
+    env.VITE_API_URL ||
     ''
-  ).replace(/\/$/, '');
+  ).toString().replace(/\/$/, '');
 }
 
 export function getCanvioClientId() {
@@ -36,11 +41,12 @@ export function getCanvioClientId() {
 }
 
 export function getCanvioApiToken() {
+  const env = getViteEnv();
   return (
     getRuntimeConfig().apiToken ||
-    import.meta.env.VITE_CANVIO_API_TOKEN ||
+    env.VITE_CANVIO_API_TOKEN ||
     ''
-  ).trim();
+  ).toString().trim();
 }
 
 export function getCanvioShareToken() {
@@ -54,10 +60,12 @@ export function getCanvioShareToken() {
 
 export function getWebSocketUrl() {
   if (getRuntimeConfig().wsUrl) return getRuntimeConfig().wsUrl!.replace(/\/$/, '');
-  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL.replace(/\/$/, '');
+  const env = getViteEnv();
+  const configuredWsUrl = typeof env.VITE_WS_URL === 'string' ? env.VITE_WS_URL : '';
+  if (configuredWsUrl) return configuredWsUrl.replace(/\/$/, '');
   
   // Connect directly to local Canvio server in local development or on localhost/LAN
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || import.meta.env.DEV)) {
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || env.DEV)) {
     const hostname = window.location.hostname || 'localhost';
     return `ws://${hostname}:4001`;
   }

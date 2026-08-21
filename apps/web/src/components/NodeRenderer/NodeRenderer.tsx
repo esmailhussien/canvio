@@ -72,8 +72,8 @@ export function NodeRenderer({ node, presentationMode = false, focusNodeId = nul
   const pendingTapEditTargetRef = useRef<HTMLElement | null>(null);
   const pendingTapShouldEditRef = useRef(false);
   const getDragThreshold = (pointerType: string) => {
-    if (pointerType === 'touch') return 12;
-    if (pointerType === 'pen') return 9;
+    if (pointerType === 'touch') return 8;
+    if (pointerType === 'pen') return 6;
     return 6;
   };
 

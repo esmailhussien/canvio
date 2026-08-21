@@ -38,6 +38,14 @@ export interface BoardRecord {
 }
 
 export type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'groq';
+export type AIErrorCode =
+  | 'AI_NOT_CONFIGURED'
+  | 'AI_QUOTA_EXCEEDED'
+  | 'AI_RATE_LIMITED'
+  | 'AI_MODEL_UNAVAILABLE'
+  | 'AI_TIMEOUT'
+  | 'AI_INVALID_RESPONSE'
+  | 'AI_REQUEST_FAILED';
 
 export interface AIContextNode {
   id: string;
@@ -88,19 +96,25 @@ export interface AIBoardResponse {
   title: string;
   nodes: RawAIBoardNode[];
   relations: RawAIBoardRelation[];
-  error?: 'AI_NOT_CONFIGURED' | 'AI_REQUEST_FAILED';
+  error?: AIErrorCode;
+  message?: string;
+  retryAfterSeconds?: number;
   details?: string;
 }
 
 export interface AIClusterResponse {
-  source: 'server-ai';
-  provider: AIProvider;
-  model: string;
+  source: 'server-ai' | 'local-fallback';
+  provider?: AIProvider;
+  model?: string;
   clusters: Array<{
     title: string;
     color: string;
     nodeIds: string[];
   }>;
+  error?: AIErrorCode;
+  message?: string;
+  retryAfterSeconds?: number;
+  details?: string;
 }
 
 export interface AIGraphInsight {
@@ -128,14 +142,16 @@ export interface AIGraphAnalysisResponse {
   healthScore: number;
   insights: AIGraphInsight[];
   suggestedRelations: AISuggestedRelation[];
-  error?: 'AI_NOT_CONFIGURED' | 'AI_REQUEST_FAILED';
+  error?: AIErrorCode;
+  message?: string;
+  retryAfterSeconds?: number;
   details?: string;
 }
 
 export interface AIChallengeResponse {
-  source: 'server-ai';
-  provider: AIProvider;
-  model: string;
+  source: 'server-ai' | 'local-fallback';
+  provider?: AIProvider;
+  model?: string;
   challengeSummary: string;
   challenges: Array<{
     targetNodeId: string;
@@ -144,12 +160,16 @@ export interface AIChallengeResponse {
   }>;
   challengerNodes?: RawAIBoardNode[];
   challengerRelations?: RawAIBoardRelation[];
+  error?: AIErrorCode;
+  message?: string;
+  retryAfterSeconds?: number;
+  details?: string;
 }
 
 export interface AISocraticResponse {
-  source: 'server-ai';
-  provider: AIProvider;
-  model: string;
+  source: 'server-ai' | 'local-fallback';
+  provider?: AIProvider;
+  model?: string;
   inquiryFocus: string;
   questions: Array<{
     id: string;
@@ -157,6 +177,10 @@ export interface AISocraticResponse {
     relatedNodeIds?: string[];
     learningGoal?: string;
   }>;
+  error?: AIErrorCode;
+  message?: string;
+  retryAfterSeconds?: number;
+  details?: string;
 }
 
 export class ApiRequestError extends Error {

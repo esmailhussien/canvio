@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { Canvas } from '../components/Canvas/Canvas';
-import { IconFitToWorld, IconMap, IconRedo, IconSticky, IconTheme, IconUndo, Toolbar } from '@canvio/ui';
+import { IconRedo, IconUndo, Toolbar } from '@canvio/ui';
 import { Cursors } from '../components/Cursors/Cursors';
 import { ShareButton } from '../components/ShareButton/ShareButton';
 import { ExportMenu } from '../components/ExportMenu/ExportMenu';
@@ -16,27 +16,26 @@ import { RelationInspector } from '../components/RelationInspector/RelationInspe
 import { PenInspector } from '../components/PenInspector/PenInspector';
 import { GraphIntelligence } from '../components/GraphIntelligence/GraphIntelligence';
 import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
-import { getPlugin } from '@canvio/objects';
 import { fitViewportToNodes } from '../utils/viewportFit';
 import { createBoard, forkBoard, touchBoard, updateBoardAppearance, BoardRecord } from '../utils/api';
 import './WorldPage.css';
 
 const TOOL_GUIDANCE: Record<string, { label: string; detail: string }> = {
-  select: { label: 'Select', detail: 'Click an element to move or edit it.' },
-  pan: { label: 'Pan', detail: 'Drag the canvas to move around. Release Space to return.' },
-  draw: { label: 'Pen', detail: 'Draw freely. Select the stroke afterward to move it.' },
-  highlighter: { label: 'Highlighter', detail: 'Mark an area, then switch to Select to move it.' },
+  select: { label: 'Select', detail: 'Tap or click an element to move it. Use two fingers to move the canvas.' },
+  pan: { label: 'Pan', detail: 'Drag the canvas to move around. Pinch to zoom on touch screens.' },
+  draw: { label: 'Pen', detail: 'Draw freely. Switch to Select to move the stroke afterward.' },
+  highlighter: { label: 'Highlighter', detail: 'Mark an area. Switch to Select to move the highlight afterward.' },
   laser: { label: 'Laser pointer', detail: 'Point at an idea while presenting. It is temporary and never saved.' },
   arrow: { label: 'Arrow', detail: 'Draw a line and Canvio will keep its arrow head editable.' },
-  text: { label: 'Text', detail: 'Click anywhere to place a text block.' },
-  sticky: { label: 'Sticky note', detail: 'Click anywhere to place a note.' },
-  shape: { label: 'Shape', detail: 'Click anywhere to place a shape.' },
-  map: { label: 'Living Map', detail: 'Click to place a world map. Add pins, then connect exact locations to ideas.' },
-  relation: { label: 'Relation', detail: 'Choose a side or map pin, then choose the target. Press Esc to cancel.' },
-  eraser: { label: 'Eraser', detail: 'Click an ink stroke to remove it.' },
-  image: { label: 'Image', detail: 'Click the canvas to place an image.' },
+  text: { label: 'Text', detail: 'Tap or click anywhere to place a text block.' },
+  sticky: { label: 'Sticky note', detail: 'Tap or click anywhere to place a note. Drag the handle to move it.' },
+  shape: { label: 'Shape', detail: 'Tap or click anywhere to place a shape.' },
+  map: { label: 'Living Map', detail: 'Tap or click to place a world map. Add pins, then connect exact locations to ideas.' },
+  relation: { label: 'Relation', detail: 'Choose a side or map pin, then choose the target.' },
+  eraser: { label: 'Eraser', detail: 'Tap or click an ink stroke to remove it.' },
+  image: { label: 'Image', detail: 'Tap or click the canvas to place an image.' },
   frame: { label: 'Frame', detail: 'Drag an area to create a frame.' },
-  code: { label: 'Code', detail: 'Click anywhere to place a code block.' },
+  code: { label: 'Code', detail: 'Tap or click anywhere to place a code block.' },
 };
 
 
@@ -50,18 +49,189 @@ const BACKGROUND_SWATCHES = [
   { value: '#2b2138', label: 'Plum background', preview: '#2b2138', grid: 'rgba(216,180,254,0.11)' },
 ];
 
+const COACH_DISMISS_KEY = 'CANVIO_STARTER_COACH_DISMISSED_V1';
+
+type CoachAction = 'add-note' | 'connect' | 'open-ai' | 'open-templates' | 'select-tool';
+
+type StarterGoal = {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  accent: string;
+  templateId: string;
+};
+
+const STARTER_GOALS: StarterGoal[] = [
+  {
+    id: 'lesson',
+    title: 'Teach a lesson',
+    description: 'Plan objectives, flow, activities, and checks.',
+    icon: 'school',
+    accent: '#38bdf8',
+    templateId: 'lesson-plan-board',
+  },
+  {
+    id: 'study',
+    title: 'Study a topic',
+    description: 'Connect definitions, examples, questions, and practice.',
+    icon: 'neurology',
+    accent: '#f59e0b',
+    templateId: 'study-concept-map',
+  },
+  {
+    id: 'project',
+    title: 'Plan a project',
+    description: 'Map scope, owners, risks, milestones, and metrics.',
+    icon: 'rocket_launch',
+    accent: '#22c55e',
+    templateId: 'launch-operating-plan',
+  },
+  {
+    id: 'research',
+    title: 'Research evidence',
+    description: 'Turn signals into insights, confidence, and decisions.',
+    icon: 'travel_explore',
+    accent: '#06b6d4',
+    templateId: 'research-evidence-wall',
+  },
+  {
+    id: 'map',
+    title: 'Map a place',
+    description: 'Use pins, field notes, evidence, and location relations.',
+    icon: 'map',
+    accent: '#10b981',
+    templateId: 'site-visit-map',
+  },
+  {
+    id: 'decision',
+    title: 'Make a decision',
+    description: 'Compare options, tradeoffs, evidence, owners, and next action.',
+    icon: 'psychology',
+    accent: '#a855f7',
+    templateId: 'decision-intelligence-room',
+  },
+];
+
+type CoachTip = {
+  step: string;
+  title: string;
+  body: string;
+  icon: string;
+  action: CoachAction;
+  actionLabel: string;
+};
+
+function getCoachTip({
+  activeTool,
+  nodeCount,
+  relationCount,
+  selectedCount,
+}: {
+  activeTool: string;
+  nodeCount: number;
+  relationCount: number;
+  selectedCount: number;
+}): CoachTip {
+  if (activeTool === 'relation') {
+    return {
+      step: 'Connect',
+      title: nodeCount < 2 ? 'Add two ideas first' : 'Pick source, then target',
+      body: nodeCount < 2
+        ? 'Relations need two elements. Add another note, shape, map pin, or text block, then connect them.'
+        : 'Tap an edge or map pin, then tap the element it explains. Labels make the board easier for AI to read.',
+      icon: 'hub',
+      action: nodeCount < 2 ? 'add-note' : 'select-tool',
+      actionLabel: nodeCount < 2 ? 'Add note' : 'Back to Select',
+    };
+  }
+
+  if (activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow') {
+    return {
+      step: 'Ink',
+      title: 'Draw now, edit after',
+      body: 'Finish the stroke, then switch to Select to move it, resize it, or connect it with other ideas.',
+      icon: activeTool === 'arrow' ? 'arrow_outward' : 'draw',
+      action: 'select-tool',
+      actionLabel: 'Select tool',
+    };
+  }
+
+  if (activeTool === 'map') {
+    return {
+      step: 'Map',
+      title: 'Maps are living objects',
+      body: 'Place the map, add pins, then connect exact locations to notes or evidence when the place matters.',
+      icon: 'map',
+      action: 'select-tool',
+      actionLabel: 'Select after placing',
+    };
+  }
+
+  if (nodeCount === 0) {
+    return {
+      step: 'Start',
+      title: 'Make the first idea visible',
+      body: 'Add one sticky note or use AI/templates when you want Canvio to create a first structure for you.',
+      icon: 'sticky_note_2',
+      action: 'add-note',
+      actionLabel: 'Add sticky note',
+    };
+  }
+
+  if (nodeCount === 1) {
+    return {
+      step: 'Build',
+      title: 'Add one more idea',
+      body: 'A board becomes useful when there is at least one comparison, example, question, or next step.',
+      icon: 'add_box',
+      action: 'add-note',
+      actionLabel: 'Add another note',
+    };
+  }
+
+  if (nodeCount > 1 && relationCount === 0) {
+    return {
+      step: 'Connect',
+      title: 'Show how the ideas relate',
+      body: 'Use Relation to explain cause, evidence, sequence, risk, or dependency between elements.',
+      icon: 'conversion_path',
+      action: 'connect',
+      actionLabel: 'Connect ideas',
+    };
+  }
+
+  if (selectedCount > 0) {
+    return {
+      step: 'Refine',
+      title: 'Try a safe variation',
+      body: 'Use Experiment to duplicate selected elements and explore another version without damaging the original.',
+      icon: 'difference',
+      action: 'select-tool',
+      actionLabel: 'Keep editing',
+    };
+  }
+
+  return {
+    step: 'Use',
+    title: 'Turn the board into something useful',
+    body: 'Ask AI to summarize, find gaps, write an article, or suggest the next move from your current board.',
+    icon: 'auto_awesome',
+    action: 'open-ai',
+    actionLabel: 'Ask AI',
+  };
+}
+
 export function WorldPage() {
   const { worldId } = useParams<{ worldId: string }>();
   const navigate = useNavigate();
   const activeTool = useCanvasStore((s) => s.activeTool);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const nodes = useCanvasStore((s) => s.nodes);
+  const relations = useCanvasStore((s) => s.relations);
   const canUndo = useCanvasStore((s) => s.canUndo);
   const canRedo = useCanvasStore((s) => s.canRedo);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const selectNode = useCanvasStore((s) => s.selectNode);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
-  const nextZIndex = useCanvasStore((s) => s.nextZIndex);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const theme = useCanvasStore((s) => s.theme);
   const themePreference = useCanvasStore((s) => s.themePreference);
@@ -83,6 +253,8 @@ export function WorldPage() {
   const [isCanvioMenuOpen, setIsCanvioMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isStarterDismissed, setIsStarterDismissed] = useState(false);
+  const [hasLoadedCoachPreference, setHasLoadedCoachPreference] = useState(false);
+  const [isCoachDismissed, setIsCoachDismissed] = useState(false);
   const [autoShapeEnabled, setAutoShapeEnabled] = useState(false);
   const [isPresenting, setIsPresenting] = useState(false);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
@@ -114,6 +286,22 @@ export function WorldPage() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', activeTheme);
   }, [activeTheme, theme]);
+
+  useEffect(() => {
+    try {
+      setIsCoachDismissed(window.localStorage.getItem(COACH_DISMISS_KEY) === '1');
+    } catch {
+      setIsCoachDismissed(false);
+    } finally {
+      setHasLoadedCoachPreference(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    setIsStarterDismissed(false);
+    setIsPresenting(false);
+    setFocusNodeId(null);
+  }, [worldId]);
 
   const handleFitToWorld = () => {
     const allNodes = Object.values(nodes);
@@ -192,6 +380,47 @@ export function WorldPage() {
     setFocusNodeId(null);
   };
 
+  const handleDismissCoach = () => {
+    setIsCoachDismissed(true);
+    try {
+      window.localStorage.setItem(COACH_DISMISS_KEY, '1');
+    } catch {
+      // Ignore storage errors; the visible state still updates for this session.
+    }
+  };
+
+  const handleShowCoach = () => {
+    setIsCoachDismissed(false);
+    setIsStarterDismissed(true);
+    setIsCanvioMenuOpen(false);
+    setIsExportMenuOpen(false);
+    try {
+      window.localStorage.removeItem(COACH_DISMISS_KEY);
+    } catch {
+      // Ignore storage errors; the guide still opens for this session.
+    }
+  };
+
+  const handleCoachAction = (action: CoachAction) => {
+    if (action === 'add-note') {
+      setActiveTool('sticky');
+      return;
+    }
+    if (action === 'connect') {
+      setActiveTool('relation');
+      return;
+    }
+    if (action === 'open-ai') {
+      setIsAIOpen(true);
+      return;
+    }
+    if (action === 'open-templates') {
+      setIsTemplateOpen(true);
+      return;
+    }
+    setActiveTool('select');
+  };
+
   const handleStartFromScratch = (reset = false) => {
     if (reset && Object.keys(nodes).length > 0) {
       const confirmed = window.confirm('Start with a blank canvas? Current canvas content will be cleared.');
@@ -207,42 +436,6 @@ export function WorldPage() {
     });
     setActiveTool('select');
     setViewport({ x: 0, y: 0, zoom: 1 });
-  };
-
-  const handleDropMap = () => {
-    setIsStarterDismissed(true);
-    replaceWorld({
-      nodes: {},
-      relations: {},
-      viewport: { x: 0, y: 0, zoom: 1 },
-      appearance: { theme, canvasBackground },
-    });
-    const mapPlugin = getPlugin('map');
-    if (mapPlugin) {
-      const mapNode = mapPlugin.create({ x: 0, y: 0 });
-      const positionedNode = {
-        ...mapNode,
-        position: {
-          x: -(mapNode.size.width / 2),
-          y: -(mapNode.size.height / 2)
-        },
-        zIndex: nextZIndex(),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      addNode(positionedNode);
-      selectNode(positionedNode.id);
-      setActiveTool('select');
-      window.setTimeout(() => {
-        const isCompact = window.innerWidth <= 760;
-        fitViewportToNodes([positionedNode], {
-          maxZoom: 1,
-          minZoom: 0.35,
-          paddingX: isCompact ? 44 : 220,
-          paddingY: isCompact ? 230 : 220,
-        });
-      }, 0);
-    }
   };
 
   const handleStartTemplate = (templateId: string) => {
@@ -363,8 +556,17 @@ export function WorldPage() {
 
   // Connect to collaboration
   const { connected, connectionIssue, users, persistenceState, retryConnection } = useCollaboration(worldId || '');
+  const nodeCount = Object.keys(nodes).length;
+  const relationCount = Object.keys(relations).length;
   const toolGuidance = TOOL_GUIDANCE[activeTool] || TOOL_GUIDANCE.select;
-  const showStarter = Object.keys(nodes).length === 0 && !isStarterDismissed && !isPresenting;
+  const showStarter = nodeCount === 0 && !isStarterDismissed && !isPresenting;
+  const coachTip = getCoachTip({
+    activeTool,
+    nodeCount,
+    relationCount,
+    selectedCount: selectedNodeIds.length,
+  });
+  const showCoach = hasLoadedCoachPreference && !isCoachDismissed && !showStarter && !isPresenting;
   const saveLabel = persistenceState === 'loading'
     ? 'Restoring board'
     : persistenceState === 'saving'
@@ -413,49 +615,45 @@ export function WorldPage() {
               What are you working on?
             </h1>
             <p className="world-page__empty-subtitle">
-              Choose a starting point. You can change direction at any time.
+              Choose a familiar starting point. Canvio will fit it to the board for you.
             </p>
           </div>
 
           <div className="world-page__starter-panel">
             <div className="world-page__starter-section">
-              <span className="world-page__starter-label">Start blank</span>
-              <button className="world-page__starter-card primary" onClick={() => handleStartFromScratch(false)}>
-                <span className="world-page__starter-card-icon" aria-hidden="true">
-                  <IconSticky size={22} />
-                </span>
+              <span className="world-page__starter-label">Clean start</span>
+              <button
+                className="world-page__starter-card world-page__starter-card--blank"
+                onClick={() => handleStartFromScratch(false)}
+                aria-label="Start from scratch"
+              >
+                <span className="world-page__starter-card-icon material-symbols-outlined" aria-hidden="true">edit_note</span>
                 <span className="world-page__starter-card-copy">
                   <strong>Start from scratch</strong>
-                  <small>Make your own board</small>
+                  <small>Open a clean board and build freely.</small>
                 </span>
               </button>
             </div>
             <div className="world-page__starter-section world-page__starter-section--wide">
-              <span className="world-page__starter-label">Start with a purpose</span>
+              <span className="world-page__starter-label">Start with a goal</span>
               <div className="world-page__starter-grid">
-                <button className="world-page__starter-card lesson-card" onClick={() => handleStartTemplate('lesson-plan-board')}>
-                  <span className="world-page__starter-card-icon material-symbols-outlined" aria-hidden="true">school</span>
-                  <span className="world-page__starter-card-copy">
-                    <strong>Teach a lesson</strong>
-                    <small>Plan an explanation</small>
-                  </span>
-                </button>
-                <button className="world-page__starter-card study-card" onClick={() => handleStartTemplate('study-concept-map')}>
-                  <span className="world-page__starter-card-icon material-symbols-outlined" aria-hidden="true">neurology</span>
-                  <span className="world-page__starter-card-copy">
-                    <strong>Study a topic</strong>
-                    <small>Connect what you know</small>
-                  </span>
-                </button>
-                <button className="world-page__starter-card map-card" onClick={handleDropMap}>
-                  <span className="world-page__starter-card-icon" aria-hidden="true">
-                    <IconMap size={22} />
-                  </span>
-                  <span className="world-page__starter-card-copy">
-                    <strong>Explore a place</strong>
-                    <small>Start with a world map</small>
-                  </span>
-                </button>
+                {STARTER_GOALS.map((goal) => (
+                  <button
+                    key={goal.id}
+                    className="world-page__starter-card world-page__starter-card--goal"
+                    style={{ '--starter-accent': goal.accent } as React.CSSProperties}
+                    onClick={() => handleStartTemplate(goal.templateId)}
+                    aria-label={`Start with ${goal.title.toLowerCase()}`}
+                  >
+                    <span className="world-page__starter-card-icon material-symbols-outlined" aria-hidden="true">
+                      {goal.icon}
+                    </span>
+                    <span className="world-page__starter-card-copy">
+                      <strong>{goal.title}</strong>
+                      <small>{goal.description}</small>
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
             <div className="world-page__starter-actions">
@@ -485,6 +683,43 @@ export function WorldPage() {
       )}
 
       <Cursors users={users} />
+      {showCoach && (
+        <aside className="world-page__coach" aria-label="Canvio guide" aria-live="polite">
+          <div className="world-page__coach-top">
+            <span className="world-page__coach-step">
+              <span className="material-symbols-outlined" aria-hidden="true">{coachTip.icon}</span>
+              {coachTip.step}
+            </span>
+            <button
+              type="button"
+              className="world-page__coach-close"
+              onClick={handleDismissCoach}
+              aria-label="Hide Canvio guide"
+              title="Hide guide"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
+          </div>
+          <strong>{coachTip.title}</strong>
+          <p>{coachTip.body}</p>
+          <div className="world-page__coach-actions">
+            <button
+              type="button"
+              className="world-page__coach-primary"
+              onClick={() => handleCoachAction(coachTip.action)}
+            >
+              {coachTip.actionLabel}
+            </button>
+            <button
+              type="button"
+              className="world-page__coach-secondary"
+              onClick={handleDismissCoach}
+            >
+              Got it
+            </button>
+          </div>
+        </aside>
+      )}
       {!isPresenting && (
         <>
           {!showStarter && (
@@ -568,6 +803,7 @@ export function WorldPage() {
             className="selection-quick-actions__btn"
             onClick={handleExperimentSelection}
             title="Create an editable copy to try another version"
+            aria-label="Create experiment from selected elements"
           >
             <span className="material-symbols-outlined">difference</span>
             <span>Experiment</span>
@@ -576,6 +812,7 @@ export function WorldPage() {
             className="selection-quick-actions__btn"
             onClick={isSelectedNodeFocused ? handleClearFocus : handleFocusSelectedNode}
             title={isSelectedNodeFocused ? 'Show all elements' : 'Spotlight selected element'}
+            aria-label={isSelectedNodeFocused ? 'Show all elements' : 'Focus selected element'}
           >
             <span className="material-symbols-outlined">{isSelectedNodeFocused ? 'visibility' : 'filter_center_focus'}</span>
             <span>{isSelectedNodeFocused ? 'All' : 'Focus'}</span>
@@ -654,6 +891,14 @@ export function WorldPage() {
               >
                 <span className="material-symbols-outlined text-sm">space_dashboard</span>
                 <span>Canvas Models & Layouts</span>
+              </button>
+
+              <button
+                className="canvio-menu-item"
+                onClick={handleShowCoach}
+              >
+                <span className="material-symbols-outlined text-sm">help</span>
+                <span>Show Canvio Guide</span>
               </button>
 
               <button
@@ -793,6 +1038,16 @@ export function WorldPage() {
 
         {/* Right: Undo, Redo, Divider, Robot AI & Share */}
         <div className="world-header__right">
+          <button
+            className={`header-ai-btn ${showCoach ? 'active' : ''}`}
+            onClick={handleShowCoach}
+            aria-label="Show Canvio Guide"
+            aria-pressed={showCoach}
+            title="Show Canvio guide"
+          >
+            <span className="material-symbols-outlined text-base">help</span>
+          </button>
+
           <button
             className="header-icon-btn"
             onClick={() => useCanvasStore.getState().undo()}

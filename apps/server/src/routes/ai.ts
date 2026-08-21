@@ -3,6 +3,14 @@ import { createAuthHook, createRateLimitHook, readPositiveIntEnv } from '../secu
 
 type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'groq';
 type RelationshipType = 'related_to' | 'leads_to' | 'based_on' | 'part_of' | 'depends_on' | 'contradicts' | 'enables' | 'explains' | 'causes' | 'example_of' | 'mitigates' | 'inspired_by' | 'same_as' | 'custom';
+export type AIErrorCode =
+  | 'AI_NOT_CONFIGURED'
+  | 'AI_QUOTA_EXCEEDED'
+  | 'AI_RATE_LIMITED'
+  | 'AI_MODEL_UNAVAILABLE'
+  | 'AI_TIMEOUT'
+  | 'AI_INVALID_RESPONSE'
+  | 'AI_REQUEST_FAILED';
 
 interface AIContextNode {
   id?: string;
@@ -116,16 +124,13 @@ export async function aiRoutes(fastify: FastifyInstance) {
         ...normalizeBoardPayload(parsed, prompt),
       };
     } catch (err: any) {
-      fastify.log.error({ err }, 'AI board generation failed');
+      const failure = createAIFailureResponse(primaryProvider, request.body?.model, err);
+      fastify.log.error({ err, error: failure.error }, 'AI board generation failed');
       return reply.send({
-        source: 'local-fallback',
-        provider: primaryProvider,
-        model: resolveModel(primaryProvider, request.body?.model),
+        ...failure,
         title: '',
         nodes: [],
         relations: [],
-        error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED',
-        details: err?.message,
       });
     }
   });
@@ -158,16 +163,13 @@ export async function aiRoutes(fastify: FastifyInstance) {
         ...normalizeBoardPayload(parsed, output === 'article' ? 'Board article draft' : 'Board summary'),
       };
     } catch (err: any) {
-      fastify.log.error({ err }, 'AI summarize failed');
+      const failure = createAIFailureResponse(primaryProvider, request.body?.model, err);
+      fastify.log.error({ err, error: failure.error }, 'AI summarize failed');
       return reply.send({
-        source: 'local-fallback',
-        provider: primaryProvider,
-        model: resolveModel(primaryProvider, request.body?.model),
+        ...failure,
         title: '',
         nodes: [],
         relations: [],
-        error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED',
-        details: err?.message,
       });
     }
   });
@@ -196,8 +198,12 @@ Every input node id should appear in exactly one cluster when possible.`;
         clusters: normalizeClusters(parsed, nodes),
       };
     } catch (err: any) {
-      fastify.log.error({ err }, 'AI organize failed');
-      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+      const failure = createAIFailureResponse(primaryProvider, request.body?.model, err);
+      fastify.log.warn({ err, error: failure.error }, 'AI organize unavailable; client should use local clustering');
+      return reply.send({
+        ...failure,
+        clusters: [],
+      });
     }
   });
 
@@ -244,18 +250,14 @@ Return ONLY raw JSON with this exact schema:
         ...parsed,
       };
     } catch (err: any) {
-      const error = err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED';
-      fastify.log.warn({ err, error }, 'AI graph analysis unavailable; client should use local reasoning fallback');
+      const failure = createAIFailureResponse(primaryProvider, request.body?.model, err);
+      fastify.log.warn({ err, error: failure.error }, 'AI graph analysis unavailable; client should use local reasoning fallback');
       return reply.send({
-        source: 'local-fallback',
-        provider: primaryProvider,
-        model: resolveModel(primaryProvider, request.body?.model),
+        ...failure,
         critique: '',
         healthScore: 0,
         insights: [],
         suggestedRelations: [],
-        error,
-        details: err?.message,
       });
     }
   });
@@ -310,8 +312,15 @@ Return ONLY raw JSON with this schema:
         ...parsed,
       };
     } catch (err: any) {
-      fastify.log.error({ err }, 'AI challenge failed');
-      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+      const failure = createAIFailureResponse(primaryProvider, request.body?.model, err);
+      fastify.log.warn({ err, error: failure.error }, 'AI challenge unavailable; client should use local challenge fallback');
+      return reply.send({
+        ...failure,
+        challengeSummary: '',
+        challenges: [],
+        challengerNodes: [],
+        challengerRelations: [],
+      });
     }
   });
 
@@ -346,10 +355,109 @@ Return ONLY raw JSON:
         ...parsed,
       };
     } catch (err: any) {
-      fastify.log.error({ err }, 'AI socratic failed');
-      return reply.code(503).send({ error: err?.message?.includes('AI_NOT_CONFIGURED') ? 'AI_NOT_CONFIGURED' : 'AI_REQUEST_FAILED', details: err?.message });
+      const failure = createAIFailureResponse(primaryProvider, request.body?.model, err);
+      fastify.log.warn({ err, error: failure.error }, 'AI socratic unavailable; client should use local Socratic fallback');
+      return reply.send({
+        ...failure,
+        inquiryFocus: '',
+        questions: [],
+      });
     }
   });
+}
+
+function createAIFailureResponse(primaryProvider: AIProvider, requestedModel: string | undefined, error: unknown) {
+  const failure = classifyAIError(error);
+  return {
+    source: 'local-fallback' as const,
+    provider: primaryProvider,
+    model: resolveModel(primaryProvider, requestedModel),
+    ...failure,
+    details: sanitizeAIErrorDetails(error),
+  };
+}
+
+export function classifyAIError(error: unknown): { error: AIErrorCode; message: string; retryAfterSeconds?: number } {
+  const rawMessage = getErrorMessage(error);
+  const message = rawMessage.toLowerCase();
+  const retryAfterSeconds = parseRetryAfterSeconds(rawMessage);
+
+  if (/ai_not_configured|not configured|missing api key|api key is required|no api key/.test(message)) {
+    return {
+      error: 'AI_NOT_CONFIGURED',
+      message: 'Server AI is not configured yet, so Canvio used local smart mode.',
+    };
+  }
+
+  if (/quota|resource_exhausted|insufficient_quota|billing|current plan/.test(message)) {
+    return {
+      error: 'AI_QUOTA_EXCEEDED',
+      message: retryAfterSeconds
+        ? `AI quota is temporarily exhausted. Canvio used local smart mode; try server AI again in about ${retryAfterSeconds}s.`
+        : 'AI quota is temporarily exhausted. Canvio used local smart mode.',
+      retryAfterSeconds,
+    };
+  }
+
+  if (/429|rate.?limit|too many requests|retry after|retry in/.test(message)) {
+    return {
+      error: 'AI_RATE_LIMITED',
+      message: retryAfterSeconds
+        ? `AI is busy right now. Canvio used local smart mode; try again in about ${retryAfterSeconds}s.`
+        : 'AI is busy right now. Canvio used local smart mode.',
+      retryAfterSeconds,
+    };
+  }
+
+  if (/model_not_found|model .*does not exist|does not exist|do not have access|model.*not.*found|invalid_model/.test(message)) {
+    return {
+      error: 'AI_MODEL_UNAVAILABLE',
+      message: 'The configured AI model is unavailable. Canvio used local smart mode while the model setting is updated.',
+    };
+  }
+
+  if (/timeout|timed out|abort|econnreset|etimedout|network/.test(message)) {
+    return {
+      error: 'AI_TIMEOUT',
+      message: 'AI took too long to respond. Canvio used local smart mode so you can keep working.',
+    };
+  }
+
+  if (/invalid json|malformed json|expected ','|expected property|json repair|returned invalid/.test(message)) {
+    return {
+      error: 'AI_INVALID_RESPONSE',
+      message: 'AI returned an unreadable response. Canvio used local smart mode instead.',
+    };
+  }
+
+  return {
+    error: 'AI_REQUEST_FAILED',
+    message: 'Server AI was unavailable. Canvio used local smart mode instead.',
+  };
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function parseRetryAfterSeconds(message: string) {
+  const retryIn = message.match(/retry\s+in\s+(\d+(?:\.\d+)?)\s*s/i);
+  if (retryIn?.[1]) return Math.max(1, Math.ceil(Number(retryIn[1])));
+
+  const retryDelay = message.match(/"retryDelay"\s*:\s*"(\d+)s"/i) || message.match(/retryDelay[^0-9]+(\d+)s/i);
+  if (retryDelay?.[1]) return Math.max(1, Number(retryDelay[1]));
+
+  return undefined;
+}
+
+function sanitizeAIErrorDetails(error: unknown) {
+  return getErrorMessage(error).replace(/\s+/g, ' ').trim().slice(0, 700);
 }
 
 function resolveProvider(provider?: string): AIProvider {
