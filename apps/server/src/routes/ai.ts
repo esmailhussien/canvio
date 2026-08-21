@@ -65,7 +65,7 @@ const PROVIDERS: AIProvider[] = ['gemini', 'openai', 'anthropic', 'groq'];
 const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'enables', 'explains', 'causes', 'example_of', 'mitigates', 'inspired_by'];
 const NODE_TYPES = ['sticky', 'shape', 'text', 'frame'];
 const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
-const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
 const GROQ_PREFERRED_MODELS = [
   'openai/gpt-oss-20b',
   'openai/gpt-oss-120b',
@@ -77,6 +77,7 @@ const GROQ_PREFERRED_MODELS = [
 ];
 
 let groqModelsCache: { expiresAt: number; ids: string[] } | null = null;
+let groqWorkingModelCache: { expiresAt: number; model: string } | null = null;
 
 export async function aiRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', createRateLimitHook({
@@ -416,9 +417,16 @@ async function callAIWithFallback(
     const key = resolveApiKey(prov);
     if (!key) continue;
 
-    const mod = resolveModel(prov, prov === primaryProvider ? requestedModel : undefined);
+    const requestedProviderModel = prov === primaryProvider ? requestedModel : undefined;
+    let mod = resolveModel(prov, requestedProviderModel);
+    const cachedGroqModel = prov === 'groq' && !requestedProviderModel ? getCachedWorkingGroqModel() : null;
+    if (cachedGroqModel) {
+      mod = cachedGroqModel;
+    }
+
     try {
       const parsed = await callProviderForJson(prov, key, mod, systemPrompt, userPrompt);
+      rememberSuccessfulProviderModel(prov, mod);
       return { parsed, provider: prov, model: mod };
     } catch (err: any) {
       console.warn(`[Canvio AI Fallback Agent] Provider "${prov}" failed:`, err?.message || err);
@@ -432,6 +440,7 @@ async function callAIWithFallback(
           try {
             console.warn(`[Canvio AI Fallback Agent] Retrying Groq with default model "${DEFAULT_GROQ_MODEL}".`);
             const parsed = await callProviderForJson(prov, key, DEFAULT_GROQ_MODEL, systemPrompt, userPrompt);
+            rememberSuccessfulProviderModel(prov, DEFAULT_GROQ_MODEL);
             return { parsed, provider: prov, model: DEFAULT_GROQ_MODEL };
           } catch (fallbackErr: any) {
             console.warn(`[Canvio AI Fallback Agent] Groq default model "${DEFAULT_GROQ_MODEL}" failed:`, fallbackErr?.message || fallbackErr);
@@ -447,6 +456,7 @@ async function callAIWithFallback(
             try {
               console.warn(`[Canvio AI Fallback Agent] Retrying Groq with discovered model "${accessibleModel}".`);
               const parsed = await callProviderForJson(prov, key, accessibleModel, systemPrompt, userPrompt);
+              rememberSuccessfulProviderModel(prov, accessibleModel);
               return { parsed, provider: prov, model: accessibleModel };
             } catch (discoveredErr: any) {
               console.warn(`[Canvio AI Fallback Agent] Groq discovered model "${accessibleModel}" failed:`, discoveredErr?.message || discoveredErr);
@@ -468,6 +478,19 @@ async function callAIWithFallback(
 
 function isModelUnavailableError(error: Error) {
   return /model_not_found|does not exist|do not have access/i.test(error.message);
+}
+
+function getCachedWorkingGroqModel() {
+  if (!groqWorkingModelCache || groqWorkingModelCache.expiresAt <= Date.now()) {
+    return null;
+  }
+
+  return groqWorkingModelCache.model;
+}
+
+function rememberSuccessfulProviderModel(provider: AIProvider, model: string) {
+  if (provider !== 'groq') return;
+  groqWorkingModelCache = { model, expiresAt: Date.now() + 60 * 60 * 1000 };
 }
 
 async function resolveAccessibleGroqModel(apiKey: string, attemptedModels: Set<string>) {
