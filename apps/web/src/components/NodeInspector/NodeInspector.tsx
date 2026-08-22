@@ -697,16 +697,6 @@ export function NodeInspector({ node }: NodeInspectorProps) {
 }
 
 function formatAIProvider(provider?: string) {
-  switch (provider) {
-    case 'groq':
-      return 'Groq';
-    case 'gemini':
-      return 'Gemini';
-    case 'openai':
-      return 'OpenAI';
-    case 'anthropic':
-      return 'Anthropic';
-    default:
-      return 'Server AI';
-  }
+  // Vendor-neutral branding: users see Canvio AI regardless of provider.
+  return 'Canvio AI';
 }

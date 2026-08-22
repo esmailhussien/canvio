@@ -12,7 +12,7 @@ import {
 import { nanoid } from 'nanoid';
 import { useCanvasStore, type LivingNode } from '../../store/canvasStore';
 import { fitTemplateToViewport, fitViewportToNodes } from '../../utils/viewportFit';
-import { getNodesBounds, placeBoardAwayFromExisting } from '../../utils/boardPlacement';
+import { getNodesBounds, placeBoardAwayFromExisting, prepareGeneratedNodes } from '../../utils/boardPlacement';
 import { useDialogA11y } from '../../hooks/useDialogA11y';
 import './AIAssistantModal.css';
 
@@ -178,7 +178,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
         },
         updatedAt: createdAt,
       }));
-      const placedNodes = placeBoardAwayFromExisting(taggedNodes, Object.values(useCanvasStore.getState().nodes));
+      const placedNodes = placeBoardAwayFromExisting(prepareGeneratedNodes(taggedNodes), Object.values(useCanvasStore.getState().nodes));
 
       // Add generated nodes and relations to the store
       placedNodes.forEach((node) => addNode(node));
@@ -222,7 +222,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       const allNodes = Object.values(useCanvasStore.getState().nodes);
       const allRelations = Object.values(useCanvasStore.getState().relations);
       const res = await summarizeBoardWithAIAsync(allNodes, allRelations, output);
-      const placedNodes = placeBoardAwayFromExisting(res.nodes, allNodes);
+      const placedNodes = placeBoardAwayFromExisting(prepareGeneratedNodes(res.nodes), allNodes);
       placedNodes.forEach((n) => addNode(n));
       res.relations.forEach((r) => addRelation(r));
       fitTemplateToViewport(placedNodes);
@@ -335,7 +335,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
         },
         updatedAt: timestamp,
       }));
-      const placedNodes = placeBoardAwayFromExisting(taggedNodes, allNodes);
+      const placedNodes = placeBoardAwayFromExisting(prepareGeneratedNodes(taggedNodes), allNodes);
 
       placedNodes.forEach((node) => addNode(node));
       result.relations.forEach((rel) => addRelation(rel));
@@ -888,16 +888,6 @@ function countMapPins(nodes: LivingNode[]) {
 }
 
 function formatAIProvider(provider?: string) {
-  switch (provider) {
-    case 'groq':
-      return 'Groq';
-    case 'gemini':
-      return 'Gemini';
-    case 'openai':
-      return 'OpenAI';
-    case 'anthropic':
-      return 'Anthropic';
-    default:
-      return 'Server AI';
-  }
+  // Vendor-neutral branding: users see Canvio AI regardless of provider.
+  return 'Canvio AI';
 }

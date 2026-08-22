@@ -1330,10 +1330,6 @@ export function WorldPage() {
             onClick={() => setIsReasoningOpen((prev) => !prev)}
             aria-label="Visual Reasoning Partner & Graph Health"
             title="Visual Reasoning Partner & Graph Health (Ctrl+Shift+R)"
-            style={{
-              background: isReasoningOpen ? 'rgba(99, 102, 241, 0.25)' : undefined,
-              color: isReasoningOpen ? '#c0c1ff' : undefined,
-            }}
           >
             <span className="material-symbols-outlined text-base">psychology</span>
           </button>

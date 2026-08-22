@@ -724,6 +724,32 @@ test('graph analysis detects orphans, contradictions, and bounds the health scor
   assert.ok(analysis.metrics.reasoningHealthScore >= 0 && analysis.metrics.reasoningHealthScore <= 100);
 });
 
+test('generated boards get overlapping nodes resolved apart', async () => {
+  const { resolveNodeOverlaps } = await import('../../apps/web/src/utils/boardPlacement');
+  const a = makeNode('a', { position: { x: 0, y: 0 }, size: { width: 200, height: 120 } });
+  const b = makeNode('b', { position: { x: 100, y: 40 }, size: { width: 200, height: 120 } });
+  const c = makeNode('c', { position: { x: 900, y: 900 }, size: { width: 200, height: 120 } });
+
+  const resolved = resolveNodeOverlaps([a, b, c]);
+  const box = (n: typeof a) => ({
+    minX: n.position.x,
+    minY: n.position.y,
+    maxX: n.position.x + n.size.width,
+    maxY: n.position.y + n.size.height,
+  });
+  const overlap = (p: typeof a, q: typeof a) => {
+    const pB = box(p); const qB = box(q);
+    return pB.minX < qB.maxX && pB.maxX > qB.minX && pB.minY < qB.maxY && pB.maxY > qB.minY;
+  };
+
+  assert.equal(overlap(resolved[0], resolved[1]), false, 'a and b must not intersect');
+  // Far-apart node keeps its author position untouched.
+  assert.deepEqual(resolved[2].position, { x: 900, y: 900 });
+  // Already-clean layouts pass through unchanged.
+  const clean = resolveNodeOverlaps([makeNode('x', { position: { x: 0, y: 0 } }), makeNode('y', { position: { x: 500, y: 500 } })]);
+  assert.deepEqual(clean[1].position, { x: 500, y: 500 });
+});
+
 let passed = 0;
 
 for (const { name, run } of tests) {

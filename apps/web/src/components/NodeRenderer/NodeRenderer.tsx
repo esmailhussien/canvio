@@ -682,13 +682,17 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
 
   const nodeTouchScale = Math.max(1, Math.min(2.75, 1 / Math.max(0.32, viewportZoom)));
   const baseZIndex = Number.isFinite(node.zIndex) ? node.zIndex : 0;
+  // Selected/interacting nodes ride above siblings so their inspector bar,
+  // ports, and handles can never be covered by neighbouring notes. Frames
+  // are included: otherwise the frame's Portrait/Landscape inspector gets
+  // buried under any sticky overlapping its edge.
   const shouldElevateForEditing =
-    node.type !== 'frame' && (isSelected || isInteractionBusy || isRelationSource || isRelationTarget);
+    isSelected || isInteractionBusy || isRelationSource || isRelationTarget;
   const nodeStyle = {
     transform: `translate(${node.position.x}px, ${node.position.y}px)`,
     width: node.size.width,
     height: node.size.height,
-    zIndex: shouldElevateForEditing ? baseZIndex + 10000 : baseZIndex,
+    zIndex: shouldElevateForEditing ? Math.max(baseZIndex, 0) + 100000 : baseZIndex,
     '--node-touch-scale': nodeTouchScale,
   } as CSSProperties;
 

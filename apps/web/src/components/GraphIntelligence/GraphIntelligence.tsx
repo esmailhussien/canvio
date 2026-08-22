@@ -594,7 +594,7 @@ export const GraphIntelligence: React.FC<GraphIntelligenceProps> = ({
                         </button>
                       )}
                     </div>
-                    <div className="gi-insight-desc" style={{ color: '#e0e7ff', fontWeight: 500 }}>
+                    <div className="gi-insight-desc" style={{ fontWeight: 500 }}>
                       {q.question}
                     </div>
                     {q.learningGoal && (
@@ -700,16 +700,6 @@ function getBestNextMove(
 }
 
 function formatAIProvider(provider?: string) {
-  switch (provider) {
-    case 'groq':
-      return 'Groq';
-    case 'gemini':
-      return 'Gemini';
-    case 'openai':
-      return 'OpenAI';
-    case 'anthropic':
-      return 'Anthropic';
-    default:
-      return 'Server AI';
-  }
+  // Vendor-neutral branding: users see Canvio AI regardless of provider.
+  return 'Canvio AI';
 }

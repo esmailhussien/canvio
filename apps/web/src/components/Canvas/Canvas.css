@@ -307,6 +307,13 @@
   color: #c084fc;
 }
 
+/* Light theme: pastel purple icon washes out on the light toolbar surface. */
+[data-theme='light'] .canvas__radial-circle-item.ai-item {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.16), rgba(99, 102, 241, 0.16));
+  border-color: rgba(124, 58, 237, 0.45);
+  color: #7c3aed;
+}
+
 .canvas__radial-circle-item.ai-item:hover {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.45), rgba(99, 102, 241, 0.45));
   border-color: #c084fc;

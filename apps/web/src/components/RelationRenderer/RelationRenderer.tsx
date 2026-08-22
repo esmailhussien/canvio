@@ -201,6 +201,9 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
     return () => window.clearTimeout(timer);
   }, [relations]);
 
+  // Pills-layer anti-stack ledger, rebuilt each render in insertion order.
+  const occupiedPillRects: Array<{ cx: number; cy: number; w: number; h: number }> = [];
+
   return (
     <svg
       className={layer === 'pills' ? 'canvas__relations-svg canvas__relations-svg--pills' : 'canvas__relations-svg'}
@@ -395,6 +398,25 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
         const pillHeight = isMapRelation ? 28 : 24;
         const pillRadius = pillHeight / 2;
 
+        // Anti-stack: when several relations share a midpoint (fan-outs from
+        // one node), offset each subsequent pill vertically so labels never
+        // pile on top of each other. Insertion order keeps it deterministic.
+        let pillMidY = pathResult.midPoint.y;
+        if (layer === 'pills') {
+          const collides = (cy: number) =>
+            occupiedPillRects.some(
+              (r) =>
+                Math.abs(pathResult.midPoint.x - r.cx) < (pillWidth + r.w) / 2 &&
+                Math.abs(cy - r.cy) < (pillHeight + r.h) / 2 + 4
+            );
+          const step = pillHeight + 8;
+          for (let attempt = -3; attempt <= 3; attempt += 1) {
+            const candidate = pathResult.midPoint.y + attempt * step;
+            if (!collides(candidate)) { pillMidY = candidate; break; }
+          }
+          occupiedPillRects.push({ cx: pathResult.midPoint.x, cy: pillMidY, w: pillWidth, h: pillHeight });
+        }
+
         const lineWidth = (style.width || 2.5) + (isMapRelation ? 0.45 : 0);
         const shouldAnimate = style.animated || rel.relationship === 'leads_to' || isEnables;
         const strokeDashArray = isContradiction
@@ -508,7 +530,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
                 above nodes so text never clips under neighbouring cards. */}
             {layer === 'pills' && (displayText || hasIcon) && (
               <g
-                transform={`translate(${pathResult.midPoint.x}, ${pathResult.midPoint.y})`}
+                transform={`translate(${pathResult.midPoint.x}, ${pillMidY})`}
                 style={{ pointerEvents: 'none' }}
               >
                 {/* 1. Solid opaque backdrop mask: completely blocks any underlying line/glow from showing through */}

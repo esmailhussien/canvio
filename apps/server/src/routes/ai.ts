@@ -695,6 +695,7 @@ Content Guidelines:
 Spatial & Graph Rules:
 - Relations are first-class: Use descriptive labels on arrows (e.g., "satisfies", "causes", "transforms into", "example of").
 - Use visual variety: Place a central theme in a Shape (hexagon/rectangle), group topics logically with clear X/Y spacing (horizontal offset ~300px, vertical offset ~180px), use colored Stickies for sub-points, and put everything inside an overarching Frame.
+- NO OVERLAP RULE: node bounding boxes must never intersect. Before returning, verify every pair of nodes keeps at least 60px of clear space between edges (x+width+60 <= next.x, or separate rows with y+height+60 <= next.y). Sticky text must fit its box: keep sticky text under 90 characters, or increase that node's height by 30px per extra expected line.
 
 Return ONLY raw JSON with this exact schema:
 {
