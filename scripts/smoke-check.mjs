@@ -21,7 +21,7 @@ if (!existsSync(indexPath)) {
   if (!index.includes('/canvio-config.js')) {
     fail('runtime config script is not referenced by index.html.');
   }
-  if (!index.includes('Canvio | Online Whiteboard')) {
+  if (!index.includes('Canvio | Connected Whiteboard')) {
     fail('index.html is missing expected title metadata.');
   }
 }

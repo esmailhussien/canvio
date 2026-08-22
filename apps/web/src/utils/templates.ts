@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import { LivingNode, Relation, useCanvasStore } from '../store/canvasStore';
 import { fitTemplateToViewport } from './viewportFit';
+import { autoFitStickyHeight, placeBoardAwayFromExisting } from './boardPlacement';
 
 export type TemplateCategoryId =
   | 'education'
@@ -53,19 +54,28 @@ function shape(
   };
 }
 
-function sticky(id: string, x: number, y: number, text: string, color: string, zIndex: number): LivingNode {
-  return {
+function sticky(
+  id: string,
+  x: number,
+  y: number,
+  text: string,
+  color: string,
+  zIndex: number,
+  width = 220,
+  height = 132
+): LivingNode {
+  return autoFitStickyHeight({
     id,
     type: 'sticky',
     position: { x, y },
-    size: { width: 220, height: 132 },
+    size: { width, height },
     rotation: 0,
     zIndex,
     locked: false,
     data: { color, text },
     createdAt: now(),
     updatedAt: now(),
-  };
+  });
 }
 
 function textBlock(
@@ -179,15 +189,15 @@ export const TEMPLATES: CanvasTemplate[] = [
       const codeId = nanoid(10);
 
       const nodes: LivingNode[] = [
-        frame(frameId, -600, -330, 1220, 700, 'Canvio Sample Workspace', '#8083ff'),
-        textBlock(titleId, -520, -265, 520, 62, 'Sample board: connect ideas into useful work', 1, 24),
-        sticky(questionId, -520, -150, 'Question\nWhat are we trying to understand, explain, or decide?', 'yellow', 2),
-        sticky(evidenceId, -220, -150, 'Evidence\nNotes, examples, screenshots, research, and files stay close to the idea.', 'blue', 3),
+        frame(frameId, -620, -330, 1260, 720, 'Canvio Sample Workspace', '#8083ff'),
+        textBlock(titleId, -540, -262, 560, 56, 'Sample board: from question to decision', 1, 22),
+        sticky(questionId, -540, -160, 'Question\nWhat are we trying to understand?', 'yellow', 2, 230, 150),
+        sticky(evidenceId, -240, -170, 'Evidence\nNotes, examples, screenshots, files.', 'blue', 3, 240, 150),
         {
           id: mapId,
           type: 'map',
-          position: { x: 110, y: -170 },
-          size: { width: 430, height: 260 },
+          position: { x: 110, y: -190 },
+          size: { width: 430, height: 270 },
           rotation: 0,
           zIndex: 4,
           locked: false,
@@ -203,16 +213,16 @@ export const TEMPLATES: CanvasTemplate[] = [
           createdAt: now(),
           updatedAt: now(),
         },
-        shape(aiId, -520, 90, 240, 112, {
+        shape(aiId, -540, 90, 240, 112, {
           shape: 'hexagon',
           fill: 'rgba(168, 85, 247, 0.16)',
           stroke: '#a855f7',
           strokeWidth: 2,
           label: 'AI Navigator',
         }, 5),
-        sticky(reasoningId, -220, 92, 'Reasoning Partner\nChecks clarity, gaps, evidence, and next moves from the board.', 'purple', 6),
-        sticky(actionId, 110, 160, 'Deliver\nPresent, share, export frames, or turn the board into a summary or article.', 'green', 7),
-        codeBlock(codeId, 390, 190, 210, 118, 'board-output.ts', 'const output = [\n  "summary",\n  "article",\n  "presentation"\n];', 8),
+        sticky(reasoningId, -210, 70, 'Reasoning Partner\nChecks clarity, gaps, evidence.', 'purple', 6, 250, 140),
+        sticky(actionId, 120, 120, 'Deliver\nShare, present, or export.', 'green', 7, 250, 150),
+        codeBlock(codeId, 430, 180, 190, 118, 'board-output.ts', 'const output = [\n  "summary",\n  "article"\n];', 8),
       ];
 
       return {
@@ -1105,21 +1115,22 @@ export function applyTemplate(templateId: string) {
   const cx = Math.round(-store.viewport.x);
   const cy = Math.round(-store.viewport.y);
   const nextZ = store.nextZIndex();
-  const insertedNodes: LivingNode[] = [];
 
-  nodes.forEach((node, index) => {
-    const insertedNode = {
-      ...node,
-      position: {
-        x: node.position.x + cx,
-        y: node.position.y + cy,
-      },
-      zIndex: node.type === 'frame' ? node.zIndex : nextZ + index,
-    };
-    insertedNodes.push(insertedNode);
-    store.addNode(insertedNode);
-  });
+  let placedNodes: LivingNode[] = nodes.map((node, index) => ({
+    ...node,
+    position: {
+      x: node.position.x + cx,
+      y: node.position.y + cy,
+    },
+    zIndex: node.type === 'frame' ? node.zIndex : nextZ + index,
+  }));
+
+  // Applying a second template on a populated board must land beside the
+  // existing content, never stacked on top of it.
+  placedNodes = placeBoardAwayFromExisting(placedNodes, Object.values(store.nodes));
+
+  placedNodes.forEach((node) => store.addNode(node));
   relations.forEach((r) => store.addRelation(r));
 
-  fitTemplateToViewport(insertedNodes);
+  fitTemplateToViewport(placedNodes);
 }

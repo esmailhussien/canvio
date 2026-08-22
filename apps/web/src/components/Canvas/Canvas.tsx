@@ -642,6 +642,13 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           ))}
         </div>
 
+        {/* Relation label pills float ABOVE nodes so text never clips under
+            neighbouring cards. Non-interactive: selection/erase stay on the
+            paths layer below. */}
+        <div className="canvas__relation-pills-layer">
+          <RelationRenderer relations={relations} nodes={nodes} presentationMode={presentationMode} focusNodeId={focusNodeId} layer="pills" />
+        </div>
+
         {/* Free Ink Layer (Freehand annotations & highlighter overlay rendered above nodes) */}
         <FreeInkLayer presentationMode={presentationMode} />
 
@@ -790,6 +797,10 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           <div
             className="canvas__radial-ring"
             style={{ left: radialMenu.screenX, top: radialMenu.screenY }}
+            // Without this, Canvas's pointerdown handler closes the menu the
+            // moment you press an item — the button unmounts before its click
+            // can fire, so Quick add silently does nothing.
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             <span className="canvas__radial-title">Quick add</span>

@@ -12,6 +12,7 @@ import {
 import { nanoid } from 'nanoid';
 import { useCanvasStore, type LivingNode } from '../../store/canvasStore';
 import { fitTemplateToViewport, fitViewportToNodes } from '../../utils/viewportFit';
+import { getNodesBounds, placeBoardAwayFromExisting } from '../../utils/boardPlacement';
 import { useDialogA11y } from '../../hooks/useDialogA11y';
 import './AIAssistantModal.css';
 
@@ -703,7 +704,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
 type BoardAnalysisResult = Awaited<ReturnType<typeof analyzeGraphWithAIAsync>>;
 
 function createGapNotes(result: BoardAnalysisResult, existingNodes: LivingNode[]): LivingNode[] {
-  const bounds = getBounds(existingNodes);
+  const bounds = getNodesBounds(existingNodes);
   const startX = Number.isFinite(bounds.maxX) ? bounds.maxX + 180 : 0;
   const startY = Number.isFinite(bounds.minY) ? bounds.minY : 0;
   const timestamp = Date.now();
@@ -729,7 +730,7 @@ function createGapNotes(result: BoardAnalysisResult, existingNodes: LivingNode[]
 }
 
 function createNextStepNote(result: BoardAnalysisResult, existingNodes: LivingNode[]): LivingNode[] {
-  const bounds = getBounds(existingNodes);
+  const bounds = getNodesBounds(existingNodes);
   const startX = Number.isFinite(bounds.maxX) ? bounds.maxX + 180 : 0;
   const startY = Number.isFinite(bounds.minY) ? bounds.minY : 0;
   const timestamp = Date.now();
@@ -781,44 +782,6 @@ function createAISticky({
   };
 }
 
-function placeBoardAwayFromExisting(generatedNodes: ReturnType<typeof generateSpatialBoard>['nodes'], existingNodes: ReturnType<typeof generateSpatialBoard>['nodes']) {
-  if (generatedNodes.length === 0 || existingNodes.length === 0) return generatedNodes;
-
-  const generatedBounds = getBounds(generatedNodes);
-  const existingBounds = getBounds(existingNodes);
-  const intersects = !(
-    generatedBounds.maxX < existingBounds.minX ||
-    generatedBounds.minX > existingBounds.maxX ||
-    generatedBounds.maxY < existingBounds.minY ||
-    generatedBounds.minY > existingBounds.maxY
-  );
-
-  if (!intersects) return generatedNodes;
-
-  const offsetX = existingBounds.maxX - generatedBounds.minX + 180;
-  const offsetY = existingBounds.minY - generatedBounds.minY;
-  return generatedNodes.map((node) => ({
-    ...node,
-    position: {
-      x: node.position.x + offsetX,
-      y: node.position.y + offsetY,
-    },
-  }));
-}
-
-function getBounds(nodes: ReturnType<typeof generateSpatialBoard>['nodes']) {
-  return nodes.reduce((acc, node) => ({
-    minX: Math.min(acc.minX, node.position.x),
-    minY: Math.min(acc.minY, node.position.y),
-    maxX: Math.max(acc.maxX, node.position.x + node.size.width),
-    maxY: Math.max(acc.maxY, node.position.y + node.size.height),
-  }), {
-    minX: Infinity,
-    minY: Infinity,
-    maxX: -Infinity,
-    maxY: -Infinity,
-  });
-}
 
 function buildIntentPrompt(intent: AIIntent, prompt: string) {
   const { nodes, relations } = useCanvasStore.getState();

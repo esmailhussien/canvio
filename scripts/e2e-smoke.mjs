@@ -189,6 +189,19 @@ async function main() {
       message: 'expected starter dismissal to persist after opening AI from starter',
     }));
 
+    console.log('E2E: checking radial Quick add creates a node');
+    // Regression guard: Canvas's pointerdown handler used to close the menu
+    // before item clicks could land, making Quick add silently dead.
+    await page.locator('.canvas').click({ button: 'right', position: { x: 640, y: 200 } });
+    await page.locator('.canvas__radial-circle-item[aria-label="Add Sticky Note"]').waitFor({ state: 'visible', timeout: 5000 });
+    const beforeRadial = await page.locator('.node-renderer').count();
+    await page.locator('.canvas__radial-circle-item[aria-label="Add Sticky Note"]').click();
+    await page.waitForFunction(
+      (prev) => document.querySelectorAll('.node-renderer').length > prev,
+      beforeRadial,
+      { timeout: 8000 }
+    );
+
     console.log('E2E: inserting field operations template');
     await page.getByRole('button', { name: 'Presets & Layout' }).click();
     await page.locator('.template-card').filter({ hasText: 'Field Operations Map' }).click();
@@ -217,7 +230,10 @@ async function main() {
         throw new Error(`map marker did not become relation source: ${JSON.stringify(state)}; ${error.message}`);
       });
 
-    const targetNode = page.locator('.node-renderer:not(.node-type-map)').first();
+    // Pick the relation target from the END of the DOM list: template nodes
+    // are appended after any earlier (possibly offscreen) board content, and
+    // fitTemplateToViewport framed the template itself.
+    const targetNode = page.locator('.node-renderer:not(.node-type-map)').last();
     const targetBox = await targetNode.boundingBox();
     if (!targetBox) throw new Error('Could not locate relation target node');
     await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2);
@@ -319,7 +335,8 @@ async function main() {
     if (!relationBox) throw new Error('Could not locate frame relation');
     await page.mouse.click(relationBox.x + relationBox.width / 2, relationBox.y + relationBox.height / 2);
     await assertState(page, 'relation inside frame selectable', () => {
-      const selectedRelations = document.querySelectorAll('.relation-group--selected').length;
+      // Scope to the paths layer: label pills render a mirrored group above nodes.
+      const selectedRelations = document.querySelectorAll('.canvas__relations-layer .relation-group--selected').length;
       const selectedFrames = document.querySelectorAll('.node-renderer.node-type-frame.selected').length;
       const inspector = document.querySelector('.relation-inspector');
       return {

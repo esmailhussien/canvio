@@ -8,6 +8,13 @@ interface Props {
   nodes: Record<string, LivingNode>;
   presentationMode?: boolean;
   focusNodeId?: string | null;
+  /**
+   * 'paths' (default) renders lines/hit-areas below nodes.
+   * 'pills' renders ONLY label pills — mounted above nodes by Canvas so
+   * relation text never clips underneath neighbouring cards. The pills
+   * layer is non-interactive; selection/erase stay on the paths layer.
+   */
+  layer?: 'paths' | 'pills';
 }
 
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
@@ -120,7 +127,7 @@ function renderRelationIconPaths(relType?: string, color: string = 'currentColor
   }
 }
 
-export function RelationRenderer({ relations, nodes, presentationMode = false, focusNodeId = null }: Props) {
+export function RelationRenderer({ relations, nodes, presentationMode = false, focusNodeId = null, layer = 'paths' }: Props) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const selectedRelationId = useCanvasStore((s) => s.selectedRelationId);
   const selectRelation = useCanvasStore((s) => s.selectRelation);
@@ -196,6 +203,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
 
   return (
     <svg
+      className={layer === 'pills' ? 'canvas__relations-svg canvas__relations-svg--pills' : 'canvas__relations-svg'}
       style={{
         position: 'absolute',
         top: -50000,
@@ -208,6 +216,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
       }}
       viewBox="-50000 -50000 100000 100000"
     >
+      {layer === 'paths' && (
       <defs>
         {/* Arrow Marker Definitions */}
         <marker
@@ -256,7 +265,9 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
           <path d="M 5 0 L 10 5 L 5 10 L 0 5 z" fill="currentColor" />
         </marker>
       </defs>
+      )}
 
+      {layer === 'paths' && (
       <style>{`
         @keyframes relationFlow {
           from { stroke-dashoffset: 28; }
@@ -267,6 +278,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
           50% { stroke-opacity: 1; filter: drop-shadow(0 0 8px #ef4444); }
         }
       `}</style>
+      )}
 
       {Object.values(relations).map((rel) => {
         const source = nodes[rel.sourceId];
@@ -324,14 +336,20 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
 
 
         const baseLabel = rel.label || (rel.relationship && rel.relationship !== 'related_to' ? rel.relationship.replace('_', ' ') : '');
+        // Keep map-relation pills compact: full sticky text as an endpoint
+        // name used to produce ~90-char pills that overlapped neighbouring nodes.
+        const shortEndpoint = (node: LivingNode, port?: string) => {
+          const clean = getRelationEndpointLabel(node, port).replace(/\s+/g, ' ').trim();
+          return clean.length > 20 ? `${clean.slice(0, 19).trimEnd()}…` : clean;
+        };
         const endpointLabel = source.type === 'map' || target.type === 'map'
-          ? `${getRelationEndpointLabel(source, rel.sourcePort).slice(0, 36)} → ${getRelationEndpointLabel(target, rel.targetPort).slice(0, 36)}`
+          ? `${shortEndpoint(source, rel.sourcePort)} → ${shortEndpoint(target, rel.targetPort)}`
           : '';
         const rawDisplay = (endpointLabel
           ? (baseLabel ? `${baseLabel} • ${endpointLabel}` : endpointLabel)
           : baseLabel && distanceLabel
             ? `${baseLabel} • ${distanceLabel}`
-            : baseLabel || distanceLabel)?.slice(0, 96);
+            : baseLabel || distanceLabel)?.slice(0, 64);
 
         const hasIcon = Boolean(rel.relationship && rel.relationship !== 'related_to');
         const displayText = rawDisplay || (hasIcon ? rel.relationship?.replace('_', ' ') : '');
@@ -393,33 +411,37 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
           <g
             key={rel.id}
             style={{
-              pointerEvents: presentationMode ? 'none' : (isEraser || isSelectTool) ? 'auto' : 'none',
-              cursor: presentationMode ? 'default' : isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
+              pointerEvents: layer === 'pills' || presentationMode ? 'none' : (isEraser || isSelectTool) ? 'auto' : 'none',
+              cursor: layer === 'pills' || presentationMode ? 'default' : isEraser ? 'pointer' : isSelectTool ? 'pointer' : 'default'
             }}
             className={`relation-group ${isSelected ? 'relation-group--selected' : ''} ${isHovered ? 'relation-group--hovered' : ''} ${isEraser ? 'relation-group--eraser' : ''} ${recentRelationId === rel.id ? 'relation-group--new' : ''} ${isFocusDimmed ? 'relation-group--focus-dimmed' : ''} ${isFocusActive ? 'relation-group--focus-active' : ''} ${isContradiction ? 'relation-group--contradiction' : ''}`}
-            aria-label={`${getRelationEndpointLabel(source, rel.sourcePort)} ${rel.relationship || 'related to'} ${getRelationEndpointLabel(target, rel.targetPort)}`}
-            onMouseEnter={() => setHoveredRelationId(rel.id)}
-            onMouseLeave={() => setHoveredRelationId((id) => id === rel.id ? null : id)}
-            onClick={(e) => {
-              if (isEraser) {
+            aria-label={layer === 'paths' ? `${getRelationEndpointLabel(source, rel.sourcePort)} ${rel.relationship || 'related to'} ${getRelationEndpointLabel(target, rel.targetPort)}` : undefined}
+            {...(layer === 'paths' ? {
+              onMouseEnter: () => setHoveredRelationId(rel.id),
+              onMouseLeave: () => setHoveredRelationId((id) => id === rel.id ? null : id),
+              onClick: (e: React.MouseEvent) => {
+                if (isEraser) {
+                  e.stopPropagation();
+                  removeRelation(rel.id);
+                } else if (isSelectTool) {
+                  e.stopPropagation();
+                  selectRelation(rel.id);
+                }
+              },
+              onDoubleClick: (e: React.MouseEvent) => {
+                if (!isSelectTool || presentationMode) return;
                 e.stopPropagation();
-                removeRelation(rel.id);
-              } else if (isSelectTool) {
-                e.stopPropagation();
+                // Inline editing via the floating inspector instead of a
+                // blocking window.prompt (product principle: no dialogs).
                 selectRelation(rel.id);
-              }
-            }}
-            onDoubleClick={(e) => {
-              if (!isSelectTool || presentationMode) return;
-              e.stopPropagation();
-              // Inline editing via the floating inspector instead of a
-              // blocking window.prompt (product principle: no dialogs).
-              selectRelation(rel.id);
-              window.dispatchEvent(new CustomEvent('canvio:focus-relation-label', {
-                detail: { id: rel.id },
-              }));
-            }}
+                window.dispatchEvent(new CustomEvent('canvio:focus-relation-label', {
+                  detail: { id: rel.id },
+                }));
+              },
+            } : {})}
           >
+            {layer === 'paths' && (
+            <>
             {/* Thick transparent hit area line for easier clicking */}
             <path
               d={pathResult.pathD}
@@ -479,12 +501,15 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
               markerEnd={style.endArrow === 'arrow' || rel.relationship === 'leads_to' || isDependency || isEnables ? (isSelected ? 'url(#arrow-end-selected)' : 'url(#arrow-end)') : style.endArrow === 'diamond' ? 'url(#diamond-end)' : undefined}
               style={{ color: lineColor }}
             />
+            </>
+            )}
 
-            {/* Semantic Relationship Pill Label at Midpoint */}
-            {(displayText || hasIcon) && (
+            {/* Semantic Relationship Pill Label — rendered in the pills layer
+                above nodes so text never clips under neighbouring cards. */}
+            {layer === 'pills' && (displayText || hasIcon) && (
               <g
                 transform={`translate(${pathResult.midPoint.x}, ${pathResult.midPoint.y})`}
-                style={{ pointerEvents: isSelectTool ? 'auto' : 'none' }}
+                style={{ pointerEvents: 'none' }}
               >
                 {/* 1. Solid opaque backdrop mask: completely blocks any underlying line/glow from showing through */}
                 <rect

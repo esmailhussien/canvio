@@ -2,7 +2,7 @@
   "name": "canvio",
   "version": "0.1.0",
   "private": true,
-  "description": "The Operating System for Ideas — build ideas the way you build cities.",
+  "description": "A connected whiteboard for thinking, learning, planning, and research — with maps, AI, and relations built in when your ideas need them.",
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "turbo dev",

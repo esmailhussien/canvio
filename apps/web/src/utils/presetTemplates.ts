@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { LivingNode, Relation } from '../store/canvasStore';
+import { autoFitStickyHeight } from './boardPlacement';
 
 export interface TemplatePreset {
   id: string;
@@ -9,7 +10,7 @@ export interface TemplatePreset {
   create: (centerX: number, centerY: number, nextZ: () => number) => { nodes: LivingNode[]; relations: Relation[] };
 }
 
-export const PRESET_TEMPLATES: TemplatePreset[] = [
+const PRESET_TEMPLATES_RAW: TemplatePreset[] = [
   {
     id: 'mindmap',
     name: 'Mind Map',
@@ -621,7 +622,7 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
         id: rootId,
         type: 'shape',
         position: { x: cx + 220, y: cy - 60 },
-        size: { width: 160, height: 120 },
+        size: { width: 240, height: 120 },
         rotation: 0,
         zIndex: nextZ(),
         locked: false,
@@ -686,8 +687,8 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
       const decNode: LivingNode = {
         id: decId,
         type: 'shape',
-        position: { x: cx - 540, y: cy - 50 },
-        size: { width: 160, height: 100 },
+        position: { x: cx - 560, y: cy - 50 },
+        size: { width: 200, height: 100 },
         rotation: 0,
         zIndex: nextZ(),
         locked: false,
@@ -699,8 +700,8 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
       const optANode: LivingNode = {
         id: optAId,
         type: 'shape',
-        position: { x: cx - 320, y: cy - 180 },
-        size: { width: 180, height: 80 },
+        position: { x: cx - 340, y: cy - 180 },
+        size: { width: 220, height: 80 },
         rotation: 0,
         zIndex: nextZ(),
         locked: false,
@@ -738,8 +739,8 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
       const optBNode: LivingNode = {
         id: optBId,
         type: 'shape',
-        position: { x: cx - 320, y: cy + 100 },
-        size: { width: 180, height: 80 },
+        position: { x: cx - 340, y: cy + 100 },
+        size: { width: 240, height: 80 },
         rotation: 0,
         zIndex: nextZ(),
         locked: false,
@@ -802,3 +803,12 @@ export const PRESET_TEMPLATES: TemplatePreset[] = [
     },
   },
 ];
+
+// Guarantee every preset sticky has room for its text (and typing space).
+export const PRESET_TEMPLATES: TemplatePreset[] = PRESET_TEMPLATES_RAW.map((preset) => ({
+  ...preset,
+  create: (cx: number, cy: number, nextZ: () => number) => {
+    const result = preset.create(cx, cy, nextZ);
+    return { ...result, nodes: result.nodes.map(autoFitStickyHeight) };
+  },
+}));
