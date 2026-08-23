@@ -750,6 +750,30 @@ test('generated boards get overlapping nodes resolved apart', async () => {
   assert.deepEqual(clean[1].position, { x: 500, y: 500 });
 });
 
+test('frame refits to wrap its content after overlap resolution', async () => {
+  const { resolveNodeOverlaps } = await import('../../apps/web/src/utils/boardPlacement');
+  // Frame authored at x=0; two colliding stickies inside it get pushed right
+  // by separation rules — the frame must grow to keep containing them.
+  const frame = makeNode('frame', { type: 'frame', position: { x: 0, y: 0 }, size: { width: 500, height: 400 }, zIndex: 0 });
+  const s1 = makeNode('s1', { position: { x: 40, y: 40 }, size: { width: 220, height: 132 } });
+  const s2 = makeNode('s2', { position: { x: 120, y: 80 }, size: { width: 220, height: 132 } });
+
+  const resolved = resolveNodeOverlaps([frame, s1, s2]);
+  const fit = resolved.find((n) => n.id === 'frame')!;
+  const inside = resolved
+    .filter((n) => n.type !== 'frame')
+    .every((n) => {
+      const cx = n.position.x + n.size.width / 2;
+      const cy = n.position.y + n.size.height / 2;
+      return (
+        cx >= fit.position.x && cx <= fit.position.x + fit.size.width &&
+        cy >= fit.position.y && cy <= fit.position.y + fit.size.height
+      );
+    });
+  assert.equal(inside, true, 'frame must wrap all originally contained nodes after resolution');
+  assert.ok(fit.size.width >= 320 && fit.size.height >= 220, 'frame keeps sane minimum size');
+});
+
 let passed = 0;
 
 for (const { name, run } of tests) {
