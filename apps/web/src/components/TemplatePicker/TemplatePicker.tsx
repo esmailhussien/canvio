@@ -89,14 +89,16 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
             </button>
           </div>
 
-          <nav className="template-sidebar__nav">
+          <nav className="template-sidebar__nav" aria-label="Template categories">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 className={`template-sidebar__link ${selectedCategory === cat.id ? 'active' : ''}`}
                 onClick={() => setSelectedCategory(cat.id)}
+                aria-pressed={selectedCategory === cat.id}
+                aria-current={selectedCategory === cat.id ? 'true' : undefined}
               >
-                <span className="material-symbols-outlined text-lg">{cat.icon}</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">{cat.icon}</span>
                 <span>{cat.label}</span>
               </button>
             ))}
@@ -236,6 +238,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
                       onClick={() => applyAndClose(t.id)}
                       role="button"
                       tabIndex={0}
+                      aria-label={`Apply template: ${t.name} — ${t.category}`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
@@ -271,7 +274,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({ isOpen, onClose,
                           <span className="template-card__stats">
                             {t.nodes} nodes / {t.relations} relations
                           </span>
-                          <button className="template-card__apply-btn" type="button">
+                          <button className="template-card__apply-btn" type="button" tabIndex={-1} aria-hidden="true">
                             Apply
                           </button>
                         </div>

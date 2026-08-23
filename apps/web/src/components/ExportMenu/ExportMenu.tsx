@@ -22,16 +22,43 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
 
   const nodes = useCanvasStore((s) => s.nodes);
   const relations = useCanvasStore((s) => s.relations);
+  const inkStrokes = useCanvasStore((s) => s.inkStrokes);
+  const viewport = useCanvasStore((s) => s.viewport);
+  const theme = useCanvasStore((s) => s.theme);
+  const canvasBackground = useCanvasStore((s) => s.canvasBackground);
   const replaceWorld = useCanvasStore((s) => s.replaceWorld);
+  const setViewport = useCanvasStore((s) => s.setViewport);
+
+  // replaceWorld clears local undo history, so recovery uses an explicit
+  // pre-import snapshot instead of the history stack.
+  const preImportSnapshotRef = useRef<{
+    nodes: typeof nodes;
+    relations: typeof relations;
+    inkStrokes: typeof inkStrokes;
+    viewport: typeof viewport;
+    appearance: { theme: 'dark' | 'light'; canvasBackground: string | null };
+  } | null>(null);
 
   useEffect(() => {
     if (!exportStatus && !exportError) return;
+    // Restore statuses carry an Undo action — keep them until acted on
+    // (matches the cleared-board notice pattern) instead of auto-clearing.
+    if (exportStatus?.startsWith('Restored') && !exportError) return;
     const timeout = window.setTimeout(() => {
       setExportStatus(null);
       setExportError(null);
     }, 7000);
     return () => window.clearTimeout(timeout);
   }, [exportStatus, exportError]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   const handleExportPNG = async () => {
     try {
@@ -87,6 +114,13 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       setExportStatus(null);
       const text = await file.text();
       const result = parseCanvioBackup(text);
+      preImportSnapshotRef.current = {
+        nodes,
+        relations,
+        inkStrokes,
+        viewport,
+        appearance: { theme, canvasBackground },
+      };
       replaceWorld(result.world);
       const warningText = result.meta.warnings.length > 0 ? ` (${result.meta.warnings[0]})` : '';
       setExportStatus(`Restored ${Object.keys(result.world.nodes).length} nodes${warningText}`);
@@ -99,12 +133,25 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
     }
   };
 
+  const handleUndoImport = () => {
+    const snapshot = preImportSnapshotRef.current;
+    if (!snapshot) return;
+    replaceWorld(snapshot);
+    setViewport(snapshot.viewport);
+    preImportSnapshotRef.current = null;
+    setExportStatus('Import undone');
+    setExportError(null);
+  };
+
   return (
     <div className="export-menu-container" ref={refToUse}>
       <button
         className="export-menu__trigger-btn"
         onClick={onToggle}
         title="Export & Import Options"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label="Export and import options"
       >
         <span className="material-symbols-outlined text-sm">ios_share</span>
         <span>Export</span>
@@ -112,12 +159,22 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
 
       {(exportStatus || exportError) && (
         <div className={`export-menu__status-chip ${exportError ? 'export-menu__status-chip--error' : ''}`} role="status">
-          {exportError || exportStatus}
+          <span>{exportError || exportStatus}</span>
+          {exportStatus?.startsWith('Restored') && preImportSnapshotRef.current && (
+            <button
+              type="button"
+              className="export-menu__status-chip-action"
+              onClick={handleUndoImport}
+              aria-label="Undo import"
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
 
       {isOpen && (
-        <div className="canvio-dropdown-menu export-menu__popover">
+        <div className="canvio-dropdown-menu export-menu__popover" role="menu" aria-label="Export and import">
           <button
             className="canvio-menu-item"
             disabled={exporting !== null}

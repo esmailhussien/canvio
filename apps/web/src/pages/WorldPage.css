@@ -49,8 +49,11 @@
   gap: 22px;
   box-sizing: border-box;
   padding: 84px 16px calc(126px + env(safe-area-inset-bottom, 0px));
-  pointer-events: none;
-  z-index: calc(var(--z-toolbar) - 1);
+  pointer-events: auto;
+  z-index: calc(var(--z-toolbar) + 10);
+  background: color-mix(in srgb, var(--bg-canvas) 72%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .world-page__empty-bg-glow {
@@ -143,6 +146,72 @@
   pointer-events: auto;
   opacity: 0;
   animation: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+}
+
+.world-page__empty-hint {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: calc(var(--z-toolbar) + 5);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  pointer-events: auto;
+  animation: fade-up 0.4s ease-out both;
+}
+
+.world-page__empty-hint button {
+  border: none;
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
+  font: inherit;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.world-page__empty-hint button:hover,
+.world-page__empty-hint button:focus-visible {
+  background: color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  outline: none;
+}
+
+.world-page__empty-hint kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.world-page__empty-hint-sep {
+  opacity: 0.5;
+  margin: 0 2px;
+}
+
+.world-page__empty-hint-link {
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .world-page__starter-close {
@@ -368,6 +437,37 @@
   font-size: 0.68rem;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.world-page__tool-status-fit {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+  /* The pill container is pointer-events:none; re-enable for the control. */
+  pointer-events: auto;
+}
+
+.world-page__tool-status-fit:hover,
+.world-page__tool-status-fit:focus-visible {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  outline: none;
+}
+
+.world-page__tool-status-fit .material-symbols-outlined {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .world-page__notice {

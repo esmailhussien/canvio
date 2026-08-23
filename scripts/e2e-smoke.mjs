@@ -203,7 +203,7 @@ async function main() {
     );
 
     console.log('E2E: inserting field operations template');
-    await page.getByRole('button', { name: 'Presets & Layout' }).click();
+    await page.getByRole('button', { name: 'Templates', exact: true }).first().click();
     await page.locator('.template-card').filter({ hasText: 'Field Operations Map' }).click();
     await page.waitForFunction(() => document.querySelectorAll('.leaflet-marker-icon').length >= 2);
 

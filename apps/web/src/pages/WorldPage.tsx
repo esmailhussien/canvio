@@ -474,7 +474,12 @@ export function WorldPage() {
     const newId = nanoid(10);
     createBoard().catch(() => {});
     setIsCanvioMenuOpen(false);
-    dismissStarter();
+    // Explicit "new board" intent re-arms the starter so the goal picker is
+    // reachable again. Matches HomePage's Start-a-blank-board behavior.
+    try {
+      window.localStorage.removeItem(STARTER_DISMISS_KEY);
+    } catch {}
+    setIsStarterDismissed(false);
     navigate(`/w/${newId}`);
   };
 
@@ -813,13 +818,19 @@ export function WorldPage() {
       />
 
       {showStarter && (
-        <div className="world-page__empty-launcher" aria-label="Start canvas">
+        <div
+          className="world-page__empty-launcher"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="starter-title"
+          onClick={() => dismissStarter()}
+        >
           {/* Subtle animated magical background for empty state */}
           <div className="world-page__empty-bg-glow"></div>
           
-          <div className="world-page__empty-hero">
+          <div className="world-page__empty-hero" onClick={(e) => e.stopPropagation()}>
             <span className="world-page__empty-kicker">A simple place to think</span>
-            <h1 className="world-page__empty-title">
+            <h1 id="starter-title" className="world-page__empty-title">
               What are you working on?
             </h1>
             <p className="world-page__empty-subtitle">
@@ -827,7 +838,7 @@ export function WorldPage() {
             </p>
           </div>
 
-          <div className="world-page__starter-panel">
+          <div className="world-page__starter-panel" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className="world-page__starter-close"
@@ -903,6 +914,31 @@ export function WorldPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {!showStarter && nodeCount === 0 && !isPresenting && !isDemoWorld && !showCoach && persistenceState !== 'loading' && (
+        <div className="world-page__empty-hint" role="status" aria-live="polite">
+          <span>Board is empty —</span>
+          <button type="button" onClick={() => setActiveTool('sticky')}>
+            Add note
+          </button>
+          <span>or press</span>
+          <kbd>T</kbd>
+          <span>or right-click for Quick add</span>
+          <span className="world-page__empty-hint-sep">·</span>
+          <button
+            type="button"
+            className="world-page__empty-hint-link"
+            onClick={() => {
+              try {
+                window.localStorage.removeItem(STARTER_DISMISS_KEY);
+              } catch {}
+              setIsStarterDismissed(false);
+            }}
+          >
+            Show starter
+          </button>
         </div>
       )}
 
@@ -984,6 +1020,18 @@ export function WorldPage() {
               </span>
               <span className="world-page__tool-status-detail">{toolGuidance.detail}</span>
               {activeTool !== 'select' && <kbd>Esc</kbd>}
+              {nodeCount > 0 && (
+                <button
+                  type="button"
+                  className="world-page__tool-status-fit"
+                  onClick={handleFitToWorld}
+                  title="Fit board to view (F)"
+                  aria-label="Fit board to view"
+                >
+                  <span className="material-symbols-outlined">fit_screen</span>
+                  Fit
+                </button>
+              )}
             </div>
           )}
           <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
@@ -1149,7 +1197,7 @@ export function WorldPage() {
                 }}
               >
                 <span className="material-symbols-outlined text-sm">space_dashboard</span>
-                <span>Canvas Models & Layouts</span>
+                <span>Templates</span>
               </button>
 
               <button
@@ -1259,10 +1307,10 @@ export function WorldPage() {
               setIsCanvioMenuOpen(false);
               setIsExportMenuOpen(false);
             }}
-            aria-label="Presets & Layout"
+            aria-label="Templates"
             aria-haspopup="dialog"
             aria-expanded={isTemplateOpen}
-            title="Open templates and layouts"
+            title="Open templates"
           >
             <span className="material-symbols-outlined" aria-hidden="true">space_dashboard</span>
             <span className="world-header__surface-btn-label">Templates</span>

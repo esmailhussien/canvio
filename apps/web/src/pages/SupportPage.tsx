@@ -156,6 +156,10 @@ export function SupportPage() {
     setIsCreating(true);
     const newId = nanoid(10);
     createBoard().catch(() => {});
+    // Explicit "new board" intent re-arms the starter (matches Home + menu).
+    try {
+      window.localStorage.removeItem('CANVIO_STARTER_DISMISSED_V1');
+    } catch {}
     navigate(`/w/${newId}`);
   };
 

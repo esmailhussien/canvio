@@ -233,8 +233,8 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--toolbar-bg, rgba(19, 19, 27, 0.92));
   border: 1px solid var(--toolbar-border, rgba(255, 255, 255, 0.2));
@@ -414,8 +414,8 @@
     top: 8px;
     right: 8px;
     left: auto;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     transform: none;
     z-index: 2;
   }

@@ -92,7 +92,8 @@
   position: absolute;
   right: 8px;
   bottom: 8px;
-  height: 28px;
+  height: 36px;
+  min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);

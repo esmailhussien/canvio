@@ -3,7 +3,7 @@
   bottom: 16px;
   right: 16px;
   width: 160px;
-  height: 154px;
+  height: 172px;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--glass-bg);
@@ -36,7 +36,8 @@
 }
 
 .minimap__controls button {
-  height: 24px;
+  height: 36px;
+  min-height: 36px;
   min-width: 0;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -68,7 +69,7 @@
     bottom: calc(94px + env(safe-area-inset-bottom, 0px));
     right: 10px;
     width: 118px;
-    height: 116px;
+    height: 132px;
     border-radius: 12px;
   }
 
@@ -82,6 +83,7 @@
   }
 
   .minimap__controls button {
-    height: 25px;
+    height: 36px;
+    min-height: 36px;
   }
 }

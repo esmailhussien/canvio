@@ -71,6 +71,8 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const [radialMenu, setRadialMenu] = useState<{ screenX: number; screenY: number; worldPos: { x: number; y: number } } | null>(null);
   const touchPanStartRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const activeDrawingPointerIdRef = useRef<number | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
   const isInkTool = activeTool === 'draw' || activeTool === 'highlighter' || activeTool === 'arrow';
 
   // Drag-to-Create Frame state
@@ -249,6 +251,9 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       setCursorWorldPos(worldPos);
 
       if (isPanning && lastMousePos) {
+        // After a long-press opens Quick add, the finger is still down —
+        // don't pan the board behind the open menu.
+        if (radialMenu) return;
         if (touchPanStartRef.current) {
           const totalDx = e.clientX - touchPanStartRef.current.x;
           const totalDy = e.clientY - touchPanStartRef.current.y;
@@ -296,6 +301,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       lastMousePos,
       panBy,
       pinchStateRef,
+      radialMenu,
       screenToWorld,
       setLastMousePos,
       updateMarquee,
@@ -409,7 +415,81 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       activeDrawingPointerIdRef.current = null;
     }
     handleTouchStart(e);
-  }, [cancelDrawing, handleTouchStart, isDrawing]);
+
+    // Long-press radial on touch: single finger hold 520ms opens Quick add.
+    // Gated to the bare canvas surface — holding a note or mid-stroke must
+    // not pop the menu.
+    if (e.touches.length === 1 && !radialMenu) {
+      const target = e.target as HTMLElement;
+      const isCanvasSurface =
+        target === canvasRef.current ||
+        target.classList.contains('canvas__world') ||
+        target.classList.contains('canvas__grid');
+      const touch = e.touches[0];
+      if (isCanvasSurface) {
+        longPressOriginRef.current = { x: touch.clientX, y: touch.clientY };
+        if (longPressTimerRef.current !== null) {
+          window.clearTimeout(longPressTimerRef.current);
+        }
+        longPressTimerRef.current = window.setTimeout(() => {
+          const origin = longPressOriginRef.current;
+          if (!origin) return;
+          const worldPos = screenToWorld(origin.x, origin.y);
+          setRadialMenu({ screenX: origin.x, screenY: origin.y, worldPos });
+          longPressOriginRef.current = null;
+          longPressTimerRef.current = null;
+        }, 520);
+      } else {
+        if (longPressTimerRef.current !== null) {
+          window.clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+        longPressOriginRef.current = null;
+      }
+    } else {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      longPressOriginRef.current = null;
+    }
+  }, [cancelDrawing, handleTouchStart, isDrawing, radialMenu, screenToWorld]);
+
+  const handleTouchMoveWithLongPress = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (longPressOriginRef.current && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - longPressOriginRef.current.x;
+        const dy = e.touches[0].clientY - longPressOriginRef.current.y;
+        if (Math.hypot(dx, dy) > 10) {
+          if (longPressTimerRef.current !== null) {
+            window.clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
+          longPressOriginRef.current = null;
+        }
+      }
+      handleTouchMove(e);
+    },
+    [handleTouchMove]
+  );
+
+  const handleTouchEndWithLongPress = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      longPressOriginRef.current = null;
+      handleTouchEnd(e);
+    },
+    [handleTouchEnd]
+  );
+
+  useEffect(() => () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+    }
+  }, []);
 
   // Radial Menu Context Handler
   const handleContextMenu = useCallback(
@@ -510,9 +590,9 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onTouchStart={handleCanvasTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onTouchMove={handleTouchMoveWithLongPress}
+      onTouchEnd={handleTouchEndWithLongPress}
+      onTouchCancel={handleTouchEndWithLongPress}
       onWheel={handleWheel}
       onContextMenu={handleContextMenu}
       onDragOver={handleDragOver}

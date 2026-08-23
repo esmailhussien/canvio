@@ -278,14 +278,30 @@ export function HowItWorksPage() {
           <h2>Quick keyboard controls</h2>
           <div className="shortcuts-grid">
             <div className="shortcut-card"><kbd>V</kbd><span>Select and move</span></div>
-            <div className="shortcut-card"><kbd>P</kbd><span>Freehand pen</span></div>
+            <div className="shortcut-card"><kbd>P / D</kbd><span>Freehand pen</span></div>
+            <div className="shortcut-card"><kbd>S / N</kbd><span>Sticky note</span></div>
+            <div className="shortcut-card"><kbd>T</kbd><span>Text block</span></div>
+            <div className="shortcut-card"><kbd>R</kbd><span>Shape</span></div>
+            <div className="shortcut-card"><kbd>M</kbd><span>Living Map</span></div>
+            <div className="shortcut-card"><kbd>L</kbd><span>Relation</span></div>
+            <div className="shortcut-card"><kbd>F</kbd><span>Frame</span></div>
+            <div className="shortcut-card"><kbd>C</kbd><span>Code block</span></div>
+            <div className="shortcut-card"><kbd>I</kbd><span>Image</span></div>
             <div className="shortcut-card"><kbd>E</kbd><span>Stroke eraser</span></div>
             <div className="shortcut-card"><kbd>Q</kbd><span>Laser pointer</span></div>
+            <div className="shortcut-card"><kbd>K</kbd><span>Highlighter</span></div>
+            <div className="shortcut-card"><kbd>A</kbd><span>Arrow</span></div>
             <div className="shortcut-card"><kbd>1 – 9, 0</kbd><span>Semantic relation type</span></div>
+            <div className="shortcut-card"><kbd>Space / H + drag</kbd><span>Pan canvas</span></div>
             <div className="shortcut-card"><kbd>Ctrl + K</kbd><span>AI Navigator</span></div>
             <div className="shortcut-card"><kbd>Ctrl + Shift + R</kbd><span>Reasoning Partner</span></div>
-            <div className="shortcut-card"><kbd>Space + drag</kbd><span>Pan canvas</span></div>
             <div className="shortcut-card"><kbd>Ctrl + Z</kbd><span>Undo</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + Y</kbd><span>Redo</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + D</kbd><span>Duplicate</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + G</kbd><span>Group into Frame</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + A</kbd><span>Select all</span></div>
+            <div className="shortcut-card"><kbd>Del / Backspace</kbd><span>Delete</span></div>
+            <div className="shortcut-card"><kbd>Esc</kbd><span>Deselect / Close</span></div>
           </div>
         </section>
 
