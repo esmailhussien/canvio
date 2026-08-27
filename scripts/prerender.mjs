@@ -332,28 +332,45 @@ const PAGES = [
         ${buildNavigationHtml('/support')}
         <main class="support-main" style="max-width: 1000px; margin: 0 auto; padding: 40px 24px;">
           <header style="text-align: center; margin-bottom: 48px;">
-            <h1 style="font-size: clamp(30px, 4vw, 44px); font-weight: 800; margin-bottom: 16px;">Canvio Support & Community</h1>
+            <h1 style="font-size: clamp(30px, 4vw, 44px); font-weight: 800; margin-bottom: 16px;">Help Canvio become easier, faster, and more useful.</h1>
             <p style="font-size: 18px; color: var(--text-secondary, #94a3b8); max-width: 650px; margin: 0 auto;">
-              Report bugs, suggest features, explore the product roadmap, or contribute to open-source development.
+              Report a problem, ask a question, request an improvement, or support open-source development.
             </p>
           </header>
 
           <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 60px;">
-            <div style="padding: 24px; border-radius: 16px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
+            <div style="padding: 24px; border-radius: 8px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
               <h2 style="font-size: 20px; color: #ef4444; margin-bottom: 8px;">Report a Bug</h2>
-              <p style="color: var(--text-secondary, #94a3b8); margin-bottom: 16px;">Found an issue with drawing, synchronization, or export? Let us know so we can fix it quickly.</p>
+              <p style="color: var(--text-secondary, #94a3b8); margin-bottom: 16px;">Found an issue with drawing, touch, synchronization, sharing, or export? Send the steps and device details.</p>
               <a href="mailto:support@canvio.space?subject=Canvio%20Bug%20Report" style="color: #818cf8; font-weight: 600;">Email Bug Report →</a>
             </div>
-            <div style="padding: 24px; border-radius: 16px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
+            <div style="padding: 24px; border-radius: 8px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
+              <h2 style="font-size: 20px; color: #38bdf8; margin-bottom: 8px;">Send UX Feedback</h2>
+              <p style="color: var(--text-secondary, #94a3b8); margin-bottom: 16px;">Tell us where Canvio feels difficult on mobile, tablet, pen, classroom displays, or daily desktop work.</p>
+              <a href="mailto:support@canvio.space?subject=Canvio%20UX%20Feedback" style="color: #818cf8; font-weight: 600;">Share Experience →</a>
+            </div>
+            <div style="padding: 24px; border-radius: 8px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
               <h2 style="font-size: 20px; color: #22c55e; margin-bottom: 8px;">Request a Feature</h2>
-              <p style="color: var(--text-secondary, #94a3b8); margin-bottom: 16px;">Have an idea for a new node type, AI behavior, template model, or keyboard shortcut?</p>
+              <p style="color: var(--text-secondary, #94a3b8); margin-bottom: 16px;">Suggest a workflow, template, AI behavior, export option, or object type that would make Canvio more useful.</p>
               <a href="mailto:support@canvio.space?subject=Canvio%20Feature%20Request" style="color: #818cf8; font-weight: 600;">Submit Feature Idea →</a>
             </div>
-            <div style="padding: 24px; border-radius: 16px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
+            <div style="padding: 24px; border-radius: 8px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));">
               <h2 style="font-size: 20px; color: #38bdf8; margin-bottom: 8px;">Open Source Code</h2>
               <p style="color: var(--text-secondary, #94a3b8); margin-bottom: 16px;">Inspect the code, report GitHub issues, or contribute improvements directly.</p>
               <a href="https://github.com/esmailhussien/canvio" target="_blank" rel="noopener noreferrer" style="color: #818cf8; font-weight: 600;">View on GitHub →</a>
             </div>
+          </section>
+
+          <section style="padding: 24px; border-radius: 8px; background: var(--bg-surface, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); margin-bottom: 36px;">
+            <h2 style="font-size: 24px; margin-bottom: 12px;">Roadmap direction</h2>
+            <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6; margin-bottom: 12px;">Canvio is prioritizing interaction quality, reliable sharing and export, stronger board-aware AI, and readable relations across notes, shapes, maps, and frames.</p>
+            <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">Next ideas include clearer board publishing, editable infographics, and board-aware image generation. Exploring describes direction, not a release promise.</p>
+          </section>
+
+          <section style="text-align: center; margin-bottom: 36px;">
+            <h2 style="font-size: 24px; margin-bottom: 12px;">Support independent development</h2>
+            <p style="color: var(--text-secondary, #94a3b8); margin-bottom: 16px;">Contributions help cover hosting, collaboration infrastructure, testing devices, and focused development time.</p>
+            <a href="https://ko-fi.com/canvio" target="_blank" rel="noopener noreferrer" style="color: #f59e0b; font-weight: 700;">Support Canvio on Ko-fi →</a>
           </section>
         </main>
         ${buildFooterHtml()}
@@ -609,7 +626,7 @@ const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
   </url>
   <url>
     <loc>https://canvio.space/support</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

@@ -148,6 +148,10 @@ export function SupportPage() {
   const toggleTheme = useCanvasStore((s) => s.toggleTheme);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
