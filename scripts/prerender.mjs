@@ -21,6 +21,10 @@ const ORGANIZATION_LOGO = `${SITE_URL}/logo.png`;
 
 const articlesPath = join(root, 'apps', 'web', 'src', 'pages', 'updatesData.json');
 const UPDATE_ARTICLES = JSON.parse(readFileSync(articlesPath, 'utf8'));
+const LATEST_UPDATE_DATE = UPDATE_ARTICLES.reduce(
+  (latest, article) => article.datePublished > latest ? article.datePublished : latest,
+  '2026-08-15',
+);
 
 
 function buildNavigationHtml(activePath) {
@@ -46,7 +50,7 @@ function buildFooterHtml() {
       <div style="max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 20px;">
         <div style="text-align: left;">
           <strong>Canvio</strong> — Connect ideas. Create knowledge.
-          <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 14px;">Connect ideas, maps, notes, and AI-assisted models on an infinite canvas.</p>
+          <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 14px;">Connect notes, relations, AI, drawing, and maps when place matters on an infinite canvas.</p>
         </div>
         <div style="display: flex; gap: 20px; font-size: 14px;">
           <a href="/how-it-works" style="color: var(--text-secondary, #94a3b8);">How It Works</a>
@@ -233,10 +237,10 @@ const PAGES = [
         ${buildNavigationHtml('/how-it-works')}
         <main class="how-main" style="max-width: 1000px; margin: 0 auto; padding: 40px 24px;">
           <header style="text-align: center; margin-bottom: 48px;">
-            <p style="color: #818cf8; font-weight: 600; margin-bottom: 8px;">A Calm & Powerful Workflow</p>
+            <p style="color: #818cf8; font-weight: 600; margin-bottom: 8px;">Simple enough to start. Powerful enough to keep thinking.</p>
             <h1 style="font-size: clamp(30px, 4vw, 44px); font-weight: 800; margin-bottom: 16px;">How Canvio Works</h1>
             <p style="font-size: 18px; color: var(--text-secondary, #94a3b8); max-width: 650px; margin: 0 auto;">
-              From the first stroke to a completed knowledge board — four steps to organize complex ideas visually.
+              Start with a board, add living elements, connect the meaning, and bring in maps only when place matters.
             </p>
           </header>
 
@@ -245,7 +249,7 @@ const PAGES = [
               <span style="color: #38bdf8; font-weight: 700; font-size: 14px;">STEP 01</span>
               <h2 style="font-size: 24px; margin: 8px 0 12px;">Start Anywhere: Blank, Model, or AI Draft</h2>
               <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">
-                Begin your work without friction. Open a blank canvas in 2 seconds, pick from pre-built models (study concept maps, lesson plans, decision matrices), or type a prompt into AI Navigator to generate an editable starting structure with connected cards.
+                Open a blank canvas, choose a curated model, or ask Canvio AI for an editable starting structure. AI can mix useful object types, meaningful relations, and the language you requested instead of returning a flat answer.
               </p>
             </article>
 
@@ -253,7 +257,7 @@ const PAGES = [
               <span style="color: #22c55e; font-weight: 700; font-size: 14px;">STEP 02</span>
               <h2 style="font-size: 24px; margin: 8px 0 12px;">Build with Living Canvas Objects</h2>
               <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">
-                Every item is an interactive object. Write notes, draw with pressure-sensitive stylus ink, create geometric shapes, group sections with frames, add code blocks, and add interactive maps when location matters.
+                Every item remains editable. Write notes, draw with pressure-sensitive stylus ink, create geometric shapes, group sections with frames, add code blocks, and bring in interactive maps when location matters.
               </p>
             </article>
 
@@ -261,7 +265,7 @@ const PAGES = [
               <span style="color: #a855f7; font-weight: 700; font-size: 14px;">STEP 03</span>
               <h2 style="font-size: 24px; margin: 8px 0 12px;">Connect Ideas with Meaningful Relations</h2>
               <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">
-                Connections in Canvio aren't just dumb lines — they carry meaning. Define relationships like "based on", "depends on", "leads to", or "contradicts". Smart routing keeps arrows readable as you rearrange items on the canvas.
+                Connections in Canvio carry meaning. Define relationships like "based on", "depends on", "leads to", or "contradicts". The Visual Reasoning Partner reads that structure and suggests the clearest next improvement.
               </p>
             </article>
 
@@ -269,7 +273,7 @@ const PAGES = [
               <span style="color: #f59e0b; font-weight: 700; font-size: 14px;">STEP 04</span>
               <h2 style="font-size: 24px; margin: 8px 0 12px;">Deliver: Present, Collaborate, and Export</h2>
               <p style="color: var(--text-secondary, #94a3b8); line-height: 1.6;">
-                Share your board link for instant multiplayer collaboration powered by Yjs CRDTs. Switch into Presentation Mode with a spotlight focus and temporary laser pointer. Export frame pages or full-resolution PNGs whenever you need them.
+                Share a board link for live collaboration, switch into Present mode, and guide attention with a temporary laser pointer. Export frame pages, PNGs, PDFs, or JSON backups when the work is ready to use elsewhere.
               </p>
             </article>
           </div>
@@ -587,19 +591,19 @@ const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://canvio.space/</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>${LATEST_UPDATE_DATE}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://canvio.space/how-it-works</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://canvio.space/updates</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>${LATEST_UPDATE_DATE}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>

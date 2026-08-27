@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import dotenv from 'dotenv';
 import { boardRoutes } from './routes/boards.js';
 import { aiRoutes } from './routes/ai.js';
+import { telemetryRoutes } from './routes/telemetry.js';
 import { createCorsOriginGuard } from './security.js';
 import { FASTIFY_OPTIONS, registerErrorHandler, registerSecurityHeaders } from './http.js';
 import { getReadiness } from './health.js';
@@ -25,6 +26,7 @@ app.get('/', async () => {
     endpoints: {
       boards: '/api/boards',
       ai: '/api/ai',
+      telemetry: '/api/telemetry/events',
     },
   };
 });
@@ -44,6 +46,7 @@ app.get('/health/ready', async (_request, reply) => {
 
 app.register(boardRoutes, { prefix: '/api/boards' });
 app.register(aiRoutes, { prefix: '/api/ai' });
+app.register(telemetryRoutes, { prefix: '/api/telemetry' });
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 

@@ -261,7 +261,7 @@
 
 .world-page__starter-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1164,6 +1164,10 @@ button.presence-avatar--self:focus-visible {
   color: var(--accent-primary, #8083ff);
 }
 
+.header-ai-btn--mobile-ai {
+  display: none;
+}
+
 .world-page.is-presenting {
   cursor: grab;
 }
@@ -1418,6 +1422,10 @@ button.presence-avatar--self:focus-visible {
     width: 44px !important;
     min-width: 44px !important;
     height: 44px !important;
+  }
+
+  .header-ai-btn--mobile-ai {
+    display: flex;
   }
 
   .world-header__surface-btn {
@@ -1676,7 +1684,13 @@ button.presence-avatar--self:focus-visible {
   }
 
   .world-header__right .header-ai-btn[aria-label="Present Board"],
+  .world-header__right .header-ai-btn--guide,
+  .world-header__right .header-ai-btn--reasoning,
   .world-header__right .header-divider {
+    display: none;
+  }
+
+  .world-header__left .export-menu__trigger-btn {
     display: none;
   }
 
@@ -1743,6 +1757,12 @@ button.presence-avatar--self:focus-visible {
   }
 }
 
+@media (max-width: 380px) {
+  .world-header__right .header-icon-btn--redo {
+    display: none;
+  }
+}
+
 @media (pointer: coarse) {
 
   .header-icon-btn,
@@ -1767,4 +1787,30 @@ button.presence-avatar--self:focus-visible {
     min-height: 44px;
     touch-action: manipulation;
   }
+}
+
+.world-page__panel-loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: var(--z-toast);
+  min-height: 42px;
+  padding: 11px 16px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--radius-full);
+  background: var(--toolbar-bg);
+  box-shadow: var(--toolbar-shadow);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+/* Continuous gestures should prioritize canvas pixels over decorative glass. */
+.world-page:has(.canvas--panning) .world-header,
+.world-page:has(.canvas--panning) .canvio-toolbar,
+.world-page:has(.canvas--panning) .minimap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
 }

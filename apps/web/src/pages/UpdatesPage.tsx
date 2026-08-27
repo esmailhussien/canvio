@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { createBoard } from '../utils/api';
 import { useCanvasStore } from '../store/canvasStore';
 import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
 import { IconTheme } from '@canvio/ui';
-import { getUpdateArticle, UPDATE_ARTICLES, UpdateCategory } from './updatesContent';
+import { getUpdateArticle, LATEST_UPDATE, UPDATE_ARTICLES, UpdateCategory } from './updatesContent';
 import './UpdatesPage.css';
 
 const CATEGORIES: Array<'All' | UpdateCategory> = ['All', 'Feature', 'Design note', 'Guide', 'Release'];
@@ -55,6 +55,10 @@ export function UpdatesPage() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [slug]);
+
   const handleCreateWorld = () => {
     if (isCreating) return;
     setIsCreating(true);
@@ -64,6 +68,12 @@ export function UpdatesPage() {
   };
 
   const article = slug ? getUpdateArticle(slug) : undefined;
+  const relatedArticles = article
+    ? UPDATE_ARTICLES
+        .filter((item) => item.slug !== article.slug)
+        .sort((left, right) => Number(right.category === article.category) - Number(left.category === article.category))
+        .slice(0, 2)
+    : [];
   const filteredArticles = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return UPDATE_ARTICLES.filter((item) => {
@@ -72,6 +82,8 @@ export function UpdatesPage() {
       return categoryMatch && queryMatch;
     });
   }, [activeCategory, query]);
+
+  if (slug && !article) return <Navigate to="/updates" replace />;
 
   return (
     <div className="updates-page dot-grid">
@@ -127,7 +139,7 @@ export function UpdatesPage() {
                 <h2>More from Canvio Updates</h2>
               </div>
               <div className="updates-related__grid">
-                {UPDATE_ARTICLES.filter((item) => item.slug !== article.slug).slice(0, 2).map((item) => (
+                {relatedArticles.map((item) => (
                   <Link className="updates-related__card" to={`/updates/${item.slug}`} key={item.slug}>
                     <UpdateGlyph icon={item.icon} accent={item.accent} />
                     <span className="updates-category" style={{ color: item.accent, backgroundColor: `${item.accent}18` }}>{item.category}</span>
@@ -151,15 +163,15 @@ export function UpdatesPage() {
             <section className="updates-featured" aria-label="Featured update">
               <div className="updates-featured__visual">
                 <span className="material-symbols-outlined" aria-hidden="true">psychology_alt</span>
-                <div className="updates-featured__mini-card updates-featured__mini-card--one">Score</div>
-                <div className="updates-featured__mini-card updates-featured__mini-card--two">Next move</div>
-                <div className="updates-featured__mini-card updates-featured__mini-card--three">Board AI</div>
+                <div className="updates-featured__mini-card updates-featured__mini-card--one">Rich tools</div>
+                <div className="updates-featured__mini-card updates-featured__mini-card--two">Your language</div>
+                <div className="updates-featured__mini-card updates-featured__mini-card--three">Clear relations</div>
               </div>
               <div className="updates-featured__copy">
                 <div className="updates-article__meta"><span className="updates-category" style={{ color: '#a855f7', backgroundColor: '#a855f718' }}>Featured</span><span>Latest update</span></div>
-                <h2>{UPDATE_ARTICLES[0].title}</h2>
-                <p>{UPDATE_ARTICLES[0].excerpt}</p>
-                <Link className="updates-text-link" to={`/updates/${UPDATE_ARTICLES[0].slug}`}>Read the update <span aria-hidden="true">-&gt;</span></Link>
+                <h2>{LATEST_UPDATE.title}</h2>
+                <p>{LATEST_UPDATE.excerpt}</p>
+                <Link className="updates-text-link" to={`/updates/${LATEST_UPDATE.slug}`}>Read the update <span aria-hidden="true">-&gt;</span></Link>
               </div>
             </section>
 
@@ -177,15 +189,21 @@ export function UpdatesPage() {
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search updates"
                     aria-label="Search updates"
+                    aria-describedby="updates-result-count"
                     autoComplete="off"
                   />
                 </label>
               </div>
-              <div className="updates-filters" role="tablist" aria-label="Filter updates">
+              <div className="updates-filters" role="group" aria-label="Filter updates by category">
                 {CATEGORIES.map((category) => (
-                  <button key={category} className={activeCategory === category ? 'active' : ''} onClick={() => setActiveCategory(category)} role="tab" aria-selected={activeCategory === category}>{category}</button>
+                  <button key={category} className={activeCategory === category ? 'active' : ''} onClick={() => setActiveCategory(category)} aria-pressed={activeCategory === category}>{category}</button>
                 ))}
               </div>
+              <p className="updates-results" id="updates-result-count" aria-live="polite">
+                {filteredArticles.length} {filteredArticles.length === 1 ? 'update' : 'updates'}
+                {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
+                {query.trim() ? ` matching “${query.trim()}”` : ''}
+              </p>
               <div className="updates-grid">
                 {filteredArticles.map((item) => (
                   <Link className="updates-card" to={`/updates/${item.slug}`} key={item.slug}>
@@ -196,7 +214,13 @@ export function UpdatesPage() {
                   </Link>
                 ))}
               </div>
-              {filteredArticles.length === 0 && <p className="updates-empty">No updates match that search yet.</p>}
+              {filteredArticles.length === 0 && (
+                <div className="updates-empty">
+                  <strong>No matching updates</strong>
+                  <span>Try another phrase or show the complete archive.</span>
+                  <button onClick={() => { setQuery(''); setActiveCategory('All'); }}>Clear filters</button>
+                </div>
+              )}
             </section>
           </main>
         </>

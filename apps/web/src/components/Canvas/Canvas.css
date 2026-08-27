@@ -105,6 +105,10 @@
   pointer-events: none;
 }
 
+.canvas--panning .canvas__world {
+  will-change: transform;
+}
+
 .canvas__world > * {
   pointer-events: auto;
 }

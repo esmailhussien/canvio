@@ -1,11 +1,21 @@
-import { useState, useCallback, useRef, useEffect, memo, type CSSProperties } from 'react';
+import { lazy, Suspense, useState, useCallback, useRef, useEffect, memo, type CSSProperties } from 'react';
 import { LivingNode } from '../../store/canvasStore';
 import { useCanvasStore } from '../../store/canvasStore';
-import { DrawingNode, StickyNote, MapNode, TextNode, ImageNode, ShapeNode, FrameNode, CodeNode } from '@canvio/objects';
+import { DrawingNode } from '@canvio/objects/src/drawing/DrawingNode';
+import { StickyNote } from '@canvio/objects/src/sticky-note/StickyNote';
+import { TextNode } from '@canvio/objects/src/text/TextNode';
+import { ImageNode } from '@canvio/objects/src/image/ImageNode';
+import { ShapeNode } from '@canvio/objects/src/shape/ShapeNode';
+import { FrameNode } from '@canvio/objects/src/frame/FrameNode';
+import { CodeNode } from '@canvio/objects/src/code/CodeNode';
 import { NodeInspector } from '../NodeInspector/NodeInspector';
 import { makeMarkerPort } from '../RelationRenderer/relationUtils';
 import { nanoid } from 'nanoid';
 import './NodeRenderer.css';
+
+const MapNode = lazy(() => import('@canvio/objects/src/map/MapNode').then((module) => ({
+  default: module.MapNode,
+})));
 
 interface Props {
   node: LivingNode;
@@ -711,16 +721,18 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
         {node.type === 'drawing' && <DrawingNode node={node} />}
         {node.type === 'sticky' && <StickyNote node={node} selected={isSelected} onChange={updateNode} />}
         {node.type === 'map' && (
-          <MapNode
-            node={node}
-            selected={isSelected}
-            onChange={updateNode}
-            relationMode={!presentationMode && activeTool === 'relation'}
-            relationSourcePort={relationSourceId === node.id ? relationSourcePort : null}
-            onMarkerRelation={handleMarkerRelation}
-            onMarkerRelationHover={handleMarkerRelationHover}
-            onRequestRelationMode={handleRequestMapRelationMode}
-          />
+          <Suspense fallback={<div className="node-map-loading" role="status">Loading map...</div>}>
+            <MapNode
+              node={node}
+              selected={isSelected}
+              onChange={updateNode}
+              relationMode={!presentationMode && activeTool === 'relation'}
+              relationSourcePort={relationSourceId === node.id ? relationSourcePort : null}
+              onMarkerRelation={handleMarkerRelation}
+              onMarkerRelationHover={handleMarkerRelationHover}
+              onRequestRelationMode={handleRequestMapRelationMode}
+            />
+          </Suspense>
         )}
         {node.type === 'text' && <TextNode node={node} selected={isSelected} onChange={updateNode} />}
         {node.type === 'image' && <ImageNode node={node} selected={isSelected} onChange={updateNode} />}

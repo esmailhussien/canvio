@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { Canvas } from '../components/Canvas/Canvas';
@@ -6,19 +6,32 @@ import { IconRedo, IconUndo, Toolbar } from '@canvio/ui';
 import { Cursors } from '../components/Cursors/Cursors';
 import { ShareButton } from '../components/ShareButton/ShareButton';
 import { ExportMenu } from '../components/ExportMenu/ExportMenu';
-import { TemplatePicker } from '../components/TemplatePicker/TemplatePicker';
-import { AIAssistantModal } from '../components/AIAssistantModal/AIAssistantModal';
 import { Minimap } from '../components/Minimap/Minimap';
 import { applyTemplate } from '../utils/templates';
 import { useCanvasStore, type HistorySnapshot, type Viewport } from '../store/canvasStore';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { RelationInspector } from '../components/RelationInspector/RelationInspector';
 import { PenInspector } from '../components/PenInspector/PenInspector';
-import { GraphIntelligence } from '../components/GraphIntelligence/GraphIntelligence';
 import { CanvioLogoIcon } from '../components/CanvioLogo/CanvioLogo';
 import { fitViewportToNodes } from '../utils/viewportFit';
 import { createBoard, forkBoard, touchBoard, updateBoardAppearance, BoardRecord } from '../utils/api';
+import {
+  markBoardTelemetryMilestone,
+  startBoardTelemetry,
+  trackBoardEvent,
+  type BoardVisitTelemetry,
+} from '../utils/productTelemetry';
 import './WorldPage.css';
+
+const TemplatePicker = lazy(() => import('../components/TemplatePicker/TemplatePicker').then((module) => ({
+  default: module.TemplatePicker,
+})));
+const AIAssistantModal = lazy(() => import('../components/AIAssistantModal/AIAssistantModal').then((module) => ({
+  default: module.AIAssistantModal,
+})));
+const GraphIntelligence = lazy(() => import('../components/GraphIntelligence/GraphIntelligence').then((module) => ({
+  default: module.GraphIntelligence,
+})));
 
 const TOOL_GUIDANCE: Record<string, { label: string; detail: string }> = {
   select: { label: 'Select', detail: 'Tap or click an element to move it. Use two fingers to move the canvas.' },
@@ -54,7 +67,7 @@ const STARTER_DISMISS_KEY = 'CANVIO_STARTER_DISMISSED_V1';
 const DEMO_BOARD_PREFIX = 'demo-';
 const DEMO_TEMPLATE_ID = 'canvio-demo-board';
 
-type CoachAction = 'add-note' | 'connect' | 'open-ai' | 'open-templates' | 'select-tool';
+type CoachAction = 'add-note' | 'connect' | 'open-ai' | 'open-templates' | 'select-tool' | 'share';
 
 type StarterGoal = {
   id: string;
@@ -92,43 +105,27 @@ function cloneRecoverableWorldSnapshot(snapshot: RecoverableWorldSnapshot): Reco
 const STARTER_GOALS: StarterGoal[] = [
   {
     id: 'lesson',
-    title: 'Teach a lesson',
-    description: 'Plan objectives, flow, activities, and checks.',
+    title: 'Explain or learn',
+    description: 'Connect the main idea, evidence, examples, and questions.',
     icon: 'school',
     accent: '#38bdf8',
     templateId: 'lesson-plan-board',
   },
   {
-    id: 'study',
-    title: 'Study a topic',
-    description: 'Connect definitions, examples, questions, and practice.',
-    icon: 'neurology',
-    accent: '#f59e0b',
-    templateId: 'study-concept-map',
-  },
-  {
     id: 'project',
-    title: 'Plan a project',
-    description: 'Map scope, owners, risks, milestones, and metrics.',
+    title: 'Plan work',
+    description: 'Clarify goals, owners, risks, milestones, and next actions.',
     icon: 'rocket_launch',
     accent: '#22c55e',
     templateId: 'launch-operating-plan',
   },
   {
     id: 'research',
-    title: 'Research evidence',
-    description: 'Turn signals into insights, confidence, and decisions.',
+    title: 'Research a question',
+    description: 'Organize sources, evidence, uncertainty, and conclusions.',
     icon: 'travel_explore',
     accent: '#06b6d4',
     templateId: 'research-evidence-wall',
-  },
-  {
-    id: 'map',
-    title: 'Map a place',
-    description: 'Use pins, field notes, evidence, and location relations.',
-    icon: 'map',
-    accent: '#10b981',
-    templateId: 'site-visit-map',
   },
   {
     id: 'decision',
@@ -240,12 +237,12 @@ function getCoachTip({
   }
 
   return {
-    step: 'Use',
-    title: 'Turn the board into something useful',
-    body: 'Ask AI to summarize, find gaps, write an article, or suggest the next move from your current board.',
-    icon: 'auto_awesome',
-    action: 'open-ai',
-    actionLabel: 'Ask AI',
+    step: 'Share',
+    title: 'Put the connected work to use',
+    body: 'Share the live board so someone can review, contribute, or continue from the same context.',
+    icon: 'ios_share',
+    action: 'share',
+    actionLabel: 'Share board',
   };
 }
 
@@ -254,10 +251,8 @@ export function WorldPage() {
   const navigate = useNavigate();
   const activeTool = useCanvasStore((s) => s.activeTool);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
-  const nodes = useCanvasStore((s) => s.nodes);
-  const relations = useCanvasStore((s) => s.relations);
-  const inkStrokes = useCanvasStore((s) => s.inkStrokes);
-  const viewport = useCanvasStore((s) => s.viewport);
+  const nodeCount = useCanvasStore((s) => Object.keys(s.nodes).length);
+  const relationCount = useCanvasStore((s) => Object.keys(s.relations).length);
   const canUndo = useCanvasStore((s) => s.canUndo);
   const canRedo = useCanvasStore((s) => s.canRedo);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
@@ -296,6 +291,12 @@ export function WorldPage() {
   const seededDemoWorldRef = useRef<string | null>(null);
   const recoveredWorldRef = useRef<RecoverableWorldSnapshot | null>(null);
   const noticeTimerRef = useRef<number | null>(null);
+  const boardVisitTelemetryRef = useRef<BoardVisitTelemetry | null>(null);
+  const boardVisitWorldRef = useRef<string | null>(null);
+  const telemetryOpenedWorldRef = useRef<string | null>(null);
+  const telemetryInitialEmptyRef = useRef(false);
+  const telemetryInitialRelationCountRef = useRef(0);
+  const lastRuntimeIssueRef = useRef('');
 
   const activeBackground = BACKGROUND_SWATCHES.find((swatch) => swatch.value === canvasBackground);
 
@@ -342,6 +343,14 @@ export function WorldPage() {
   useEffect(() => {
     setIsPresenting(false);
     setFocusNodeId(null);
+    telemetryOpenedWorldRef.current = null;
+    telemetryInitialEmptyRef.current = false;
+    telemetryInitialRelationCountRef.current = 0;
+    lastRuntimeIssueRef.current = '';
+    if (worldId && boardVisitWorldRef.current !== worldId) {
+      boardVisitWorldRef.current = worldId;
+      boardVisitTelemetryRef.current = startBoardTelemetry(worldId);
+    }
   }, [worldId]);
 
   useEffect(() => () => {
@@ -413,7 +422,7 @@ export function WorldPage() {
   }, [showBoardNotice]);
 
   const handleFitToWorld = () => {
-    const allNodes = Object.values(nodes);
+    const allNodes = Object.values(useCanvasStore.getState().nodes);
     if (allNodes.length > 0) {
       fitViewportToNodes(allNodes, { maxZoom: 1.05, minZoom: 0.35, paddingX: 220, paddingY: 220 });
     } else {
@@ -425,17 +434,20 @@ export function WorldPage() {
   const isSelectedNodeFocused = Boolean(selectedFocusNodeId && focusNodeId === selectedFocusNodeId);
 
   const handleFitPresentationView = () => {
-    if (focusNodeId && nodes[focusNodeId]) {
-      fitViewportToNodes([nodes[focusNodeId]], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
+    const focusedNode = focusNodeId ? useCanvasStore.getState().nodes[focusNodeId] : null;
+    if (focusedNode) {
+      fitViewportToNodes([focusedNode], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
       return;
     }
     handleFitToWorld();
   };
 
   const handleFocusSelectedNode = () => {
-    if (!selectedFocusNodeId || !nodes[selectedFocusNodeId]) return;
+    if (!selectedFocusNodeId) return;
+    const selectedNode = useCanvasStore.getState().nodes[selectedFocusNodeId];
+    if (!selectedNode) return;
     setFocusNodeId(selectedFocusNodeId);
-    fitViewportToNodes([nodes[selectedFocusNodeId]], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
+    fitViewportToNodes([selectedNode], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
   };
 
   const handleClearFocus = () => {
@@ -444,16 +456,19 @@ export function WorldPage() {
   };
 
   const handleEnterPresentation = () => {
+    const selectedNode = selectedFocusNodeId
+      ? useCanvasStore.getState().nodes[selectedFocusNodeId]
+      : null;
     setActiveTool('select');
     setIsCanvioMenuOpen(false);
     setIsExportMenuOpen(false);
     setIsTemplateOpen(false);
     setIsAIOpen(false);
-    setFocusNodeId(selectedFocusNodeId && nodes[selectedFocusNodeId] ? selectedFocusNodeId : null);
+    setFocusNodeId(selectedNode ? selectedFocusNodeId : null);
     setIsPresenting(true);
     window.setTimeout(() => {
-      if (selectedFocusNodeId && nodes[selectedFocusNodeId]) {
-        fitViewportToNodes([nodes[selectedFocusNodeId]], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
+      if (selectedNode) {
+        fitViewportToNodes([selectedNode], { maxZoom: 1.2, minZoom: 0.45, paddingX: 260, paddingY: 220 });
       } else {
         handleFitToWorld();
       }
@@ -539,17 +554,22 @@ export function WorldPage() {
       setIsTemplateOpen(true);
       return;
     }
+    if (action === 'share') {
+      setShareNameFocusSignal(Date.now());
+      return;
+    }
     setActiveTool('select');
   };
 
   const handleStartFromScratch = (reset = false) => {
-    const hasContent = Object.keys(nodes).length > 0 || Object.keys(relations).length > 0 || inkStrokes.length > 0;
+    const store = useCanvasStore.getState();
+    const hasContent = Object.keys(store.nodes).length > 0 || Object.keys(store.relations).length > 0 || store.inkStrokes.length > 0;
     if (reset && hasContent) {
       recoveredWorldRef.current = cloneRecoverableWorldSnapshot({
-        nodes,
-        relations,
-        inkStrokes,
-        viewport,
+        nodes: store.nodes,
+        relations: store.relations,
+        inkStrokes: store.inkStrokes,
+        viewport: store.viewport,
         appearance: { theme, canvasBackground },
       });
     }
@@ -666,7 +686,7 @@ export function WorldPage() {
     return () => window.removeEventListener('pointerdown', handleClickOutside);
   }, [isCanvioMenuOpen, isExportMenuOpen]);
 
-  // Ctrl+K shortcut for AI Navigator, Ctrl+Shift+R for Reasoning Partner
+  // Ctrl+K opens Canvio AI; Ctrl+Shift+R opens the Reasoning Partner.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -683,10 +703,16 @@ export function WorldPage() {
   }, []);
 
   useEffect(() => {
-    if (focusNodeId && !nodes[focusNodeId]) {
+    if (!focusNodeId) return;
+    if (!useCanvasStore.getState().nodes[focusNodeId]) {
       setFocusNodeId(null);
+      return;
     }
-  }, [focusNodeId, nodes]);
+
+    return useCanvasStore.subscribe((state) => {
+      if (!state.nodes[focusNodeId]) setFocusNodeId(null);
+    });
+  }, [focusNodeId]);
 
   useEffect(() => {
     if (!isPresenting) return;
@@ -709,7 +735,7 @@ export function WorldPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPresenting, focusNodeId, nodes]);
+  }, [isPresenting, focusNodeId]);
 
   useEffect(() => {
     if (!isPresenting) return;
@@ -723,15 +749,103 @@ export function WorldPage() {
       window.removeEventListener('resize', handlePresentationResize);
       if (fitTimer !== null) window.clearTimeout(fitTimer);
     };
-  }, [isPresenting, focusNodeId, nodes]);
+  }, [isPresenting, focusNodeId]);
 
   // Connect to collaboration
   const { connected, connectionIssue, users, persistenceState, retryConnection } = useCollaboration(worldId || '');
-  const nodeCount = Object.keys(nodes).length;
-  const relationCount = Object.keys(relations).length;
   const isDemoWorld = Boolean(worldId?.startsWith(DEMO_BOARD_PREFIX));
   const toolGuidance = TOOL_GUIDANCE[activeTool] || TOOL_GUIDANCE.select;
   const showStarter = nodeCount === 0 && !isStarterDismissed && !isPresenting;
+
+  useEffect(() => {
+    if (!worldId || telemetryOpenedWorldRef.current === worldId) return;
+    if (persistenceState === 'loading' && !connectionIssue) return;
+
+    // Route changes can render once with the previous board's persistence
+    // state. A short settling window lets collaboration reset and hydrate.
+    const timer = window.setTimeout(() => {
+      if (telemetryOpenedWorldRef.current === worldId) return;
+      const currentStore = useCanvasStore.getState();
+      const settledNodeCount = Object.keys(currentStore.nodes).length;
+      const settledRelationCount = Object.keys(currentStore.relations).length;
+      telemetryOpenedWorldRef.current = worldId;
+      telemetryInitialEmptyRef.current = settledNodeCount === 0;
+      telemetryInitialRelationCountRef.current = settledRelationCount;
+      const visit = boardVisitTelemetryRef.current || startBoardTelemetry(worldId);
+      const hasShareToken = new URLSearchParams(window.location.search).has('share');
+      trackBoardEvent(worldId, 'board_opened', {
+        entry: isDemoWorld ? 'demo' : hasShareToken ? 'share' : 'direct',
+        nodeCount: settledNodeCount,
+        relationCount: settledRelationCount,
+      });
+      if (visit.isReturn) {
+        trackBoardEvent(worldId, 'board_returned', { returnAfterMinutes: visit.returnAfterMinutes });
+      }
+      if (hasShareToken) {
+        trackBoardEvent(worldId, 'share_opened', {});
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [worldId, persistenceState, connectionIssue, isDemoWorld, nodeCount, relationCount]);
+
+  useEffect(() => {
+    if (!worldId || telemetryOpenedWorldRef.current !== worldId || !telemetryInitialEmptyRef.current || nodeCount === 0) return;
+    if (!markBoardTelemetryMilestone(worldId, 'first-element')) return;
+    const openedAt = boardVisitTelemetryRef.current?.openedAt || Date.now();
+    trackBoardEvent(worldId, 'first_element_created', {
+      elementCount: nodeCount,
+      activationMs: Math.min(86_400_000, Math.max(0, Date.now() - openedAt)),
+    });
+  }, [worldId, nodeCount]);
+
+  useEffect(() => {
+    if (!worldId || telemetryOpenedWorldRef.current !== worldId || telemetryInitialRelationCountRef.current > 0 || relationCount === 0) return;
+    if (!markBoardTelemetryMilestone(worldId, 'first-relation')) return;
+    const openedAt = boardVisitTelemetryRef.current?.openedAt || Date.now();
+    trackBoardEvent(worldId, 'first_relation_created', {
+      relationCount,
+      activationMs: Math.min(86_400_000, Math.max(0, Date.now() - openedAt)),
+    });
+  }, [worldId, relationCount]);
+
+  useEffect(() => {
+    if (!worldId || !connectionIssue) return;
+    const issueKey = `collaboration:${connectionIssue}`;
+    if (lastRuntimeIssueRef.current === issueKey) return;
+    lastRuntimeIssueRef.current = issueKey;
+    trackBoardEvent(worldId, 'runtime_issue', {
+      area: 'collaboration',
+      code: connectionIssue.toLowerCase().includes('offline') ? 'offline' : 'connection_failed',
+      recoverable: true,
+    });
+  }, [worldId, connectionIssue]);
+
+  useEffect(() => {
+    if (!worldId || persistenceState !== 'error') return;
+    const issueKey = 'persistence:local-save';
+    if (lastRuntimeIssueRef.current === issueKey) return;
+    lastRuntimeIssueRef.current = issueKey;
+    trackBoardEvent(worldId, 'runtime_issue', {
+      area: 'persistence',
+      code: 'local_save_failed',
+      recoverable: true,
+    });
+  }, [worldId, persistenceState]);
+
+  useEffect(() => {
+    if (!worldId) return;
+    const handleRuntimeIssue = (event: Event) => {
+      const detail = (event as CustomEvent<{ area?: string; code?: string }>).detail;
+      if (detail?.area !== 'map' || detail.code !== 'tile_load_failed') return;
+      trackBoardEvent(worldId, 'runtime_issue', {
+        area: 'map',
+        code: 'tile_load_failed',
+        recoverable: true,
+      });
+    };
+    window.addEventListener('canvio:runtime-issue', handleRuntimeIssue);
+    return () => window.removeEventListener('canvio:runtime-issue', handleRuntimeIssue);
+  }, [worldId]);
 
   useEffect(() => {
     if (!showStarter) return;
@@ -834,7 +948,7 @@ export function WorldPage() {
               What are you working on?
             </h1>
             <p className="world-page__empty-subtitle">
-              Choose a familiar starting point. Canvio will fit it to the board for you.
+              Start clean or choose the result you need. Everything stays editable.
             </p>
           </div>
 
@@ -863,7 +977,7 @@ export function WorldPage() {
               </button>
             </div>
             <div className="world-page__starter-section world-page__starter-section--wide">
-              <span className="world-page__starter-label">Start with a goal</span>
+              <span className="world-page__starter-label">Start with an outcome</span>
               <div className="world-page__starter-grid">
                 {STARTER_GOALS.map((goal) => (
                   <button
@@ -1176,7 +1290,7 @@ export function WorldPage() {
                 <span>Open Sample Board</span>
               </button>
 
-              {Object.keys(nodes).length > 0 && (
+              {nodeCount > 0 && (
                 <button
                   className="canvio-menu-item canvio-menu-item--danger"
                   onClick={() => {
@@ -1188,6 +1302,17 @@ export function WorldPage() {
                   <span>Start Over This Board</span>
                 </button>
               )}
+
+              <button
+                className="canvio-menu-item"
+                onClick={() => {
+                  setIsExportMenuOpen(true);
+                  setIsCanvioMenuOpen(false);
+                }}
+              >
+                <span className="material-symbols-outlined text-sm">ios_share</span>
+                <span>Export or Restore</span>
+              </button>
 
               <button
                 className="canvio-menu-item"
@@ -1317,23 +1442,23 @@ export function WorldPage() {
           </button>
         </div>
 
-        {/* Center: ✨ AI Navigator (Ctrl+K) */}
+        {/* Center: direct access to board-aware AI. */}
         <div className="world-header__center">
           <button
             className="ai-navigator-pill"
             onClick={() => setIsAIOpen(true)}
-            aria-label="AI Navigator"
-            title="AI Navigator (Ctrl+K)"
+            aria-label="Open Canvio AI"
+            title="Ask Canvio (Ctrl+K)"
           >
             <span className="material-symbols-outlined text-base">auto_awesome</span>
-            <span>AI Navigator (Ctrl+K)</span>
+            <span>Ask Canvio</span>
           </button>
         </div>
 
         {/* Right: Undo, Redo, Divider, Robot AI & Share */}
         <div className="world-header__right">
           <button
-            className={`header-ai-btn ${showCoach ? 'active' : ''}`}
+            className={`header-ai-btn header-ai-btn--guide ${showCoach ? 'active' : ''}`}
             onClick={handleShowCoach}
             aria-label="Show Canvio Guide"
             aria-pressed={showCoach}
@@ -1353,7 +1478,7 @@ export function WorldPage() {
           </button>
 
           <button
-            className="header-icon-btn"
+            className="header-icon-btn header-icon-btn--redo"
             onClick={() => useCanvasStore.getState().redo()}
             disabled={!canRedo}
             aria-label="Redo"
@@ -1374,7 +1499,7 @@ export function WorldPage() {
           </button>
 
           <button
-            className={`header-ai-btn ${isReasoningOpen ? 'active' : ''}`}
+            className={`header-ai-btn header-ai-btn--reasoning ${isReasoningOpen ? 'active' : ''}`}
             onClick={() => setIsReasoningOpen((prev) => !prev)}
             aria-label="Visual Reasoning Partner & Graph Health"
             title="Visual Reasoning Partner & Graph Health (Ctrl+Shift+R)"
@@ -1383,15 +1508,15 @@ export function WorldPage() {
           </button>
 
           <button
-            className="header-ai-btn"
+            className="header-ai-btn header-ai-btn--mobile-ai"
             onClick={() => setIsAIOpen(true)}
-            aria-label="AI Assistant"
-            title="AI Assistant (Ctrl+K)"
+            aria-label="Open Canvio AI"
+            title="Ask Canvio (Ctrl+K)"
           >
             <span className="material-symbols-outlined text-base">auto_awesome</span>
           </button>
 
-          <ShareButton worldId={worldId || ''} focusNameSignal={shareNameFocusSignal} />
+          <ShareButton worldId={worldId || ''} focusNameSignal={shareNameFocusSignal} collaboratorCount={users.length} />
 
           {connectionIssue && !connected ? (
             <button
@@ -1454,22 +1579,34 @@ export function WorldPage() {
         </div>
       </header>}
 
-      <TemplatePicker
-        isOpen={isTemplateOpen}
-        onClose={() => setIsTemplateOpen(false)}
-        onStartBlank={() => {
-          handleStartFromScratch(true);
-          setIsTemplateOpen(false);
-        }}
-      />
+      {isTemplateOpen && (
+        <Suspense fallback={<div className="world-page__panel-loading" role="status">Opening templates...</div>}>
+          <TemplatePicker
+            isOpen
+            onClose={() => setIsTemplateOpen(false)}
+            onStartBlank={() => {
+              handleStartFromScratch(true);
+              setIsTemplateOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
 
-      <AIAssistantModal isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
+      {isAIOpen && (
+        <Suspense fallback={<div className="world-page__panel-loading" role="status">Opening Canvio AI...</div>}>
+          <AIAssistantModal isOpen onClose={() => setIsAIOpen(false)} />
+        </Suspense>
+      )}
 
-      <GraphIntelligence
-        isOpen={isReasoningOpen}
-        onClose={() => setIsReasoningOpen(false)}
-        onFocusNode={setFocusNodeId}
-      />
+      {isReasoningOpen && (
+        <Suspense fallback={<div className="world-page__panel-loading" role="status">Opening Reasoning Partner...</div>}>
+          <GraphIntelligence
+            isOpen
+            onClose={() => setIsReasoningOpen(false)}
+            onFocusNode={setFocusNodeId}
+          />
+        </Suspense>
+      )}
 
       {!isPresenting && <Minimap />}
     </div>

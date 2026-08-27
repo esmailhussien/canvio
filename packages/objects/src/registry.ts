@@ -1,6 +1,6 @@
 import { drawingPlugin } from './drawing/DrawingNode';
 import { stickyPlugin } from './sticky-note/StickyNote';
-import { mapPlugin } from './map/MapNode';
+import { mapPlugin } from './map/mapPlugin';
 import { textPlugin } from './text/TextNode';
 import { imagePlugin } from './image/ImageNode';
 import { shapePlugin } from './shape/ShapeNode';

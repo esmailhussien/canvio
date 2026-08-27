@@ -1,209 +1,149 @@
-# Canvio Product Review — Idea · UI · UX · Positioning
+# Canvio Product Review - Market Readiness, UX, and Focus
 
-> **Scope:** Enhancement-only review of what exists. No new features proposed.
-> **Date:** August 21, 2026
-> **Method:** Full audit of in-app UX surfaces, public marketing pages, SEO/prerendered content, and live market research (Miro / FigJam / Heptabase / tldraw / Kinopio / Storyflow / Felt / ArcGIS ecosystem), judged against `product_bible.md`.
+> **Date:** August 27, 2026
+> **Scope:** Unrestricted review of the product idea and existing experience. Enhancement only; no feature expansion.
+> **Method:** Product-bible alignment, current-code audit, responsive visual review, and core-flow verification.
 
----
+## Executive Verdict
 
-## Executive Summary
+Canvio has a respectable product concept, but its value is not the number of tools on its canvas.
 
-**Verdict:** The core idea is genuinely differentiated and the in-app experience is close to the product's own bible. The dominant problems sit at the *edges* of the experience: the first 30 seconds (starter wall), recovery when lost (wayfinding), and the story told to visitors (positioning chaos). Every finding below is fixable by wiring together affordances that already exist in the codebase.
+**The marketable idea is:**
 
-| Area | Grade | One-line assessment |
-|---|---|---|
-| Product idea | A− | Real open niche; thesis is sound but under-communicated |
-| Positioning | C | Six coexisting taglines; boldest claim ships nowhere |
-| Landing/conversion | C+ | 1-click-to-board is excellent; demo CTA is broken |
-| In-app UX | B+ | Strong collaboration/offline core; entry & recovery friction |
-| Consistency | C− | Three names for templates; three counts for relation types |
+> **Canvio turns scattered ideas into connected work.**
 
----
+The product gives people one visual space to collect material, show what relates, use AI on that context, and share a result others can understand. Maps are a strong native capability when place matters; they are not the category or the whole brand.
 
-## 1. Product Idea Assessment
+This is differentiated enough to launch. The largest remaining risk is not missing functionality. It is allowing the interface, copy, or roadmap to make Canvio feel like a collection of whiteboard features.
 
-### What's real (validated against the 2026 market)
+| Area | Grade | Current assessment |
+|---|---:|---|
+| Core idea | A- | Clear problem and credible product answer |
+| Product focus | B+ | Converged, but must resist broad feature language |
+| First-use UX | A- | Fast entry, clearer outcome starter, editable results |
+| Core board UX | B+ | Capable and increasingly smooth; real-device polish remains ongoing |
+| AI trust | B | Board context and fallback are visible; reliability still defines trust |
+| Market readiness | B+ | Launchable with honest positioning and disciplined measurement |
 
-Nobody combines Canvio's three pillars — spatial canvas + native maps + typed semantic relations:
+## The Product Canvio Should Sell
 
-| Segment | Players | Gap Canvio fills |
-|---|---|---|
-| Team whiteboards | Miro ($8/user), FigJam, Mural | No semantic relations, no native maps |
-| Thinking canvases | Heptabase, Kinopio, tldraw, Obsidian Canvas | Kinopio is explicitly anti-AI; none have typed relations or maps |
-| AI-guided boards | Storyflow (ranks #1 in 2026 comparison lists) | Validates the Reasoning Partner thesis — but no maps, no relations |
-| Map collaboration | ArcGIS Urban (enterprise $$), Felt, uMap, Map Whiteboard | None are thinking canvases; Felt is "fast map sharing," not reasoning |
+### Category
 
-**The open niche is exactly what `product_bible.md` §3 defines:** spatial workers (GIS engineers, urban planners, architects) who need maps + documents + logic on one board. Nearest competitive threat: **Felt** (browser-based, no-setup team map sharing).
+**A connected visual workspace** or **a connected whiteboard**.
 
-### Positioning decision: maps are native, not the brand category
+Do not lead with "infinite canvas," "AI whiteboard," "map whiteboard," or "everything workspace." Those categories either commoditize Canvio or promise too much.
 
-- Canvio should not be branded as a map-only whiteboard.
-- The public story should lead with a connected visual knowledge workspace for learning, planning, research, and work.
-- Maps remain a native differentiator when location matters: exact pins, place evidence, and relations to notes.
+### Promise
 
-The resolved line is: **maps are optional for the workflow, but native in the system.**
+**Turn scattered ideas into connected work.**
 
----
+### Proof
 
-## 2. Positioning Audit
+1. Put ideas and evidence on one board.
+2. Connect them with labeled, meaningful Relations.
+3. Let AI work from the board instead of ignoring it.
+4. Share, present, or export the result without requiring signup.
 
-### 2.1 Positioning direction now converged
+### Best first audience
 
-| Tagline variant | Where it lives | Status |
-|---|---|---|
-| `A connected whiteboard for thinking, learning, and research.` | Homepage H1 | Primary public story |
-| `Connect ideas. Create knowledge.` | Footer | Short brand line |
-| `Maps are native when place matters.` | Product bible / review / updates language | Differentiator, not category |
-| `Visual reasoning workspace` | README framing | Technical/product community language |
+People who must make complex subjects understandable: teachers, students, researchers, project teams, and developers. Spatial and field workers remain a valuable proof audience because native maps are unusually strong, but Canvio should not sound map-only.
 
-**The strongest hooks are now visible:** no signup, private by default, export your data, and open source are part of the homepage trust strip.
+## What Was Improved in This Pass
 
-### 2.2 Audience alignment
+### Homepage
 
-`product_bible.md` now defines the first users as **connected knowledge workers**: teachers, students, researchers, project teams, spatial workers, and developers.
+- Replaced the feature-led headline with the outcome-led promise: **"Turn scattered ideas into connected work."**
+- Rewrote supporting copy around clear relationships, useful decisions, board-aware AI, and optional maps.
+- Changed "Launch Canvas" to the more familiar "New board" and "Start a board."
+- Made the visual preview demonstrate semantic Relations with visible labels.
+- Reframed the four-step loop around user progress: start, make visible, connect meaning, share result.
 
-Public story:
+### First board experience
 
-- HomePage leads with connected whiteboard/value language.
-- HowItWorks explains notes, relations, AI, maps, frames, drawing, and presentation as one workflow.
-- Updates article clarifies that maps are optional for each board but native when place matters.
-- SEO keeps broad whiteboard terms while adding the specific differentiators: AI, semantic relations, and maps when place matters.
+- Reduced six competing starter goals to four broader outcomes:
+  - Explain or learn
+  - Plan work
+  - Research a question
+  - Make a decision
+- Kept blank, sample, templates, and AI available without placing every template in the first decision.
+- Clarified that every generated starting point stays editable.
 
-**Recommendation:** Lead with connected whiteboard/value language, then show maps as one high-signal proof object. This keeps Canvio universal enough for students, teachers, researchers, developers, and teams while preserving the map advantage for field and place-based work.
+### Performance and interaction quality
 
----
+- Reduced top-level rerenders during pan and drag.
+- Deferred map, template, AI, and graph code until needed.
+- Reduced initial WorldPage bundle weight.
+- Improved mobile minimap density and AI opening position.
+- Removed the external Google Fonts dependency.
 
-## 3. Marketing Surface Findings
+## What Must Not Expand
 
-### 3.1 Homepage (`apps/web/src/pages/HomePage.tsx`)
+Canvio should not add breadth merely to look competitive. Reject expansion that creates:
 
-- **Demo promise resolved:** sample/demo boards now open with seeded content instead of a blank board.
-- **Internal note resolved:** visitor-facing copy now states the positioning directly instead of exposing authorial notes.
-- **No social proof anywhere:** no testimonials, usage numbers, logos, or star counts.
-- **Social preview resolved:** `og-image.png` now shows a real 1200x630 branded product card instead of only the logo.
-- **CTA friction: excellent.** Landing → editable board = 1 click, 0 forms, 0 reading (`handleCreateWorld`, `:48-54`). Keep exactly this.
+- another chat surface;
+- project-management tables or task databases;
+- document-editor behavior;
+- social feeds or public-content mechanics;
+- file-storage features with no spatial behavior;
+- more top-level tools before existing tools are effortless;
+- AI actions that return generic prose without using board context;
+- map features that pull the whole product toward GIS complexity.
 
-### 3.2 HowItWorksPage
+## Where Expansion Is Allowed
 
-- Good skeleton (clickable 4-step loop, tabbed explorer).
-- Copy is specific and credible (e.g., the 0–100 reasoning score description, `:63`).
-- **Shortcut table is wrong:** claims `1 – 8` for relation types (`:280`) while the app implements 10 types on keys `1–9,0` (`RelationInspector.tsx:27-36`); omits ~12 real shortcuts (T, S, M, L, R, F, C, I, Ctrl+D, Ctrl+G, Ctrl+A, Ctrl+Y). Also says "**8** Semantic types" then lists **7** (`:62`).
+Expansion should deepen the existing idea:
 
-### 3.3 SEO / structured data
+| Existing capability | Valid improvement direction |
+|---|---|
+| Canvas | Faster gestures, better selection, predictable touch and pen behavior |
+| Nodes | Better editing, fitting, contrast, and spatial legibility |
+| Relations | Easier creation, exact anchoring, clearer labels, better routing |
+| AI | Stronger board grounding, clearer provenance, reliable fallback, better structured output |
+| Maps | Better pin interaction and relation anchoring without GIS-style complexity |
+| Templates | Higher-quality outcomes, consistent fitting, fewer choices at entry |
+| Collaboration | Faster joining, clear presence, reliable shared viewport and persistence |
+| Presentation/export | Faithful framing, predictable output, dependable restore compatibility |
 
-- `index.html`: title/meta now lead with connected whiteboard language and mention maps only as a when-needed differentiator.
-- Social metadata now points to the 1200x630 product card instead of the logo-only preview.
-- JSON-LD organization logos use `logo.png`; social previews use `og-image.png`.
-- Public FAQ/trust copy is visible on site and matches the schema language.
+## Remaining Market Risks
 
-### 3.4 Trust signals
+### 1. Reliability is the brand
 
-- Privacy: visible in the homepage trust strip and support FAQ.
-- Pricing/access: no-signup and free-to-try language appears in public trust copy.
-- Ownership/export: homepage explicitly says users can export their data anytime.
+A failed share, lost board, broken AI request, or inconsistent viewport damages Canvio more than a missing feature. Production monitoring should prioritize these flows.
 
----
+### 2. AI must be visibly grounded
 
-## 4. In-App UX Friction Report
+Users should always know whether Canvio AI used board content, which content types it read, and whether server AI or local smart mode produced the result. The current trust messaging is the right direction and must remain consistent across every AI action.
 
-Judged against the bible's own principles: fast before fancy · one click less · no dialogs unless necessary · zero friction ("draw in 2 seconds or we failed") · never interrupt creativity.
+### 3. Familiar language wins
 
-### Top 10 friction points (ranked by user impact)
+Use **board**, **template**, **share link**, **AI**, and **export** in controls. "World," "Node," and "Relation" can carry brand identity where context makes them obvious, but custom vocabulary must never slow a first-time user.
 
-**1. The starter wall delays first stroke, hides the toolbar, and returns constantly**
-`WorldPage.tsx:580, :300-304, :743`
-Nine choices, no X/Esc/outside-click dismissal, toolbar hidden until decided, re-shown per board AND whenever nodeCount hits 0 (deleting your last node resurrects the wall mid-session). Direct conflict with bible :40 and Magic Moment 1.
-*Fix:* add X/Esc → existing `setIsStarterDismissed(true)`; persist global dismissal like `COACH_DISMISS_KEY`; stop gating `<Toolbar/>` on `!showStarter`.
+### 4. Claims need evidence
 
-**2. `window.confirm` before "Start Over This Board"**
-`WorldPage.tsx:426` — also fires from TemplatePicker's "Blank Board" card, confirming an action just explicitly chosen. Undo infrastructure already exists. Bible :38: "Undo instead of 'Are you sure?'"
-*Fix:* delete the confirm; rely on undo; optionally reuse the transient status-chip pattern with an "Undo?" action.
+Do not publish invented testimonials, productivity percentages, user counts, or paid-tier promises. Add social proof only when it is real and attributable.
 
-**3. Silent AI Expand failure**
-`NodeInspector.tsx:94-103` — sparkle spins, console logs, nothing happens. Kills trust in the AI feature.
-*Fix:* inline error state on the inspector (patterns exist in GraphIntelligence notices).
+## Launch Metrics That Matter
 
-**4. No wayfinding: fit buried, minimap hidden when empty, zero zoom buttons**
-`WorldPage.tsx:925-931, :1195` — Fit-to-world exists once, as item #7 of a 12-item mixed dropdown. Minimap component already has an empty-state crosshair but is unmounted on empty boards. No zoom controls exist at all.
-*Fix:* always mount `<Minimap/>`; promote fit into a persistent control near it.
+Feature count is not a success metric. Measure the existing core loop:
 
-**5. Right-click hijack with an undiscoverable radial menu**
-`Canvas.tsx:415-423, :748-787` — browser context menu never appears on canvas; the Quick-add ring itself is good but invisible (its title is literally `display:none` on desktop, `Canvas.css:234-236`).
-*Fix:* keep the menu; add a one-time hint via the existing tool-status pill channel.
+1. **Time to first action:** board opened to first note or stroke.
+2. **Time to first structure:** first two elements plus a Relation.
+3. **Useful-board rate:** boards reaching at least three elements and one labeled Relation.
+4. **Share success rate:** share created and opened by another browser.
+5. **Return rate:** board reopened after 24 hours or seven days.
+6. **AI grounding rate:** AI actions completed with board context when content exists.
+7. **Export/restore reliability:** successful exports and compatible JSON restores.
 
-**6. Joiners are stuck as "Anonymous Fox"; rename lives in the sharer's dialog**
-`yjsHelpers.ts:229-232; ShareButton.tsx:136` — the only rename field is inside "Invite & Share this World," which a joiner won't open. Presence plumbing (`canvio:collaborator-name` event) already exists.
-*Fix:* make the presence avatar stack clickable → focuses the existing name field.
+## Product Decision Rule
 
-**7. Fork/image failures use blocking alerts**
-`WorldPage.tsx:493; ImageNode.tsx:135` — both violate principles 4 & 7; both have natural spatial anchors.
-*Fix:* fork → inline retry chip next to Share; image error → render inside the node's existing empty state.
+Before accepting any enhancement, ask:
 
-**8. Selection spawns three overlapping icon-only toolbars**
-`MultiSelectionInspector.tsx:127-156; WorldPage.tsx:815-847` — MultiSelectionInspector + fixed quick-actions bar + RelationInspector stack; "Experiment" appears in 3 places; 10 unlabeled align icons.
-*Fix:* consolidate Experiment into quick-actions only; text labels on coarse pointers (mechanism exists in Toolbar mobile mode).
+> Does this help someone move from a scattered thought to a connected, understandable, shareable result with less friction?
 
-**9. Template system fragmented: three names, two data sources, one hidden in Export**
-`ExportMenu.tsx:145-172; WorldPage.tsx:911 vs :1040 vs :686` — "Templates" vs "Canvas Models & Layouts" vs "Spawn Diagram Preset"; 16 templates across 7 regex-guessed categories (~2.3 each); 8 presets reachable only via Export menu jargon.
-*Fix:* rename menu item to "Templates"; move presets into TemplatePicker; replace category regexes with a stored field; make Apply button always visible on touch (hover-only today, `TemplatePicker.css:545-571`).
+If the answer is not clearly yes, it does not belong in the current product.
 
-**10. Shortcut learnability: no in-app reference, and the only reference is wrong**
-`HowItWorksPage.tsx:273-284` vs `useCanvasKeyboardShortcuts.ts` — see §3.2.
-*Fix:* mount the corrected shortcut grid inside the existing coach/"Show Canvio Guide" panel.
+## Final Position
 
-### Honorable mentions
+Canvio does not need to become larger to become marketable. It needs to become more inevitable: faster to begin, clearer to understand, easier to connect, more trustworthy when AI assists, and dependable when the result is shared or revisited.
 
-- **Restore Backup replaces the world with NO confirmation** (`ExportMenu.tsx:104-124`) — mirror image of friction #2; confirm-overuse and confirm-absence coexist.
-- RelationInspector hint "Press 1-8" contradicts its own 10 pills (`RelationInspector.tsx:209`).
-- Laser holds a permanent top-tier toolbar slot; Pan redundant with touch/space behaviors (`Toolbar.tsx:49,52`).
-- Presentation header button hidden ≤520px, leaving only the ▾ dropdown path (`WorldPage.css:1357-1360`).
-- Toolbar horizontally scrolls with hidden scrollbar on narrow desktops — tools silently overflow (`Toolbar.css:39-49`).
-- Save-error chip reduced to icon-only ≤520px; offline visibility weak (`WorldPage.tsx:610-611, :1407-1418`).
-- Starter cards lose descriptions on small screens (`WorldPage.css:1393-1395`).
-
----
-
-## 5. Prioritized Enhancement Plan (no new features)
-
-### Phase 1 — Trust & truth (days)
-1. Fix the demo CTA: seed real sample content for `demo-*` boards OR change the button label to "Open a blank board" (honest, still useful)
-2. Remove the shipped internal note from HomePage (`:188`)
-3. Correct the shortcuts table everywhere (1–9,0; full key set); fix "8 types lists 7" inconsistency
-4. Render the FAQ Q&As visibly (they're the best trust copy you own) so schema matches reality
-5. Unify footer dash characters; pick ONE tagline for footer everywhere
-
-### Phase 2 — First-stroke & recovery (week)
-6. Starter wall: X/Esc dismissal, global once-flag, toolbar visible during it
-7. Always-mounted minimap + promoted Fit control
-8. Delete both blocking confirms/alerts (start-over, fork failure, image failure) → inline patterns
-9. Surface AI Expand failures inline
-10. Clickable presence avatars → name focus for joiners
-
-### Phase 3 — Language & consistency (week)
-11. One template system: single "Templates" entry point, presets merged in, stored category field, touch-visible Apply
-12. Consolidate Experiment/Focus duplicates into quick-actions bar
-13. Radial-menu discoverability hint via tool-status pill
-14. Positioning decision (see below)
-
-### The positioning decision
-Use the universal Canvio story:
-
-**Canvio is a connected whiteboard for ideas, evidence, and work. Maps are native when place matters.**
-
-This avoids a map-only brand while still giving the product a concrete differentiator that generic whiteboards do not have.
-
----
-
-## 6. What Already Works Well (keep these)
-
-1. **Zero-friction entry mechanics** — landing → editable board in 1 click, no forms; matches bible Principle 6 perfectly
-2. **Collaboration plumbing** — Yjs realtime, offline IndexedDB fallback, autosave, race-guarded hydration; genuinely strong
-3. **Inline status/error patterns where they exist** — ShareButton retry box, ExportMenu auto-clearing chips, AIAssistantModal status line, GraphIntelligence notices; these are the house style to extend everywhere
-4. **Touch ergonomics** — tap-vs-drag thresholds per pointer type, 44px coarse-pointer targets, dedicated sticky drag handles
-5. **Updates blog** — healthy cadence, real design rationale, honest roadmap disclaimer
-6. **Support page** — pre-filled diagnostic mailto links are excellent practice
-7. **Honest microcopy** — "Exploring describes product direction, not a release promise"
-
----
-
-*Sources: full-file audits of HomePage, HowItWorksPage, SupportPage, UpdatesPage, WorldPage, Canvas, NodeRenderer, RelationRenderer/Inspector, TemplatePicker, ExportMenu, ShareButton, Toolbar, Tooltip, Minimap, ImageNode, MapNode, useCollaboration, useCanvasKeyboardShortcuts, index.html, Seo.tsx, prerender.mjs, templates/presetTemplates, product_bible.md, README.md; market research August 2026.*
+That is a focused product, not a smaller ambition.

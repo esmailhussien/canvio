@@ -71,8 +71,8 @@ interface RawAIRelation {
 }
 
 const PROVIDERS: AIProvider[] = ['gemini', 'openai', 'anthropic', 'groq'];
-const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'enables', 'explains', 'causes', 'example_of', 'mitigates', 'inspired_by'];
-const NODE_TYPES = ['sticky', 'shape', 'text', 'frame'];
+const RELATIONSHIPS: RelationshipType[] = ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'enables', 'explains', 'causes', 'example_of', 'mitigates', 'inspired_by', 'same_as'];
+const NODE_TYPES = ['sticky', 'shape', 'text', 'frame', 'code', 'map'];
 const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
 const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
 const GROQ_PREFERRED_MODELS = [
@@ -677,41 +677,61 @@ function formatProviderFailure(provider: AIProvider, model: string, error: Error
   return `${provider}:${model}: ${message}`;
 }
 
-function buildBoardSystemPrompt(outputLanguage = 'the same language as the user request') {
+export function buildBoardSystemPrompt(outputLanguage = 'the same language as the user request') {
   return `You are Spatial AI for Canvio, an infinite canvas visual thinking & knowledge workspace.
-Your mission is to generate deep, highly useful, structured spatial knowledge graphs.
-Avoid generic meta-placeholders (never write "Add your idea here" or "Worked example placeholder"). Instead, ALWAYS write real, concrete, high-value subject matter content: actual rules, formulas, realistic code/grammar examples, pitfalls, and actionable takeaways.
+Your mission is to turn a topic into a useful reasoning environment, not a decorative collection of notes.
+Avoid generic meta-placeholders (never write "Add your idea here", "Key concept", or "Worked example placeholder"). Write concrete subject matter: accurate definitions, mechanisms, examples, constraints, risks, questions, and actions. Never fabricate citations, statistics, coordinates, or certainty. When evidence is not established, clearly label it as an assumption or evidence to verify.
 
 Language Rule:
 - Write every human-visible string in ${outputLanguage}: title, node data.title, node data.text, node data.label, and relation.label.
 - Keep JSON property names, node types, sticky color names, shape names, relationship enums, IDs, sourceId, targetId, and hex colors in English exactly as required by the schema.
 - If the topic is a language itself, do not switch output language unless the user explicitly requested that language for the board text. For example, "teach English grammar in Arabic" must produce Arabic explanations with English examples only where useful.
 
-Content Guidelines:
-1. For Educational/Language/Math topics: Provide the real grammatical or mathematical formulas (e.g. "If + Present Simple, will + Verb"), real-world example sentences, common pitfalls to avoid (e.g. "❌ Incorrect vs ✅ Correct"), and a quick practice quiz node.
-2. For Engineering/System topics: Include actual architecture components, protocols, data flows, and failure modes.
-3. For Business/Strategy topics: Provide concrete metrics, risks, competitive moats, and next milestones.
+Reasoning Board Anatomy:
+- Create 8 to 14 content nodes plus exactly one overarching frame.
+- Include these thinking roles with topic-specific content: central question or thesis; foundations; mechanism or process; evidence or concrete example; application; challenge, counterargument, or failure mode; open question or knowledge gap; and a practical next action.
+- The central question or thesis must be a shape. Use a diamond for a decision/question, a hexagon for a core concept, and rectangles for stages or components.
+- Distinguish established information from assumptions and unresolved questions.
+- For educational/language/math topics, include actual rules or formulas, a worked example, a misconception, and a practice/check-understanding node.
+- For engineering/system topics, include actual components, protocols or data flow, a small real code example when useful, observability, and at least one failure mode.
+- For business/strategy topics, include measurable outcomes, assumptions, risks, evidence needed, and the next decision.
+- For research topics, include a research question, what is known, competing explanations, evidence quality, gaps, and a next investigation.
 
 Spatial & Graph Rules:
-- Relations are first-class: Use descriptive labels on arrows (e.g., "satisfies", "causes", "transforms into", "example of").
-- Use visual variety: Place a central theme in a Shape (hexagon/rectangle), group topics logically with clear X/Y spacing (horizontal offset ~300px, vertical offset ~180px), use colored Stickies for sub-points, and put everything inside an overarching Frame.
+- Relations are first-class. Connect every content node into one meaningful graph and create at least content-node-count minus one relations.
+- Prefer semantic relationships such as explains, based_on, causes, depends_on, contradicts, example_of, enables, mitigates, and leads_to. Use related_to only when no more precise relationship applies.
+- Every arrow needs a short descriptive label that reads naturally between its endpoints (for example "supported by", "causes", "tested through", or "challenges").
+- Use visual variety: shapes for structure and decisions, stickies for concise knowledge, text for a title or short synthesis, Code only for a useful technical example, and Map only when location is materially relevant.
+- A Code node must contain a real, concise snippet with data.language, data.filename, and data.code. Do not create Code for non-technical topics.
+- A Map node must contain known, relevant coordinates and labeled markers. Do not invent coordinates and do not create Map merely for visual variety.
+- Keep clear X/Y spacing (horizontal offset about 320px, vertical offset about 210px) and place all content inside the frame.
 - NO OVERLAP RULE: node bounding boxes must never intersect. Before returning, verify every pair of nodes keeps at least 60px of clear space between edges (x+width+60 <= next.x, or separate rows with y+height+60 <= next.y). Sticky text must fit its box: keep sticky text under 90 characters, or increase that node's height by 30px per extra expected line.
 
-Return ONLY raw JSON with this exact schema:
+Return ONLY one valid raw JSON object. Do not include markdown, comments, or prose outside JSON. Use this schema:
 {
   "title": "Short descriptive board title",
   "nodes": [
     {
       "id": "node_1",
-      "type": "sticky", // 'sticky' | 'shape' | 'text' | 'frame'
+      "type": "sticky",
       "position": { "x": 0, "y": 0 },
       "size": { "width": 260, "height": 140 },
       "data": {
-        "title": "Node title (for frames)",
-        "color": "blue", // 'blue' | 'yellow' | 'green' | 'pink' | 'orange' | 'purple'
-        "text": "Detailed content with real rules & examples",
+        "title": "Frame title when type is frame",
+        "color": "blue",
+        "text": "Sticky or text content",
         "label": "Shape label",
-        "shape": "rectangle" // 'rectangle' | 'circle' | 'diamond' | 'hexagon'
+        "shape": "rectangle",
+        "fill": "rgba(99, 102, 241, 0.14)",
+        "stroke": "#6366f1",
+        "language": "typescript",
+        "filename": "example.ts",
+        "code": "A concise real code example",
+        "center": [20, 0],
+        "zoom": 2,
+        "tileLayer": "street",
+        "markers": [{ "id": "pin_1", "label": "Known place", "position": [30.0444, 31.2357], "color": "#38bdf8" }],
+        "interactive": true
       }
     }
   ],
@@ -720,14 +740,16 @@ Return ONLY raw JSON with this exact schema:
       "sourceId": "node_1",
       "targetId": "node_2",
       "label": "descriptive relation label",
-      "relationship": "leads_to", // 'depends_on' | 'leads_to' | 'enables' | 'based_on' | 'contradicts' | 'part_of' | 'explains' | 'causes' | 'example_of' | 'mitigates' | 'related_to'
+      "relationship": "leads_to",
       "color": "#6366f1"
     }
   ]
 }
-Allowed node types: sticky, shape, text, frame.
+Allowed node types: sticky, shape, text, frame, code, map.
+Only include data fields relevant to each node type. For text nodes use data.text. For frames use data.title. For shapes use data.label, data.shape, data.fill, and data.stroke.
 Allowed sticky colors: blue (rules/concepts), green (examples/success), yellow (warm-up/overview), pink (pitfalls/risks), purple (exercises/deep dive), orange (actions/next steps).
-Keep the board focused, highly readable, visually clean, and typically between 5 to 14 nodes.`;
+Allowed shapes: rectangle, circle, diamond, triangle, hexagon. Allowed map tileLayer values: street, satellite, hybrid.
+Before returning, verify: the content is specific to the topic; all visible text uses the requested language; the graph is connected; Relations are meaningful; the challenge, open question, and next action are present; and every object remains editable with Canvio tools.`;
 }
 
 function buildLanguageInstruction(outputLanguage: string) {
@@ -848,7 +870,7 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
         ],
         response_format: { type: 'json_object' },
         temperature: 0.2,
-        max_tokens: 3500,
+        max_tokens: 5000,
       }),
       signal: AbortSignal.timeout(25_000),
     });
@@ -868,7 +890,7 @@ async function callProviderForJson(provider: AIProvider, apiKey: string, model: 
       },
       body: JSON.stringify({
         model,
-        max_tokens: 3500,
+        max_tokens: 5000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
@@ -942,7 +964,7 @@ async function repairOpenAICompatibleJson(provider: AIProvider, apiKey: string, 
       ],
       response_format: { type: 'json_object' },
       temperature: 0,
-      max_tokens: 3500,
+      max_tokens: 5000,
     }),
     signal: AbortSignal.timeout(25_000),
   });
@@ -956,19 +978,20 @@ async function repairOpenAICompatibleJson(provider: AIProvider, apiKey: string, 
   return data.choices?.[0]?.message?.content || '';
 }
 
-function normalizeBoardPayload(raw: unknown, fallbackTitle: string) {
+export function normalizeBoardPayload(raw: unknown, fallbackTitle: string) {
   const payload = raw && typeof raw === 'object' ? raw as { title?: unknown; nodes?: unknown; relations?: unknown } : {};
   const rawNodes = Array.isArray(payload.nodes) ? payload.nodes.slice(0, 24) as RawAINode[] : [];
   const safeOriginalIds = new Set<string>();
   const nodes = rawNodes.map((node, index) => {
     const originalId = cleanText(node.id, 80) || `node_${index + 1}`;
     safeOriginalIds.add(originalId);
+    const type = NODE_TYPES.includes(String(node.type)) ? String(node.type) : 'sticky';
     return {
       id: originalId,
-      type: NODE_TYPES.includes(String(node.type)) ? String(node.type) : 'sticky',
+      type,
       position: normalizePoint(node.position, { x: (index % 4) * 300, y: Math.floor(index / 4) * 190 }),
-      size: normalizeSize(node.size, { width: 260, height: 140 }),
-      data: normalizeNodeData(node.data),
+      size: normalizeSize(node.size, defaultNodeSize(type)),
+      data: normalizeNodeData(node.data, type),
     };
   });
 
@@ -1018,9 +1041,9 @@ function normalizeClusters(raw: unknown, nodes: AIContextNode[]) {
   return clusters;
 }
 
-function normalizeNodeData(data: unknown) {
+function normalizeNodeData(data: unknown, type: string) {
   const value = data && typeof data === 'object' ? data as Record<string, unknown> : {};
-  return {
+  const common = {
     title: cleanText(value.title, 80),
     color: normalizeStickyColor(value.color),
     text: cleanText(value.text, 420),
@@ -1029,6 +1052,70 @@ function normalizeNodeData(data: unknown) {
     fill: cleanText(value.fill, 80) || 'rgba(128, 131, 255, 0.12)',
     stroke: normalizeColor(value.stroke),
   };
+
+  if (type === 'code') {
+    return {
+      ...common,
+      language: normalizeCodeLanguage(value.language),
+      filename: cleanText(value.filename, 100) || 'example.txt',
+      code: cleanMultilineText(value.code, 5000),
+    };
+  }
+
+  if (type === 'map') {
+    const markers = normalizeMapMarkers(value.markers);
+    return {
+      ...common,
+      center: normalizeLatLng(value.center, markers[0]?.position || [20, 0]),
+      zoom: clampNumber(value.zoom, 1, 18, markers.length > 0 ? 5 : 2),
+      tileLayer: normalizeTileLayer(value.tileLayer),
+      markers,
+      interactive: true,
+    };
+  }
+
+  return common;
+}
+
+function defaultNodeSize(type: string) {
+  if (type === 'frame') return { width: 1160, height: 760 };
+  if (type === 'map') return { width: 520, height: 340 };
+  if (type === 'code') return { width: 360, height: 240 };
+  if (type === 'text') return { width: 420, height: 90 };
+  return { width: 260, height: 140 };
+}
+
+function normalizeCodeLanguage(value: unknown) {
+  const language = cleanText(value, 32).toLowerCase();
+  return /^[a-z0-9_+#.-]+$/.test(language) ? language : 'text';
+}
+
+function normalizeTileLayer(value: unknown) {
+  const layer = cleanText(value, 20);
+  return layer === 'satellite' || layer === 'hybrid' ? layer : 'street';
+}
+
+function normalizeMapMarkers(value: unknown) {
+  const markers = Array.isArray(value) ? value.slice(0, 8) : [];
+  return markers.flatMap((marker, index) => {
+    if (!marker || typeof marker !== 'object') return [];
+    const item = marker as Record<string, unknown>;
+    const position = normalizeLatLng(item.position, null);
+    if (!position) return [];
+    return [{
+      id: cleanText(item.id, 40) || `pin_${index + 1}`,
+      label: cleanText(item.label, 100) || `Location ${index + 1}`,
+      position,
+      color: normalizeColor(item.color),
+    }];
+  });
+}
+
+function normalizeLatLng(value: unknown, fallback: [number, number] | null): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return fallback;
+  const latitude = clampNumber(value[0], -90, 90, Number.NaN);
+  const longitude = clampNumber(value[1], -180, 180, Number.NaN);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) ? [latitude, longitude] : fallback;
 }
 
 function normalizePoint(value: unknown, fallback: { x: number; y: number }) {
@@ -1128,6 +1215,12 @@ function extractJsonObject(value: string) {
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : '';
+}
+
+function cleanMultilineText(value: unknown, maxLength: number) {
+  return typeof value === 'string'
+    ? value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, maxLength)
+    : '';
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {

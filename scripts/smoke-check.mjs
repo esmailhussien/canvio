@@ -45,6 +45,7 @@ const expectedPrerenderRoutes = [
   'updates',
   'updates/visual-reasoning-and-ai-thinking-partner',
   'updates/laser-pointer-for-live-guidance',
+  'updates/richer-language-aware-ai-boards',
   'updates/ai-navigator-editable-boards',
   'updates/relations-for-connected-thinking',
 ];

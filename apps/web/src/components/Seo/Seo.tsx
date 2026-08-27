@@ -81,7 +81,7 @@ const PUBLIC_PAGES: Record<string, PageSeoConfig> = {
               '@type': 'HowToStep',
               position: 1,
               name: 'Start Anywhere',
-              text: 'Open a blank canvas, choose a ready-made study model, or generate a structured board with AI Navigator.',
+              text: 'Open a blank canvas, choose a ready-made study model, or ask Canvio AI to generate a structured board.',
             },
             {
               '@type': 'HowToStep',

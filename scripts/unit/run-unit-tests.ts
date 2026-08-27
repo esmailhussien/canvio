@@ -121,7 +121,11 @@ const {
   summarizeBoardWithAIAsync,
 } = await import('../../apps/web/src/utils/spatialAIEngine');
 const { ApiRequestError } = await import('../../apps/web/src/utils/api');
-const { classifyAIError } = await import('../../apps/server/src/routes/ai');
+const { buildBoardSystemPrompt, classifyAIError, normalizeBoardPayload } = await import('../../apps/server/src/routes/ai');
+const { validateProductEventEnvelope } = await import('../../packages/core/src/telemetry');
+const { createProductEventEnvelope } = await import('../../apps/web/src/utils/productTelemetry');
+const { telemetryRoutes } = await import('../../apps/server/src/routes/telemetry');
+const { default: Fastify } = await import('fastify');
 const {
   CANVIO_BACKUP_SCHEMA_VERSION,
   CanvioBackupError,
@@ -168,6 +172,110 @@ function resetStore(): void {
     isAIAssistantOpen: false,
   } satisfies Partial<CanvasStore>);
 }
+
+test('product telemetry accepts the allowlisted activation contract', () => {
+  const result = validateProductEventEnvelope({
+    schemaVersion: 1,
+    eventId: 'event-12345678',
+    sessionId: 'session-12345678',
+    boardTraceId: 'board-12345678',
+    name: 'ai_completed',
+    occurredAt: '2026-08-27T12:00:00.000Z',
+    context: {
+      deviceClass: 'desktop',
+      inputMode: 'mouse',
+      viewportBucket: 'wide',
+      online: true,
+    },
+    properties: {
+      intent: 'summary',
+      usedBoardContext: true,
+      fallback: false,
+      provider: 'groq',
+    },
+  });
+
+  assert.equal(result.ok, true);
+});
+
+test('product telemetry rejects content, coordinates, URLs, and browser fingerprints', () => {
+  const leaked = validateProductEventEnvelope({
+    schemaVersion: 1,
+    eventId: 'event-12345678',
+    sessionId: 'session-12345678',
+    boardTraceId: 'board-12345678',
+    name: 'ai_completed',
+    occurredAt: '2026-08-27T12:00:00.000Z',
+    context: {
+      deviceClass: 'mobile',
+      inputMode: 'touch',
+      viewportBucket: 'compact',
+      online: true,
+      userAgent: 'fingerprint-me',
+    },
+    properties: {
+      intent: 'generate',
+      usedBoardContext: true,
+      fallback: true,
+      provider: 'gemini',
+      prompt: 'private lesson content',
+      latitude: 30.0444,
+      longitude: 31.2357,
+      url: 'https://canvio.space/w/private-board',
+    },
+  });
+
+  assert.equal(leaked.ok, false);
+});
+
+test('browser telemetry fails closed when a caller adds an unapproved property', () => {
+  const envelope = createProductEventEnvelope('share_created', {
+    isPublic: false,
+    collaboratorCount: 2,
+    boardTitle: 'Private board title',
+  } as never, 'board-12345678');
+
+  assert.equal(envelope, null);
+});
+
+test('telemetry API accepts safe events and rejects content-bearing payloads', async () => {
+  const app = Fastify({ logger: false });
+  await app.register(telemetryRoutes, { prefix: '/api/telemetry' });
+
+  const safeEvent = {
+    schemaVersion: 1,
+    eventId: 'event-12345678',
+    sessionId: 'session-12345678',
+    boardTraceId: 'board-12345678',
+    name: 'export_completed',
+    occurredAt: '2026-08-27T12:00:00.000Z',
+    context: {
+      deviceClass: 'tablet',
+      inputMode: 'pen',
+      viewportBucket: 'medium',
+      online: true,
+    },
+    properties: {
+      format: 'json',
+      nodeCount: 12,
+      relationCount: 8,
+    },
+  };
+
+  const accepted = await app.inject({ method: 'POST', url: '/api/telemetry/events', payload: safeEvent });
+  assert.equal(accepted.statusCode, 202);
+
+  const rejected = await app.inject({
+    method: 'POST',
+    url: '/api/telemetry/events',
+    payload: {
+      ...safeEvent,
+      properties: { ...safeEvent.properties, boardText: 'private content' },
+    },
+  });
+  assert.equal(rejected.statusCode, 400);
+  await app.close();
+});
 
 test('node removal clears dependent relations and selection', () => {
   resetStore();
@@ -389,6 +497,115 @@ test('AI server error classifier identifies production failure modes', () => {
 
   const friendly = getAIFallbackMessage(new ApiRequestError('AI quota is temporarily exhausted. Canvio used local smart mode.', 200, 'AI_QUOTA_EXCEEDED'));
   assert.equal(friendly, 'AI quota is temporarily exhausted. Canvio used local smart mode.');
+});
+
+test('AI board contract requires rich reasoning structure and preserves advanced Canvio tools', () => {
+  const prompt = buildBoardSystemPrompt('English');
+  assert.match(prompt, /central question or thesis/i);
+  assert.match(prompt, /challenge, counterargument, or failure mode/i);
+  assert.match(prompt, /open question or knowledge gap/i);
+  assert.match(prompt, /Code only for a useful technical example/i);
+  assert.match(prompt, /Map only when location is materially relevant/i);
+  assert.match(prompt, /Connect every content node into one meaningful graph/i);
+
+  const normalized = normalizeBoardPayload({
+    title: 'Field system review',
+    nodes: [
+      {
+        id: 'code_1',
+        type: 'code',
+        position: { x: 0, y: 0 },
+        size: { width: 360, height: 240 },
+        data: { language: 'typescript', filename: 'check.ts', code: 'const ready = true;\nconsole.log(ready);' },
+      },
+      {
+        id: 'map_1',
+        type: 'map',
+        position: { x: 480, y: 0 },
+        size: { width: 520, height: 340 },
+        data: {
+          center: [30.0444, 31.2357],
+          zoom: 9,
+          tileLayer: 'street',
+          markers: [{ id: 'pin_cairo', label: 'Cairo', position: [30.0444, 31.2357] }],
+        },
+      },
+    ],
+    relations: [{ sourceId: 'code_1', targetId: 'map_1', label: 'supports field view', relationship: 'explains' }],
+  }, 'fallback');
+
+  const codeNode = normalized.nodes.find((node) => node.type === 'code');
+  const mapNode = normalized.nodes.find((node) => node.type === 'map');
+  assert.equal(codeNode?.data.language, 'typescript');
+  assert.equal(codeNode?.data.filename, 'check.ts');
+  assert.match(String(codeNode?.data.code), /\nconsole\.log/);
+  assert.deepEqual(mapNode?.data.center, [30.0444, 31.2357]);
+  assert.equal(mapNode?.data.tileLayer, 'street');
+  assert.equal(Array.isArray(mapNode?.data.markers) ? mapNode.data.markers.length : 0, 1);
+  assert.equal(normalized.relations[0]?.relationship, 'explains');
+});
+
+test('AI server boards keep Code, Living Map, and semantic relations editable on the client', async () => {
+  resetStore();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('/api/ai/generate')) {
+      return new Response(JSON.stringify({
+        source: 'server-ai',
+        provider: 'groq',
+        model: 'openai/gpt-oss-20b',
+        title: 'Technical field board',
+        nodes: [
+          { id: 'frame', type: 'frame', position: { x: -80, y: -100 }, size: { width: 1180, height: 620 }, data: { title: 'Technical field board' } },
+          { id: 'core', type: 'shape', position: { x: 380, y: 120 }, size: { width: 240, height: 120 }, data: { label: 'Core system', shape: 'hexagon' } },
+          { id: 'code', type: 'code', position: { x: 20, y: 300 }, size: { width: 360, height: 220 }, data: { language: 'typescript', filename: 'probe.ts', code: 'export const probe = () => true;' } },
+          { id: 'map', type: 'map', position: { x: 660, y: 260 }, size: { width: 420, height: 260 }, data: { center: [30.0444, 31.2357], zoom: 8, tileLayer: 'street', markers: [{ id: 'site', label: 'Inspection site', position: [30.0444, 31.2357] }] } },
+        ],
+        relations: [
+          { sourceId: 'code', targetId: 'core', label: 'implements', relationship: 'explains' },
+          { sourceId: 'core', targetId: 'map', label: 'deployed at', relationship: 'example_of' },
+        ],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+
+  try {
+    const result = await generateSpatialBoardAsync('Create a technical field monitoring board');
+    assert.equal(result.source, 'server');
+    assert.ok(result.nodes.some((node) => node.type === 'code' && node.data?.filename === 'probe.ts'));
+    assert.ok(result.nodes.some((node) => node.type === 'map' && Array.isArray(node.data?.markers)));
+    assert.ok(result.relations.some((relation) => relation.relationship === 'explains'));
+    assert.ok(result.relations.some((relation) => relation.relationship === 'example_of'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('AI local smart mode creates an honest connected thinking workspace for unknown topics', () => {
+  resetStore();
+  const generated = generateSpatialBoard('Urban heat islands');
+  const contentNodes = generated.nodes.filter((node) => node.type !== 'frame');
+  const visibleText = generated.nodes.map((node) => `${node.data?.title || ''} ${node.data?.text || ''} ${node.data?.label || ''}`).join(' ');
+
+  assert.ok(generated.nodes.some((node) => node.type === 'frame'));
+  assert.ok(generated.nodes.some((node) => node.type === 'shape'));
+  assert.ok(contentNodes.length >= 8);
+  assert.ok(generated.relations.length >= contentNodes.length - 1);
+  assert.match(visibleText, /Challenge the idea/i);
+  assert.match(visibleText, /Open question/i);
+  assert.match(visibleText, /Next action/i);
+  assert.match(generated.title, /Urban heat islands/i);
+
+  const studyBoard = generateSpatialBoard('Create a study board about photosynthesis');
+  const studyContent = studyBoard.nodes.filter((node) => node.type !== 'frame');
+  const studyText = studyBoard.nodes.map((node) => `${node.data?.text || ''} ${node.data?.label || ''}`).join(' ');
+  assert.ok(studyContent.length >= 10);
+  assert.ok(studyBoard.relations.length >= studyContent.length - 1);
+  assert.match(studyText, /Evidence/i);
+  assert.match(studyText, /Challenge the model/i);
+  assert.match(studyText, /Open question/i);
 });
 
 test('AI board generation preserves requested Arabic language in local fallback', () => {

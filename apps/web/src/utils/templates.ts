@@ -218,7 +218,7 @@ export const TEMPLATES: CanvasTemplate[] = [
           fill: 'rgba(168, 85, 247, 0.16)',
           stroke: '#a855f7',
           strokeWidth: 2,
-          label: 'AI Navigator',
+          label: 'Canvio AI',
         }, 5),
         sticky(reasoningId, -210, 70, 'Reasoning Partner\nChecks clarity, gaps, evidence.', 'purple', 6, 250, 140),
         sticky(actionId, 120, 120, 'Deliver\nShare, present, or export.', 'green', 7, 250, 150),
@@ -1039,7 +1039,7 @@ export const TEMPLATES: CanvasTemplate[] = [
 
       const s1 = sticky(nanoid(10), -560, -150, 'Lands on home page\n- Reads value prop\n- Clicks Create World', 'blue', 1);
       const s2 = sticky(nanoid(10), -320, -150, 'Creates sticky notes\n- Uses template picker\n- Invites teammate', 'purple', 2);
-      const s3 = sticky(nanoid(10), -80, -150, 'Live multiplayer call\n- Real-time cursors\n- AI Navigator queries', 'green', 3);
+      const s3 = sticky(nanoid(10), -80, -150, 'Live multiplayer call\n- Real-time cursors\n- Canvio AI queries', 'green', 3);
       const s4 = sticky(nanoid(10), 160, -150, 'Exports board output\n- Shares URL link\n- Returns weekly', 'yellow', 4);
 
       const friction = sticky(nanoid(10), -320, 70, 'Friction point\nFirst time users need a 10-second interactive guided hint.', 'pink', 5);

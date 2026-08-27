@@ -1,24 +1,23 @@
 import { useEffect, useCallback } from 'react';
-import { getPlugin } from '@canvio/objects';
+import { getPlugin } from '@canvio/objects/src/registry';
 import { LivingNode } from '@canvio/core';
 import { useCanvasStore } from '../../../store/canvasStore';
 
 interface UseCanvasClipboardProps {
   canvasRef: React.RefObject<HTMLDivElement | null>;
-  cursorWorldPos: { x: number; y: number } | null;
+  cursorWorldPosRef: React.RefObject<{ x: number; y: number } | null>;
   screenToWorld: (x: number, y: number) => { x: number; y: number };
 }
 
 export function useCanvasClipboard({
   canvasRef,
-  cursorWorldPos,
+  cursorWorldPosRef,
   screenToWorld,
 }: UseCanvasClipboardProps) {
   const addNode = useCanvasStore((s) => s.addNode);
   const selectNode = useCanvasStore((s) => s.selectNode);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const nextZIndex = useCanvasStore((s) => s.nextZIndex);
-  const viewport = useCanvasStore((s) => s.viewport);
 
   const createNodeFromPlugin = useCallback(
     (type: string, worldPos: { x: number; y: number }, data?: Record<string, unknown>) => {
@@ -81,8 +80,9 @@ export function useCanvasClipboard({
 
       e.preventDefault();
       const rect = canvasRef.current?.getBoundingClientRect();
+      const viewport = useCanvasStore.getState().viewport;
       const target =
-        cursorWorldPos ||
+        cursorWorldPosRef.current ||
         (rect
           ? screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2)
           : { x: -viewport.x, y: -viewport.y });
@@ -91,7 +91,7 @@ export function useCanvasClipboard({
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [canvasRef, createImageFromFile, cursorWorldPos, screenToWorld, viewport.x, viewport.y]);
+  }, [canvasRef, createImageFromFile, cursorWorldPosRef, screenToWorld]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (Array.from(e.dataTransfer.items || []).some((item) => item.type.startsWith('image/'))) {

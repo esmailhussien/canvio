@@ -1,4 +1,4 @@
-import { Point, Bounds, LivingNode } from '../types';
+import { Point, Bounds, LivingNode } from '../types.js';
 
 /**
  * Checks if a given point is within a given bounds.

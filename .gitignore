@@ -12,3 +12,4 @@ data/
 *.patch
 %SystemDrive%*/
 *.tsbuildinfo
+AgentLayer/

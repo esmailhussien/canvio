@@ -1,5 +1,57 @@
 [
   {
+    "slug": "richer-language-aware-ai-boards",
+    "title": "AI Boards: Richer Structure, Better Tool Choice",
+    "excerpt": "Canvio AI now builds more useful editable boards with varied objects, meaningful relations, stronger topic detail, and the language requested by the user.",
+    "category": "Release",
+    "datePublished": "2026-08-27",
+    "readTime": "4 min read",
+    "icon": "auto_awesome",
+    "accent": "#a78bfa",
+    "takeaways": [
+      "Generated boards can combine notes, text, shapes, code, maps when location matters, frames, and semantic relations instead of repeating one card type.",
+      "The assistant asks for all visible board text and relation labels in the user's requested language, including Arabic.",
+      "Topic-specific prompts encourage examples, evidence, misconceptions, questions, and next actions instead of generic headings.",
+      "After generation, Canvio reports what was created and clearly identifies when a local fallback was used."
+    ],
+    "sections": [
+      {
+        "heading": "A useful board is more than a stack of notes",
+        "paragraphs": [
+          "Early AI drafts could produce a recognizable diagram but still feel repetitive. The improved generation contract asks for an editable reasoning board: a clear central idea, supporting evidence, a challenge or open question, a practical next action, and relations that explain how the parts connect.",
+          "The result is still a starting point, not a finished answer. Every object remains movable, editable, reconnectable, and available to the same tools as work created by hand."
+        ]
+      },
+      {
+        "heading": "The tool should match the idea",
+        "paragraphs": [
+          "Canvio AI can choose sticky notes for short ideas, text for headings, shapes for decisions or concepts, code blocks for real technical examples, and Living Maps only when the topic is genuinely geographic. Frames keep the generated workspace together and fit it into view.",
+          "Semantic relations such as Depends on, Explains, Causes, Contradicts, and Leads to make the structure readable by people and by the Visual Reasoning Partner."
+        ]
+      },
+      {
+        "heading": "The board should speak the user's language",
+        "paragraphs": [
+          "The generation flow now detects or accepts the requested output language and carries it through the server and local fallback. Visible node text and relation labels are requested in that language while the internal board schema stays stable.",
+          "This matters for real classrooms and teams. Someone can ask for an Arabic study board, a French project plan, or an English technical architecture without manually translating every generated card."
+        ]
+      },
+      {
+        "heading": "More transparent when the server is unavailable",
+        "paragraphs": [
+          "A generated result now summarizes its object and relation mix so people can quickly understand what changed. If the hosted AI provider is unavailable or rate-limited, Canvio identifies the local smart fallback instead of quietly presenting it as a server response.",
+          "That keeps the workflow resilient while preserving trust: the board remains useful, and the user knows which reasoning path produced it."
+        ]
+      },
+      {
+        "heading": "Why this matters",
+        "paragraphs": [
+          "Canvio's larger idea is connected visual knowledge work, not AI decoration. Better generation supports that vision by creating material people can question, reorganize, connect, present, and continue developing with the full whiteboard toolkit."
+        ]
+      }
+    ]
+  },
+  {
     "slug": "visual-reasoning-and-ai-thinking-partner",
     "title": "Visual Reasoning Partner: Score, Explain, Act",
     "excerpt": "A clearer reasoning score now explains what it measures and recommends the best next move for the board.",

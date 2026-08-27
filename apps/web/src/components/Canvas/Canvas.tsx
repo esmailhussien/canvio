@@ -48,7 +48,6 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const nodes = useCanvasStore((s) => s.nodes);
   const relations = useCanvasStore((s) => s.relations);
   const activeTool = useCanvasStore((s) => s.activeTool);
-  const panBy = useCanvasStore((s) => s.panBy);
   const addNode = useCanvasStore((s) => s.addNode);
   const selectNode = useCanvasStore((s) => s.selectNode);
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
@@ -67,6 +66,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const eraseInkAt = useCanvasStore((s) => s.eraseInkAt);
 
   const [cursorWorldPos, setCursorWorldPos] = useState<{ x: number; y: number } | null>(null);
+  const cursorWorldPosRef = useRef<{ x: number; y: number } | null>(null);
   const [laserPointer, setLaserPointer] = useState<{ x: number; y: number } | null>(null);
   const [radialMenu, setRadialMenu] = useState<{ screenX: number; screenY: number; worldPos: { x: number; y: number } } | null>(null);
   const touchPanStartRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -85,7 +85,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
     screenToWorld,
     isPanning,
     setIsPanning,
-    lastMousePos,
+    lastMousePosRef,
     setLastMousePos,
     pinchStateRef,
     handleWheel,
@@ -126,9 +126,45 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   // Custom Clipboard & Drag-Drop Hook
   const { createNodeFromPlugin, handleDragOver, handleDrop } = useCanvasClipboard({
     canvasRef,
-    cursorWorldPos,
+    cursorWorldPosRef,
     screenToWorld,
   });
+
+  const panFrameRef = useRef<number | null>(null);
+  const pendingPanRef = useRef({ x: 0, y: 0 });
+
+  const flushPendingPan = useCallback(() => {
+    if (panFrameRef.current !== null) {
+      window.cancelAnimationFrame(panFrameRef.current);
+      panFrameRef.current = null;
+    }
+    const pending = pendingPanRef.current;
+    if (pending.x !== 0 || pending.y !== 0) {
+      useCanvasStore.getState().panBy(pending.x, pending.y);
+      pendingPanRef.current = { x: 0, y: 0 };
+    }
+  }, []);
+
+  const queuePan = useCallback((dx: number, dy: number) => {
+    pendingPanRef.current.x += dx;
+    pendingPanRef.current.y += dy;
+    if (panFrameRef.current !== null) return;
+
+    panFrameRef.current = window.requestAnimationFrame(() => {
+      panFrameRef.current = null;
+      const pending = pendingPanRef.current;
+      pendingPanRef.current = { x: 0, y: 0 };
+      if (pending.x !== 0 || pending.y !== 0) {
+        useCanvasStore.getState().panBy(pending.x, pending.y);
+      }
+    });
+  }, []);
+
+  useEffect(() => () => flushPendingPan(), [flushPendingPan]);
+
+  useEffect(() => {
+    if (activeTool !== 'relation') setCursorWorldPos(null);
+  }, [activeTool]);
 
   // Viewport Culling Hook for 10x Performance Boost on Large Canvases
   const visibleNodes = useViewportCulling({
@@ -248,8 +284,10 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       if (isDrawing && !isActiveDrawingPointer) return;
       if (!isActiveDrawingPointer && (!e.isPrimary || pinchStateRef.current)) return;
       const worldPos = screenToWorld(e.clientX, e.clientY);
-      setCursorWorldPos(worldPos);
+      cursorWorldPosRef.current = worldPos;
+      if (activeTool === 'relation') setCursorWorldPos(worldPos);
 
+      const lastMousePos = lastMousePosRef.current;
       if (isPanning && lastMousePos) {
         // After a long-press opens Quick add, the finger is still down —
         // don't pan the board behind the open menu.
@@ -263,7 +301,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
         }
         const dx = (e.clientX - lastMousePos.x) / viewport.zoom;
         const dy = (e.clientY - lastMousePos.y) / viewport.zoom;
-        panBy(dx, dy);
+        queuePan(dx, dy);
         setLastMousePos({ x: e.clientX, y: e.clientY });
         return;
       }
@@ -298,9 +336,10 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       isDrawingFrame,
       isMarqueeActive,
       isPanning,
-      lastMousePos,
-      panBy,
+      activeTool,
+      lastMousePosRef,
       pinchStateRef,
+      queuePan,
       radialMenu,
       screenToWorld,
       setLastMousePos,
@@ -321,6 +360,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       }
 
       if (isPanning) {
+        flushPendingPan();
         if (touchPanStartRef.current && !touchPanStartRef.current.moved) {
           clearSelection();
         }
@@ -372,6 +412,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       addNode,
       finishDrawing,
       finishMarquee,
+      flushPendingPan,
       frameCurrentPos,
       frameStartPos,
       isDrawing,
@@ -395,6 +436,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     touchPanStartRef.current = null;
+    flushPendingPan();
     setIsPanning(false);
     setLastMousePos(null);
     // A canceled gesture must abort in-progress marquee/frame-drawing too,
@@ -407,7 +449,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       setFrameStartPos(null);
       setFrameCurrentPos(null);
     }
-  }, [cancelDrawing, finishMarquee, isDrawingFrame, isMarqueeActive, setIsPanning, setFrameCurrentPos, setFrameStartPos, setIsDrawingFrame, setLastMousePos]);
+  }, [cancelDrawing, finishMarquee, flushPendingPan, isDrawingFrame, isMarqueeActive, setIsPanning, setFrameCurrentPos, setFrameStartPos, setIsDrawingFrame, setLastMousePos]);
 
   const handleCanvasTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (e.touches.length === 2 && isDrawing) {
@@ -584,7 +626,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   return (
     <div
       ref={canvasRef}
-      className={`canvas ${relationStateClass} ${activeTool === 'laser' ? 'canvas--laser' : ''} ${isInkTool ? 'canvas--inking' : ''} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
+      className={`canvas ${relationStateClass} ${activeTool === 'laser' ? 'canvas--laser' : ''} ${isInkTool ? 'canvas--inking' : ''} ${isPanning ? 'canvas--panning' : ''} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

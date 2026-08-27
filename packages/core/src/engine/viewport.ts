@@ -1,4 +1,4 @@
-import { Point, Viewport, Bounds, Size } from '../types';
+import { Point, Viewport, Bounds, Size } from '../types.js';
 
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 5.0;

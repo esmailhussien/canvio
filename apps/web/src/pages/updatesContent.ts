@@ -15,7 +15,10 @@ export interface UpdateArticle {
   sections: Array<{ heading: string; paragraphs: string[] }>;
 }
 
-export const UPDATE_ARTICLES: UpdateArticle[] = rawArticles as UpdateArticle[];
+export const UPDATE_ARTICLES: UpdateArticle[] = [...(rawArticles as UpdateArticle[])]
+  .sort((left, right) => right.datePublished.localeCompare(left.datePublished));
+
+export const LATEST_UPDATE = UPDATE_ARTICLES[0];
 
 export function getUpdateArticle(slug: string): UpdateArticle | undefined {
   return UPDATE_ARTICLES.find((article) => article.slug === slug);

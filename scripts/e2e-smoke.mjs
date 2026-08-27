@@ -218,7 +218,11 @@ async function main() {
 
     console.log('E2E: creating relation from exact map pin to canvas node');
     await clickToolbarTool(page, 'relation');
-    await page.locator('.node-type-map .leaflet-marker-icon').first().click({ force: true });
+    // Templates are appended after any AI-generated content. Target the map
+    // that belongs to this template instead of an earlier offscreen map.
+    const templateMarker = page.locator('.node-type-map').last().locator('.leaflet-marker-icon').first();
+    await templateMarker.waitFor({ state: 'visible', timeout: 5000 });
+    await templateMarker.click();
     await page.waitForFunction(() => document.querySelectorAll('.node-renderer.relation-source').length === 1)
       .catch(async (error) => {
         const state = await page.evaluate(() => ({

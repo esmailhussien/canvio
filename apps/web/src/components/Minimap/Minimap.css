@@ -87,3 +87,21 @@
     min-height: 36px;
   }
 }
+
+@media (max-width: 520px) {
+  .minimap-container--compact {
+    width: 132px;
+    height: 48px;
+    border-radius: var(--radius-full);
+  }
+
+  .minimap-container--compact .minimap__canvas {
+    display: none;
+  }
+
+  .minimap-container--compact .minimap__controls {
+    height: 100%;
+    padding: 5px;
+    border-top: 0;
+  }
+}

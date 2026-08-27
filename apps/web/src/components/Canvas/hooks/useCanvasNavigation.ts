@@ -12,7 +12,10 @@ export function useCanvasNavigation({ canvasRef, viewport }: UseCanvasNavigation
   const zoomAtPoint = useCanvasStore((s) => s.zoomAtPoint);
 
   const [isPanning, setIsPanning] = useState(false);
-  const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const setLastMousePos = useCallback((position: { x: number; y: number } | null) => {
+    lastMousePosRef.current = position;
+  }, []);
 
   const pinchStateRef = useRef<{ distance: number; midpoint: { x: number; y: number } } | null>(null);
 
@@ -111,7 +114,7 @@ export function useCanvasNavigation({ canvasRef, viewport }: UseCanvasNavigation
     screenToWorld,
     isPanning,
     setIsPanning,
-    lastMousePos,
+    lastMousePosRef,
     setLastMousePos,
     pinchStateRef,
     handleWheel,

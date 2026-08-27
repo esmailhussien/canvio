@@ -11,6 +11,7 @@ import ywsUtils from 'y-websocket/bin/utils';
 import dotenv from 'dotenv';
 import { boardRoutes } from './routes/boards.js';
 import { aiRoutes } from './routes/ai.js';
+import { telemetryRoutes } from './routes/telemetry.js';
 import { createFilePersistence } from './storage/yPersistence.js';
 import { createCorsOriginGuard, readPositiveIntEnv } from './security.js';
 import { authorizeWebSocketBoard, getBoardIdFromWsRequest } from './wsAccess.js';
@@ -40,6 +41,7 @@ app.get('/', async () => ({
   endpoints: {
     boards: '/api/boards',
     ai: '/api/ai',
+    telemetry: '/api/telemetry/events',
     health: '/health',
   },
 }));
@@ -57,6 +59,7 @@ app.get('/health/ready', async (_request, reply) => {
 
 app.register(boardRoutes, { prefix: '/api/boards' });
 app.register(aiRoutes, { prefix: '/api/ai' });
+app.register(telemetryRoutes, { prefix: '/api/telemetry' });
 
 // WebSocket hardening: bound message size and connection counts so a single
 // client cannot exhaust memory on a small instance.

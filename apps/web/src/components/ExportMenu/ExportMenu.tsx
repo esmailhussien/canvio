@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { CanvioBackupError, parseCanvioBackup } from '../../utils/backupSchema';
 import { exportAsJSON, exportAsPDF, exportAsPNG } from '../../utils/exportUtils';
+import { trackBoardEvent } from '../../utils/productTelemetry';
 import './ExportMenu.css';
 
 interface ExportMenuProps {
@@ -67,9 +68,11 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       setExportStatus(null);
       await exportAsPNG(worldId);
       setExportStatus('PNG export ready');
+      trackBoardEvent(worldId, 'export_completed', { format: 'png', nodeCount: Object.keys(nodes).length, relationCount: Object.keys(relations).length });
       onClose();
     } catch {
       setExportError('PNG export failed');
+      trackBoardEvent(worldId, 'runtime_issue', { area: 'export', code: 'request_failed', recoverable: true });
     } finally {
       setExporting(null);
     }
@@ -82,9 +85,11 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       setExportStatus(null);
       await exportAsPDF(worldId);
       setExportStatus('PDF document ready');
+      trackBoardEvent(worldId, 'export_completed', { format: 'pdf', nodeCount: Object.keys(nodes).length, relationCount: Object.keys(relations).length });
       onClose();
     } catch {
       setExportError('PDF export failed');
+      trackBoardEvent(worldId, 'runtime_issue', { area: 'export', code: 'request_failed', recoverable: true });
     } finally {
       setExporting(null);
     }
@@ -97,9 +102,11 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       setExportStatus(null);
       exportAsJSON(nodes, relations, worldId);
       setExportStatus('JSON backup ready');
+      trackBoardEvent(worldId, 'export_completed', { format: 'json', nodeCount: Object.keys(nodes).length, relationCount: Object.keys(relations).length });
       onClose();
     } catch {
       setExportError('JSON export failed');
+      trackBoardEvent(worldId, 'runtime_issue', { area: 'export', code: 'request_failed', recoverable: true });
     } finally {
       setExporting(null);
     }
@@ -124,9 +131,19 @@ export function ExportMenu({ worldId, isOpen, onToggle, onClose, containerRef }:
       replaceWorld(result.world);
       const warningText = result.meta.warnings.length > 0 ? ` (${result.meta.warnings[0]})` : '';
       setExportStatus(`Restored ${Object.keys(result.world.nodes).length} nodes${warningText}`);
+      trackBoardEvent(worldId, 'restore_completed', {
+        nodeCount: Object.keys(result.world.nodes).length,
+        relationCount: Object.keys(result.world.relations).length,
+        warningCount: result.meta.warnings.length,
+      });
       onClose();
     } catch (error) {
       setExportError(error instanceof CanvioBackupError ? error.message : 'Import failed: choose a Canvio JSON backup');
+      trackBoardEvent(worldId, 'runtime_issue', {
+        area: 'restore',
+        code: error instanceof CanvioBackupError ? 'invalid_backup' : 'request_failed',
+        recoverable: true,
+      });
     } finally {
       setExporting(null);
       if (importInputRef.current) importInputRef.current.value = '';

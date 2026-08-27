@@ -195,7 +195,17 @@
     flex: 0 0 44px;
   }
 
+  .canvio-toolbar-button.active {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .canvio-toolbar .canvio-tooltip {
+    display: none;
+  }
+
   .canvio-toolbar-button--mobile-secondary,
+  .canvio-toolbar__mobile-secondary-wrapper,
   .canvio-toolbar-divider {
     display: none;
   }

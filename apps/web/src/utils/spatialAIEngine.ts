@@ -18,6 +18,7 @@ import {
 } from './api';
 import { analyzeGraphStructure, getNodeTitle } from './graphQueries';
 import type { GraphInsight } from '@canvio/core';
+import { trackBoardEvent, trackProductEvent } from './productTelemetry';
 
 export interface SpatialAIResult {
   title: string;
@@ -38,6 +39,37 @@ export interface AIContextStats {
 
 export type BoardDocumentFormat = 'summary' | 'article';
 
+type AITrackedResult = {
+  source?: 'server' | 'local';
+  provider?: AIProvider;
+};
+
+function withAICompletionEvent<T extends AITrackedResult>(
+  intent: 'generate' | 'summary' | 'article' | 'organize' | 'analyze' | 'challenge' | 'socratic',
+  result: T,
+  usedBoardContext: boolean,
+) {
+  const properties = {
+    intent,
+    usedBoardContext,
+    fallback: result.source === 'local',
+    provider: result.provider || 'unknown',
+  } as const;
+  const worldId = typeof window !== 'undefined' && typeof window.location?.pathname === 'string'
+    ? window.location.pathname.match(/^\/w\/([^/?#]+)/)?.[1]
+    : undefined;
+
+  if (worldId) trackBoardEvent(decodeURIComponent(worldId), 'ai_completed', properties);
+  else trackProductEvent('ai_completed', properties);
+
+  if (result.source === 'local') {
+    const issue = { area: 'ai', code: 'provider_fallback', recoverable: true } as const;
+    if (worldId) trackBoardEvent(decodeURIComponent(worldId), 'runtime_issue', issue);
+    else trackProductEvent('runtime_issue', issue);
+  }
+  return result;
+}
+
 export async function generateSpatialBoardAsync(
   prompt: string,
   provider?: string,
@@ -45,6 +77,8 @@ export async function generateSpatialBoardAsync(
   model?: string
 ): Promise<SpatialAIResult> {
   const outputLanguage = getPromptOutputLanguage(prompt);
+  const currentState = useCanvasStore.getState();
+  const usedBoardContext = Object.keys(currentState.nodes).length > 0 || Object.keys(currentState.relations).length > 0;
   try {
     const result = await generateAIBoard({
       prompt,
@@ -54,24 +88,24 @@ export async function generateSpatialBoardAsync(
       context: buildAIContext(),
     });
     if (result.source === 'server-ai') {
-      return normalizeServerBoardResult(result.title, result.nodes, result.relations, prompt, 'server', result.provider, result.model);
+      return withAICompletionEvent('generate', normalizeServerBoardResult(result.title, result.nodes, result.relations, prompt, 'server', result.provider, result.model), usedBoardContext);
     }
-    return {
+    return withAICompletionEvent('generate', {
       ...generateSpatialBoard(prompt),
       source: 'local',
       provider: normalizeProvider(provider) || result.provider,
       model,
       message: result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
-    };
+    }, usedBoardContext);
   } catch (err) {
     console.warn('Server AI generation unavailable. Falling back to local spatial template.', err);
-    return {
+    return withAICompletionEvent('generate', {
       ...generateSpatialBoard(prompt),
       source: 'local',
       provider: normalizeProvider(provider),
       model,
       message: getAIFallbackMessage(err),
-    };
+    }, usedBoardContext);
   }
 }
 
@@ -93,7 +127,7 @@ function normalizeServerBoardResult(
     const type = normalizeNodeType(node.type);
     const data = node.data || {};
     const color = normalizeStickyColor(data.color);
-    const text = cleanText(data.text, 600) || cleanText(data.label, 180) || cleanText(data.title, 120);
+    const text = cleanText(data.text, 600) || cleanText(data.label, 180) || cleanText(data.title, 120) || cleanText(data.filename, 100);
     const label = cleanText(data.label, 180) || text.slice(0, 80);
     const titleText = cleanText(data.title, 120) || label || text.slice(0, 80);
     const isRtlText = hasRtlScript(`${text} ${label} ${titleText}`);
@@ -106,8 +140,8 @@ function normalizeServerBoardResult(
         y: clampNumber(node.position?.y, -10000, 10000, Math.floor(index / 4) * 190),
       },
       size: {
-        width: clampNumber(node.size?.width, 110, 1400, type === 'frame' ? 760 : 260),
-        height: clampNumber(node.size?.height, 70, 1000, type === 'frame' ? 460 : 140),
+        width: clampNumber(node.size?.width, 110, 1400, defaultGeneratedNodeSize(type).width),
+        height: clampNumber(node.size?.height, 70, 1000, defaultGeneratedNodeSize(type).height),
       },
       rotation: 0,
       zIndex: type === 'frame' ? 0 : index + 1,
@@ -124,6 +158,18 @@ function normalizeServerBoardResult(
         stroke: normalizeColor(data.stroke, '#8083ff'),
         direction: cleanText(data.direction, 8) || (isRtlText ? 'rtl' : undefined),
         textAlign: cleanText(data.textAlign, 12) || (isRtlText ? (type === 'shape' ? 'center' : 'right') : undefined),
+        ...(type === 'code' ? {
+          language: normalizeCodeLanguage(data.language),
+          filename: cleanText(data.filename, 100) || 'example.txt',
+          code: cleanMultilineText(data.code, 5000),
+        } : {}),
+        ...(type === 'map' ? {
+          center: normalizeLatLng(data.center, [20, 0]),
+          zoom: clampNumber(data.zoom, 1, 18, 2),
+          tileLayer: normalizeTileLayer(data.tileLayer),
+          markers: normalizeMapMarkers(data.markers),
+          interactive: true,
+        } : {}),
       },
       createdAt,
       updatedAt: createdAt,
@@ -278,12 +324,12 @@ function buildAIContext(nodes = Object.values(useCanvasStore.getState().nodes), 
 
 function getNodeText(node: LivingNode) {
   const data = node.data as Record<string, unknown> | undefined;
-  return String(data?.text || data?.content || data?.title || data?.label || '');
+  return String(data?.text || data?.content || data?.code || data?.title || data?.label || data?.filename || '');
 }
 
 function getNodeDisplayName(node: LivingNode) {
   const data = node.data as Record<string, unknown> | undefined;
-  const raw = data?.title || data?.label || data?.text || data?.content;
+  const raw = data?.title || data?.label || data?.text || data?.content || data?.filename;
   const value = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
   return value.slice(0, 120) || (node.type === 'map' ? 'Living map' : `${node.type} element`);
 }
@@ -452,12 +498,12 @@ function isAIErrorCode(code: string | undefined): code is AIErrorCode {
 }
 
 function normalizeNodeType(type: unknown) {
-  return type === 'shape' || type === 'text' || type === 'frame' || type === 'sticky' ? type : 'sticky';
+  return type === 'shape' || type === 'text' || type === 'frame' || type === 'sticky' || type === 'code' || type === 'map' ? type : 'sticky';
 }
 
 function normalizeRelationship(value: unknown): Relation['relationship'] {
   const relationship = cleanText(value, 40) as Relation['relationship'];
-  return ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'same_as', 'enables', 'inspired_by', 'custom'].includes(relationship)
+  return ['related_to', 'leads_to', 'based_on', 'part_of', 'depends_on', 'contradicts', 'same_as', 'enables', 'inspired_by', 'explains', 'causes', 'example_of', 'mitigates', 'custom'].includes(relationship)
     ? relationship
     : 'related_to';
 }
@@ -478,6 +524,47 @@ function normalizeShape(value: unknown) {
   return ['rectangle', 'circle', 'diamond', 'triangle', 'hexagon'].includes(shape) ? shape : 'rectangle';
 }
 
+function defaultGeneratedNodeSize(type: string) {
+  if (type === 'frame') return { width: 1160, height: 760 };
+  if (type === 'map') return { width: 520, height: 340 };
+  if (type === 'code') return { width: 360, height: 240 };
+  if (type === 'text') return { width: 420, height: 90 };
+  return { width: 260, height: 140 };
+}
+
+function normalizeCodeLanguage(value: unknown) {
+  const language = cleanText(value, 32).toLowerCase();
+  return /^[a-z0-9_+#.-]+$/.test(language) ? language : 'text';
+}
+
+function normalizeTileLayer(value: unknown) {
+  const layer = cleanText(value, 20);
+  return layer === 'satellite' || layer === 'hybrid' ? layer : 'street';
+}
+
+function normalizeMapMarkers(value: unknown) {
+  const markers = Array.isArray(value) ? value.slice(0, 8) : [];
+  return markers.flatMap((marker, index) => {
+    if (!marker || typeof marker !== 'object') return [];
+    const item = marker as Record<string, unknown>;
+    const position = normalizeLatLng(item.position, null);
+    if (!position) return [];
+    return [{
+      id: cleanText(item.id, 40) || `pin_${index + 1}`,
+      label: cleanText(item.label, 100) || `Location ${index + 1}`,
+      position,
+      color: normalizeColor(item.color, '#38bdf8'),
+    }];
+  });
+}
+
+function normalizeLatLng(value: unknown, fallback: [number, number] | null): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return fallback;
+  const latitude = clampNumber(value[0], -90, 90, Number.NaN);
+  const longitude = clampNumber(value[1], -180, 180, Number.NaN);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) ? [latitude, longitude] : fallback;
+}
+
 function normalizeColor(value: unknown, fallback: string) {
   const color = cleanText(value, 32);
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
@@ -485,6 +572,12 @@ function normalizeColor(value: unknown, fallback: string) {
 
 function cleanText(value: unknown, maxLength: number) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : '';
+}
+
+function cleanMultilineText(value: unknown, maxLength: number) {
+  return typeof value === 'string'
+    ? value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, maxLength)
+    : '';
 }
 
 function hasRtlScript(value: string) {
@@ -580,7 +673,7 @@ export async function summarizeBoardWithAIAsync(
         model,
         message: result.message || getAIFallbackMessage(result.error || 'AI_REQUEST_FAILED'),
       };
-      return output === 'article' ? composeArticlePage(withMessage) : withMessage;
+      return withAICompletionEvent(output, output === 'article' ? composeArticlePage(withMessage) : withMessage, nodes.length > 0 || relations.length > 0);
     }
     const normalized = normalizeServerBoardResult(
       result.title,
@@ -591,7 +684,7 @@ export async function summarizeBoardWithAIAsync(
       result.provider,
       result.model
     );
-    return output === 'article' ? composeArticlePage(normalized) : normalized;
+    return withAICompletionEvent(output, output === 'article' ? composeArticlePage(normalized) : normalized, nodes.length > 0 || relations.length > 0);
   } catch (err) {
     fallbackMessage = getAIFallbackMessage(err);
     if (!isExpectedAIFallback(err)) {
@@ -601,7 +694,7 @@ export async function summarizeBoardWithAIAsync(
 
   const localResult = createLocalBoardDocument(nodes, relations, output);
   const withMessage = { ...localResult, provider, model, message: fallbackMessage };
-  return output === 'article' ? composeArticlePage(withMessage) : withMessage;
+  return withAICompletionEvent(output, output === 'article' ? composeArticlePage(withMessage) : withMessage, nodes.length > 0 || relations.length > 0);
 }
 
 function composeArticlePage(result: SpatialAIResult): SpatialAIResult {
@@ -762,7 +855,7 @@ export async function organizeAndClusterWithAIAsync(
         updateNode,
         addNode
       );
-      return { clustersCount: result.clusters.length, source: 'server', provider: result.provider, model: result.model };
+      return withAICompletionEvent('organize', { clustersCount: result.clusters.length, source: 'server', provider: result.provider, model: result.model }, true);
     }
     if (result.source === 'local-fallback') {
       throw new ApiRequestError(
@@ -786,13 +879,13 @@ export async function organizeAndClusterWithAIAsync(
   })).filter((cluster) => cluster.nodeIds.length > 0);
 
   applyClusterLayout(nodes, localClusters, updateNode, addNode);
-  return {
+  return withAICompletionEvent('organize', {
     clustersCount: localClusters.length,
     source: 'local',
     provider,
     model,
     message: fallbackMessage,
-  };
+  }, true);
 }
 
 export async function analyzeGraphWithAIAsync(
@@ -835,7 +928,7 @@ export async function analyzeGraphWithAIAsync(
 
       const mergedInsights = [...serverInsights, ...localAnalysis.insights.filter((li) => !serverInsights.some((si) => si.title === li.title))];
 
-      return {
+      return withAICompletionEvent('analyze', {
         critique: result.critique,
         healthScore: typeof result.healthScore === 'number' ? result.healthScore : localAnalysis.metrics.reasoningHealthScore,
         insights: mergedInsights,
@@ -849,7 +942,7 @@ export async function analyzeGraphWithAIAsync(
         source: 'server',
         provider: result.provider,
         model: result.model,
-      };
+      }, nodes.length > 0 || relations.length > 0);
     }
     if (result?.source === 'local-fallback') {
       throw new ApiRequestError(
@@ -901,7 +994,7 @@ export async function analyzeGraphWithAIAsync(
     }
   }
 
-  return {
+  return withAICompletionEvent('analyze', {
     critique,
     healthScore: localAnalysis.metrics.reasoningHealthScore,
     insights: localAnalysis.insights,
@@ -910,7 +1003,7 @@ export async function analyzeGraphWithAIAsync(
     provider,
     model,
     message: fallbackMessage,
-  };
+  }, nodes.length > 0 || relations.length > 0);
 }
 
 export async function challengeBoardWithAIAsync(
@@ -955,7 +1048,7 @@ export async function challengeBoardWithAIAsync(
         'server'
       );
 
-      return {
+      return withAICompletionEvent('challenge', {
         challengeSummary: result.challengeSummary,
         challenges: result.challenges || [],
         challengerNodes: normalizedResult.nodes,
@@ -963,7 +1056,7 @@ export async function challengeBoardWithAIAsync(
         source: 'server',
         provider: result.provider,
         model: result.model,
-      };
+      }, nodes.length > 0 || relations.length > 0);
     }
   } catch (err) {
     fallbackMessage = getAIFallbackMessage(err);
@@ -979,7 +1072,7 @@ export async function challengeBoardWithAIAsync(
   const cy = targetNode ? targetNode.position.y : 0;
   const challengerId = nanoid(10);
 
-  return {
+  return withAICompletionEvent('challenge', {
     challengeSummary: `Stress-testing assumption around "${targetTitle}". What edge cases or alternative explanations could falsify this reasoning?`,
     challenges: [
       {
@@ -1007,7 +1100,7 @@ export async function challengeBoardWithAIAsync(
     provider,
     model,
     message: fallbackMessage,
-  };
+  }, nodes.length > 0 || relations.length > 0);
 }
 
 export async function socraticInquiryWithAIAsync(
@@ -1042,13 +1135,13 @@ export async function socraticInquiryWithAIAsync(
     }
 
     if (result && result.questions && result.questions.length > 0) {
-      return {
+      return withAICompletionEvent('socratic', {
         inquiryFocus: result.inquiryFocus || 'Mental Model Reflection',
         questions: result.questions,
         source: 'server',
         provider: result.provider,
         model: result.model,
-      };
+      }, nodes.length > 0 || relations.length > 0);
     }
   } catch (err) {
     fallbackMessage = getAIFallbackMessage(err);
@@ -1102,14 +1195,14 @@ export async function socraticInquiryWithAIAsync(
     });
   }
 
-  return {
+  return withAICompletionEvent('socratic', {
     inquiryFocus: 'Mental Model & First Principles Examination',
     questions,
     source: 'local',
     provider,
     model,
     message: fallbackMessage,
-  };
+  }, nodes.length > 0 || relations.length > 0);
 }
 
 function applyClusterLayout(
@@ -1305,6 +1398,21 @@ function getArabicTopic(prompt: string, maxLength = 44) {
   return topic || 'موضوع جديد';
 }
 
+function getUserTopic(prompt: string, maxLength = 72) {
+  const paragraphs = prompt
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const candidate = paragraphs[paragraphs.length - 1] || prompt;
+  const topic = cleanText(
+    candidate
+      .replace(/^(create|make|build|generate|design|explain|teach|study)\s+(an?\s+)?(editable\s+)?(visual\s+)?(canvio\s+)?(board\s+)?(about|for|on)?\s*/i, '')
+      .replace(/\s+/g, ' '),
+    maxLength
+  );
+  return topic || 'New topic';
+}
+
 function generateArabicSpatialBoard(prompt: string, loweredPrompt: string, cx: number, cy: number): SpatialAIResult {
   const raw = prompt || '';
   const topic = getArabicTopic(raw);
@@ -1494,6 +1602,7 @@ function generateArabicSpatialBoard(prompt: string, loweredPrompt: string, cx: n
 
 export function generateSpatialBoard(prompt: string): SpatialAIResult {
   const p = prompt.toLowerCase();
+  const topic = getUserTopic(prompt);
   const language = getPromptOutputLanguage(prompt);
   const store = useCanvasStore.getState();
   const cx = Math.round(-store.viewport.x);
@@ -1601,30 +1710,43 @@ export function generateSpatialBoard(prompt: string): SpatialAIResult {
     const frameId = nanoid(10);
     const topicId = nanoid(10);
     const coreRuleId = nanoid(10);
+    const mechanismId = nanoid(10);
+    const evidenceId = nanoid(10);
     const exampleId = nanoid(10);
     const practiceId = nanoid(10);
     const pitfallId = nanoid(10);
     const quizId = nanoid(10);
+    const questionId = nanoid(10);
+    const actionId = nanoid(10);
 
     const nodes: LivingNode[] = [
-      frame(frameId, cx - 540, cy - 290, 1080, 580, `Interactive Learning: ${prompt.slice(0, 36)}`, '#38bdf8'),
-      shape(topicId, cx - 110, cy - 40, 220, 110, prompt.slice(0, 36) || 'Core Subject', 'rgba(56, 189, 248, 0.18)', '#38bdf8', 'hexagon', 5),
-      sticky(coreRuleId, cx - 480, cy - 220, 250, 140, '💡 Core Principle & Rules\nKey concepts, fundamental formulas, and operational definitions.', 'blue', 1),
-      sticky(exampleId, cx + 230, cy - 220, 250, 140, '📝 Worked Examples\nRealistic scenario walkthrough with step-by-step resolution.', 'green', 2),
-      sticky(pitfallId, cx - 480, cy + 60, 250, 140, '⚠️ Common Misconceptions\nFrequent errors to avoid and contrast between valid and invalid patterns.', 'pink', 3),
-      sticky(practiceId, cx + 230, cy + 60, 250, 140, '✍️ Guided Practice\nInteractive exercises and application challenges for learners.', 'yellow', 4),
-      sticky(quizId, cx - 125, cy + 130, 250, 120, '🎯 Check Understanding\n1. Explain the mechanism\n2. Solve edge case\n3. Self-evaluate', 'purple', 6),
+      frame(frameId, cx - 650, cy - 410, 1300, 820, `Learning workspace: ${topic.slice(0, 44)}`, '#38bdf8'),
+      shape(topicId, cx - 120, cy - 65, 240, 130, topic.slice(0, 42) || 'Core subject', 'rgba(56, 189, 248, 0.18)', '#38bdf8', 'hexagon', 6),
+      sticky(coreRuleId, cx - 590, cy - 330, 280, 145, `Foundations\nDefine the essential terms and rules needed to explain ${topic.slice(0, 42)} accurately.`, 'blue', 1),
+      sticky(mechanismId, cx - 590, cy - 85, 280, 145, 'How it works\nTrace the mechanism step by step: inputs, transformation, output, and conditions.', 'yellow', 2),
+      sticky(evidenceId, cx - 590, cy + 160, 280, 145, 'Evidence\nAdd an observation, source, measurement, diagram, or example that can verify each major claim.', 'green', 3),
+      sticky(exampleId, cx + 310, cy - 330, 280, 145, `Concrete example\nTrace one real case of ${topic.slice(0, 42)} from starting conditions to outcome.`, 'green', 4),
+      sticky(pitfallId, cx + 310, cy - 85, 280, 145, 'Challenge the model\nWhich common explanation is incomplete, misleading, or missing an edge case?', 'pink', 5),
+      sticky(practiceId, cx + 310, cy + 160, 280, 145, 'Apply it\nUse the idea in a new situation and explain why the same mechanism should hold.', 'orange', 7),
+      sticky(quizId, cx - 140, cy - 315, 280, 125, 'Check understanding\n1. Explain the mechanism\n2. Test an edge case\n3. Name missing evidence', 'purple', 8),
+      sticky(questionId, cx - 140, cy + 130, 280, 120, 'Open question\nWhat remains uncertain, and what evidence would settle it?', 'purple', 9),
+      shape(actionId, cx - 140, cy + 310, 280, 100, 'Next action\nVerify one claim', 'rgba(34, 197, 94, 0.16)', '#22c55e', 'diamond', 10),
     ];
 
     return {
-      title: `Learning Board: ${prompt.slice(0, 32)}`,
+      title: `Learning board: ${topic.slice(0, 44)}`,
       nodes,
       relations: [
         relation(topicId, coreRuleId, 'defines', '#38bdf8', 'explains'),
-        relation(coreRuleId, exampleId, 'demonstrated by', '#22c55e', 'example_of'),
+        relation(coreRuleId, mechanismId, 'explains through', '#f59e0b', 'leads_to'),
+        relation(mechanismId, evidenceId, 'verified by', '#22c55e', 'based_on'),
+        relation(mechanismId, exampleId, 'demonstrated by', '#22c55e', 'example_of'),
         relation(topicId, pitfallId, 'warns against', '#ec4899', 'contradicts'),
         relation(exampleId, practiceId, 'practiced in', '#eab308', 'leads_to'),
         relation(practiceId, quizId, 'evaluates', '#a855f7', 'leads_to'),
+        relation(pitfallId, questionId, 'leaves open', '#a855f7', 'leads_to'),
+        relation(evidenceId, questionId, 'narrows', '#38bdf8', 'mitigates'),
+        relation(questionId, actionId, 'resolved by', '#22c55e', 'leads_to'),
       ],
     };
   }
@@ -1791,31 +1913,40 @@ export function generateSpatialBoard(prompt: string): SpatialAIResult {
     };
   }
 
+  const frameId = nanoid(10);
   const rootId = nanoid(10);
-  const researchId = nanoid(10);
-  const problemId = nanoid(10);
-  const hypothesisId = nanoid(10);
-  const experimentId = nanoid(10);
-  const decisionId = nanoid(10);
+  const foundationsId = nanoid(10);
+  const mechanismId = nanoid(10);
+  const evidenceId = nanoid(10);
+  const challengeId = nanoid(10);
+  const questionId = nanoid(10);
+  const applicationId = nanoid(10);
+  const actionId = nanoid(10);
 
   const nodes: LivingNode[] = [
-    shape(rootId, cx - 110, cy - 65, 220, 130, prompt.slice(0, 42) || 'AI Spatial Brief', 'rgba(139, 92, 246, 0.18)', '#8b5cf6', 'hexagon', 4),
-    sticky(researchId, cx - 430, cy - 185, 240, 130, 'Research signals\nInterviews, analytics, field notes, and observed constraints.', 'blue', 1),
-    sticky(problemId, cx - 430, cy + 55, 240, 130, 'Priority problem\nThe highest-value pain or operational bottleneck to solve first.', 'orange', 2),
-    sticky(hypothesisId, cx + 190, cy - 185, 250, 130, 'Hypothesis\nA clear bet that can be tested with a small real-world experiment.', 'purple', 3),
-    sticky(experimentId, cx + 190, cy + 55, 250, 130, 'Experiment plan\nPrototype, measure, and decide whether to ship or iterate.', 'green', 5),
-    shape(decisionId, cx - 110, cy + 190, 220, 90, 'Decision Gate', 'rgba(245, 158, 11, 0.16)', '#f59e0b', 'diamond', 6),
+    frame(frameId, cx - 650, cy - 430, 1300, 860, `Thinking workspace: ${topic.slice(0, 48)}`, '#8b5cf6'),
+    shape(rootId, cx - 130, cy - 70, 260, 140, topic.slice(0, 52) || 'Core question', 'rgba(139, 92, 246, 0.18)', '#8b5cf6', 'hexagon', 5),
+    sticky(foundationsId, cx - 590, cy - 340, 280, 150, `Foundations\nDefine the essential terms and boundaries of ${topic.slice(0, 46)}. Separate facts from assumptions.`, 'blue', 1),
+    sticky(mechanismId, cx - 590, cy - 80, 280, 150, 'Mechanism\nExplain how the main parts interact, what changes, and what produces the outcome.', 'yellow', 2),
+    sticky(evidenceId, cx - 590, cy + 180, 280, 150, 'Evidence to ground it\nAdd a concrete example, observation, source, measurement, or map pin that can verify the explanation.', 'green', 3),
+    sticky(challengeId, cx + 310, cy - 340, 280, 150, 'Challenge the idea\nName the strongest counterargument, failure mode, or condition where the explanation may not hold.', 'pink', 4),
+    sticky(questionId, cx + 310, cy - 80, 280, 150, 'Open question\nWhat important uncertainty remains, and what evidence would resolve it?', 'purple', 6),
+    sticky(applicationId, cx + 310, cy + 180, 280, 150, 'Application\nUse the idea in one realistic situation. State the expected result and how success would be observed.', 'orange', 7),
+    shape(actionId, cx - 140, cy + 285, 280, 105, 'Next action\nVerify one claim', 'rgba(34, 197, 94, 0.16)', '#22c55e', 'diamond', 8),
   ];
 
   return {
-    title: `AI World: ${prompt.slice(0, 28) || 'Spatial Brief'}`,
+    title: `Thinking board: ${topic.slice(0, 48)}`,
     nodes,
     relations: [
-      relation(researchId, rootId, 'informs', '#3b82f6', 'based_on'),
-      relation(problemId, rootId, 'defines', '#f59e0b', 'part_of'),
-      relation(rootId, hypothesisId, 'creates', '#8b5cf6', 'leads_to'),
-      relation(hypothesisId, experimentId, 'tested by', '#22c55e', 'depends_on'),
-      relation(experimentId, decisionId, 'decision evidence', '#f59e0b', 'based_on'),
+      relation(foundationsId, rootId, 'defines', '#3b82f6', 'explains'),
+      relation(mechanismId, rootId, 'explains how', '#f59e0b', 'explains'),
+      relation(evidenceId, rootId, 'grounds', '#22c55e', 'based_on'),
+      relation(challengeId, rootId, 'challenges', '#ec4899', 'contradicts'),
+      relation(rootId, questionId, 'leaves open', '#a855f7', 'leads_to'),
+      relation(rootId, applicationId, 'applied through', '#f97316', 'example_of'),
+      relation(questionId, actionId, 'resolved by', '#22c55e', 'leads_to'),
+      relation(applicationId, actionId, 'tested by', '#22c55e', 'depends_on'),
     ],
   };
 }

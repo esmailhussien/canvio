@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { createBoard } from '../utils/api';
@@ -29,12 +29,12 @@ const TAB_CONTENT: Record<FeatureTab, {
     icon: '+',
     label: 'Start',
     eyebrow: '01 / Begin anywhere',
-    title: 'Open a blank board, choose a model, or ask AI to create, study, summarize, article, or tidy.',
-    description: 'Start immediately without complex setup: begin on an open canvas, load a curated model, or use the AI Navigator to create a first structure from your prompt or the board already in front of you.',
+    title: 'Start blank, choose a model, or ask AI to shape the first useful board.',
+    description: 'Begin immediately on an open canvas, load a curated model, or ask Canvio AI to create, study, summarize, draft an article, or tidy using your prompt and the board already in front of you.',
     points: [
       { glyph: 'B', title: 'Blank canvas', text: 'Start from scratch when exploring an open-ended idea or rough architecture.', color: '#38bdf8' },
       { glyph: 'M', title: 'Curated models', text: 'Use study, strategy, logic tree, and planning boards as clean starting points.', color: '#22c55e' },
-      { glyph: 'AI', title: 'AI Navigator modes', text: 'Choose Create, Study, Summary, Article, or Tidy. When a board has content, AI uses its notes, relations, and map pins when present.', color: '#a855f7' },
+      { glyph: 'AI', title: 'Canvio AI actions', text: 'Choose Create, Study, Summary, Article, or Tidy. When a board has content, AI uses its notes, relations, and map pins when present.', color: '#a855f7' },
       { glyph: 'T', title: 'Readable themes', text: 'Switch dark, light, and board background styles for different rooms and devices.', color: '#f59e0b' },
     ],
   },
@@ -47,7 +47,7 @@ const TAB_CONTENT: Record<FeatureTab, {
     points: [
       { glyph: 'N', title: 'Notes and text', text: 'Create sticky notes and text blocks to capture assertions, questions, and evidence.', color: '#facc15' },
       { glyph: 'INK', title: 'Freehand ink layer', text: 'Sketch annotations with pressure sensitivity and highlighter without cluttering the graph.', color: '#ef4444' },
-      { glyph: 'CONV', title: 'To Sticky conversion', text: 'Measure handwritten sketches and convert them into connectable sticky notes in one click.', color: '#22c55e' },
+      { glyph: 'CONV', title: 'Ink to Sticky', text: 'Turn selected handwriting or sketches into a connectable sticky note in one click.', color: '#22c55e' },
       { glyph: 'O', title: 'Rich objects', text: 'Bring in maps, images, frames, and code blocks when ideas need more than text.', color: '#06b6d4' },
     ],
   },
@@ -82,8 +82,8 @@ const TAB_CONTENT: Record<FeatureTab, {
 
 const CORE_STEPS: Array<{ id: FeatureTab; glyph: string; title: string; text: string }> = [
   { id: 'start', glyph: '01', title: 'Start', text: 'Blank, template, or AI draft.' },
-  { id: 'build', glyph: '02', title: 'Build & Sketch', text: 'Notes, media, and decoupled ink.' },
-  { id: 'connect', glyph: '03', title: 'Connect & Audit', text: 'Quick-connect, semantics, graph health.' },
+  { id: 'build', glyph: '02', title: 'Build & Sketch', text: 'Notes, media, and independent ink.' },
+  { id: 'connect', glyph: '03', title: 'Connect & Improve', text: 'Meaningful links and reasoning feedback.' },
   { id: 'deliver', glyph: '04', title: 'Share & Present', text: 'Laser pointer, live sync, exports.' },
 ];
 
@@ -99,10 +99,16 @@ export function HowItWorksPage() {
   const theme = useCanvasStore((s) => s.theme);
   const toggleTheme = useCanvasStore((s) => s.toggleTheme);
   const [activeTab, setActiveTab] = useState<FeatureTab>('start');
+  const explorerRef = useRef<HTMLElement | null>(null);
+  const tabRefs = useRef<Partial<Record<FeatureTab, HTMLButtonElement | null>>>({});
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
 
   const handleCreateWorld = () => {
     const newId = nanoid(10);
@@ -112,6 +118,34 @@ export function HowItWorksPage() {
 
   const handleOpenSampleBoard = () => {
     navigate(`/w/demo-${nanoid(8)}`);
+  };
+
+  const showWorkflowStep = (id: FeatureTab, scrollToDetails = false) => {
+    setActiveTab(id);
+    if (!scrollToDetails) return;
+    window.requestAnimationFrame(() => {
+      explorerRef.current?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, id: FeatureTab) => {
+    const ids = Object.keys(TAB_CONTENT) as FeatureTab[];
+    const currentIndex = ids.indexOf(id);
+    let nextIndex = currentIndex;
+
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % ids.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + ids.length) % ids.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = ids.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextId = ids[nextIndex];
+    setActiveTab(nextId);
+    tabRefs.current[nextId]?.focus();
   };
 
   const tab = TAB_CONTENT[activeTab];
@@ -195,8 +229,10 @@ export function HowItWorksPage() {
             <button
               className={`guide-loop__step ${activeTab === step.id ? 'active' : ''}`}
               key={step.title}
-              onClick={() => setActiveTab(step.id)}
+              onClick={() => showWorkflowStep(step.id, true)}
               aria-label={`Show ${step.title} details`}
+              aria-pressed={activeTab === step.id}
+              aria-controls="guide-workflow-panel"
             >
               <span className="guide-loop__index">{index + 1}</span>
               <GuideGlyph value={step.glyph} />
@@ -206,15 +242,20 @@ export function HowItWorksPage() {
           ))}
         </section>
 
-        <section className="guide-explorer">
+        <section className="guide-explorer" ref={explorerRef} aria-label="Explore the Canvio workflow">
           <div className="guide-tabs-nav" role="tablist" aria-label="Canvio workflow">
             {(Object.keys(TAB_CONTENT) as FeatureTab[]).map((id) => (
               <button
                 key={id}
                 className={`guide-tab-btn ${activeTab === id ? 'active' : ''}`}
-                onClick={() => setActiveTab(id)}
+                onClick={() => showWorkflowStep(id)}
+                onKeyDown={(event) => handleTabKeyDown(event, id)}
+                ref={(element) => { tabRefs.current[id] = element; }}
                 role="tab"
                 aria-selected={activeTab === id}
+                aria-controls="guide-workflow-panel"
+                id={`guide-workflow-tab-${id}`}
+                tabIndex={activeTab === id ? 0 : -1}
               >
                 <GuideGlyph value={TAB_CONTENT[id].icon} />
                 <span>{TAB_CONTENT[id].label}</span>
@@ -222,7 +263,13 @@ export function HowItWorksPage() {
             ))}
           </div>
 
-          <div className="guide-feature-detail fade-in">
+          <div
+            className="guide-feature-detail fade-in"
+            id="guide-workflow-panel"
+            role="tabpanel"
+            aria-labelledby={`guide-workflow-tab-${activeTab}`}
+            key={activeTab}
+          >
             <div className="guide-detail__info">
               <span className="guide-detail__tag">{tab.eyebrow}</span>
               <h2>{tab.title}</h2>
@@ -274,8 +321,15 @@ export function HowItWorksPage() {
           </div>
         </section>
 
-        <section className="guide-shortcuts-section">
-          <h2>Quick keyboard controls</h2>
+        <details className="guide-shortcuts-section">
+          <summary>
+            <span>
+              <span className="guide-detail__tag">Optional speed</span>
+              <strong>Keyboard shortcuts</strong>
+              <small>Open the reference when you want faster desktop control.</small>
+            </span>
+            <span className="guide-shortcuts-section__action" aria-hidden="true">Show all</span>
+          </summary>
           <div className="shortcuts-grid">
             <div className="shortcut-card"><kbd>V</kbd><span>Select and move</span></div>
             <div className="shortcut-card"><kbd>P / D</kbd><span>Freehand pen</span></div>
@@ -293,7 +347,7 @@ export function HowItWorksPage() {
             <div className="shortcut-card"><kbd>A</kbd><span>Arrow</span></div>
             <div className="shortcut-card"><kbd>1 – 9, 0</kbd><span>Semantic relation type</span></div>
             <div className="shortcut-card"><kbd>Space / H + drag</kbd><span>Pan canvas</span></div>
-            <div className="shortcut-card"><kbd>Ctrl + K</kbd><span>AI Navigator</span></div>
+            <div className="shortcut-card"><kbd>Ctrl + K</kbd><span>Ask Canvio</span></div>
             <div className="shortcut-card"><kbd>Ctrl + Shift + R</kbd><span>Reasoning Partner</span></div>
             <div className="shortcut-card"><kbd>Ctrl + Z</kbd><span>Undo</span></div>
             <div className="shortcut-card"><kbd>Ctrl + Y</kbd><span>Redo</span></div>
@@ -303,7 +357,7 @@ export function HowItWorksPage() {
             <div className="shortcut-card"><kbd>Del / Backspace</kbd><span>Delete</span></div>
             <div className="shortcut-card"><kbd>Esc</kbd><span>Deselect / Close</span></div>
           </div>
-        </section>
+        </details>
 
         <section className="guide-cta-section">
           <h2>Try the full workflow on a real board</h2>

@@ -1,6 +1,7 @@
 export { DrawingNode, drawingPlugin } from './drawing/DrawingNode';
 export { StickyNote, stickyPlugin } from './sticky-note/StickyNote';
-export { MapNode, mapPlugin } from './map/MapNode';
+export { MapNode } from './map/MapNode';
+export { mapPlugin } from './map/mapPlugin';
 export { TextNode, textPlugin } from './text/TextNode';
 export { ImageNode, imagePlugin } from './image/ImageNode';
 export { ShapeNode, shapePlugin } from './shape/ShapeNode';

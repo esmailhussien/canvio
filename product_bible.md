@@ -1,8 +1,8 @@
-# The Canvio Product Bible
+# The Canvio Product Thesis
 
-> *This document is the soul of the project.*
-> *Every technical decision, every design choice, every marketing word should pass through it.*
-> *If something contradicts this document, this document wins.*
+> *This is a living product thesis, not doctrine.*
+> *Every technical decision, design choice, and marketing claim should be tested against it.*
+> *When real user evidence reveals a better direction, the evidence wins and this document changes.*
 
 ---
 
@@ -28,7 +28,7 @@
 
 ## Product Principles
 
-These are non-negotiable. Every design decision, every feature, every pixel must pass through them.
+These are strong defaults. They protect focus, but none is immune to evidence. A deliberate exception is acceptable when it clearly improves the user's outcome without weakening the product as a whole.
 
 | # | Principle | What it means in practice |
 |---|---|---|
@@ -58,11 +58,11 @@ A **World** where ideas live, relate, and evolve together.
 
 ---
 
-## 2. What Will We Never Build?
+## 2. Boundaries We Currently Defend
 
-These are our **anti-patterns**. If a feature request falls into any of these, the answer is always no.
+These are our current **anti-patterns**, not permanent laws. A proposal that crosses one of these boundaries needs strong user evidence and must still strengthen Canvio's central job: turning scattered material into connected, understandable, shareable work.
 
-| We will NEVER be... | Because... |
+| We should not become... | Because... |
 |---|---|
 | A **document editor** (like Google Docs / Notion) | We are spatial. Not linear. Text is a Node, not the product. |
 | A **chat application** (like Slack / Teams) | Communication happens *on the World*, not beside it. |
@@ -71,7 +71,7 @@ These are our **anti-patterns**. If a feature request falls into any of these, t
 | A **general-purpose AI chatbot** (like ChatGPT) | Our AI builds spatially. It doesn't just answer questions. |
 | A **tool that requires signup to be useful** | The first draw must happen in under 2 seconds. No gates. |
 
-**The test**: If a feature makes Canvio feel like "another app with an infinite canvas stuck on," we don't build it. Every feature must make the **spatial experience** better.
+**The test**: If a feature makes Canvio feel like "another app with an infinite canvas stuck on," we normally reject it. Every accepted feature must make the connected visual workflow meaningfully better.
 
 ---
 
@@ -321,12 +321,12 @@ The single most important growth question. If a user doesn't share Canvio, it do
 
 > *Keep it simple. Change only what reinforces the philosophy. Keep everything else familiar.*
 
-### Core Terms (Custom — these define Canvio's identity)
+### Distinct Terms
 
-| Generic term | Canvio term | Why |
+| Concept | Preferred term | Why |
 |---|---|---|
-| Board / Canvas | **World** | You don't work "on" a World — you work "in" it. Alive, spatial, immersive. |
-| Object / Element | **Node** | A Node is part of a network. Nodes connect. Nodes have awareness. |
+| Workspace surface | **Board** | Familiar in controls, onboarding, support, and sharing. **World** may remain in brand storytelling, but users should not have to learn it. |
+| Object / Element | **Element** | Familiar for first-time users. **Node** remains useful in technical and graph contexts. |
 | Smart Object | **Living Node** | It's alive. It understands its content. It has behavior. |
 | Connection / Arrow | **Relation** | Arrows are visual. Relations carry meaning: "based on," "leads to," "contradicts." |
 
@@ -346,7 +346,7 @@ The single most important growth question. If a user doesn't share Canvio, it do
 | Live events | **Live Space** | Slightly custom. Intuitive enough. |
 
 > [!TIP]
-> **Rule of thumb: If a user needs to read documentation to understand a term, it's too custom.** "World" and "Node" and "Relation" are intuitive enough to understand from context. "Portal" and "Launchpad" are not.
+> **Rule of thumb: If a user needs documentation to understand a control, the language is too custom.** Brand language may be expressive; interaction language must remain familiar.
 
 ---
 
@@ -478,11 +478,9 @@ Before building any feature, ask:
 
 ---
 
-> *This is the Product Bible.*
-> *Every line of code serves this vision.*
-> *Every feature passes the Soul Test.*
-> *Every design follows the Principles.*
-> *Every moment aims to be Magic.*
+> *This is the current Product Thesis.*
+> *It gives the team direction without pretending the future is already known.*
+> *Every release should strengthen a real use case, learn from behavior, and revise assumptions when necessary.*
 >
 > ***Now let's build.***
 

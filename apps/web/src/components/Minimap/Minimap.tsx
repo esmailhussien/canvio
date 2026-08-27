@@ -10,10 +10,20 @@ export const Minimap: React.FC = () => {
   const zoomAtPoint = useCanvasStore((s) => s.zoomAtPoint);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isCompact, setIsCompact] = useState(false);
 
   const renderRafRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 520px)');
+    const sync = () => setIsCompact(media.matches);
+    sync();
+    media.addEventListener?.('change', sync);
+    return () => media.removeEventListener?.('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (isCompact) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -130,7 +140,7 @@ export const Minimap: React.FC = () => {
         cancelAnimationFrame(renderRafRef.current);
       }
     };
-  }, [nodes, viewport]);
+  }, [isCompact, nodes, viewport]);
 
   const [isDragging, setIsDragging] = useState(false);
 
@@ -218,7 +228,7 @@ export const Minimap: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="minimap-container"
+      className={`minimap-container ${isCompact ? 'minimap-container--compact' : ''}`}
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
@@ -232,6 +242,7 @@ export const Minimap: React.FC = () => {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className="minimap__canvas"
+        aria-hidden={isCompact}
       />
       <div className="minimap__controls" role="toolbar" aria-label="Board view controls">
         <button type="button" onClick={() => handleZoom(0.86)} aria-label="Zoom out" title="Zoom out">

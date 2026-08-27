@@ -49,7 +49,6 @@ const PRIMARY_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?:
   { id: 'pan', icon: IconPan, label: 'Pan (Space)', group: '1' },
   { id: 'draw', icon: IconDraw, label: 'Draw (P)', group: '2' },
   { id: 'highlighter', icon: IconHighlighter, label: 'Highlighter (K)', group: '2' },
-  { id: 'laser', icon: IconLaserPointer, label: 'Laser pointer (Q)', group: '2' },
   { id: 'arrow', icon: IconArrowTool, label: 'Arrow (A)', group: '2' },
   { id: 'text', icon: IconText, label: 'Text (T)', group: '3' },
   { id: 'sticky', icon: IconSticky, label: 'Sticky (S)', group: '3' },
@@ -61,6 +60,7 @@ const PRIMARY_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?:
 const MOBILE_PRIMARY_TOOLS = new Set<ToolMode>(['select', 'draw', 'sticky', 'map', 'relation']);
 
 const ADVANCED_TOOLS: { id: ToolMode; icon: React.FC<any>; label: string; group?: string }[] = [
+  { id: 'laser', icon: IconLaserPointer, label: 'Laser pointer (Q)', group: 'presentation' },
   { id: 'eraser', icon: IconEraser, label: 'Eraser (E)', group: 'ink' },
   { id: 'image', icon: IconImage, label: 'Image (I)', group: '3' },
   { id: 'frame', icon: IconFrame, label: 'Frame (F)', group: '3' },
@@ -93,7 +93,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) =>
       key={`${className || 'toolbar'}-${tool.id}`}
       content={tool.label}
       position={compact ? 'right' : 'top'}
-      className={className.includes('canvio-toolbar-button--mobile-menu') ? 'canvio-toolbar-more__mobile-secondary' : ''}
+      className={className.includes('canvio-toolbar-button--mobile-menu')
+        ? 'canvio-toolbar-more__mobile-secondary'
+        : className.includes('canvio-toolbar-button--mobile-secondary')
+          ? 'canvio-toolbar__mobile-secondary-wrapper'
+          : ''}
     >
       <button
         className={`canvio-toolbar-button ${compact ? 'canvio-toolbar-button--menu' : ''} ${className} ${activeTool === tool.id ? 'active' : ''}`}

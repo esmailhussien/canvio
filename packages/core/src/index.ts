@@ -1,3 +1,4 @@
-export * from './types';
-export * from './engine/viewport';
-export * from './engine/selection';
+export * from './types.js';
+export * from './engine/viewport.js';
+export * from './engine/selection.js';
+export * from './telemetry.js';

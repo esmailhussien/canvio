@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconCopy, IconShare, IconX } from '@canvio/ui';
 import { ApiRequestError, createBoardShareLink } from '../../utils/api';
 import { useDialogA11y } from '../../hooks/useDialogA11y';
+import { trackBoardEvent } from '../../utils/productTelemetry';
 import './ShareButton.css';
 
 type ShareStatus = 'idle' | 'loading' | 'ready' | 'copied' | 'error';
@@ -19,9 +20,10 @@ interface ShareButtonProps {
   // Bump this token to open the dialog and focus the display-name field —
   // used by the presence avatar so joiners can rename "Anonymous Fox".
   focusNameSignal?: number;
+  collaboratorCount?: number;
 }
 
-export function ShareButton({ worldId, focusNameSignal = 0 }: ShareButtonProps) {
+export function ShareButton({ worldId, focusNameSignal = 0, collaboratorCount = 0 }: ShareButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<ShareStatus>('idle');
   const [shareUrl, setShareUrl] = useState('');
@@ -46,6 +48,12 @@ export function ShareButton({ worldId, focusNameSignal = 0 }: ShareButtonProps) 
       setShareUrl(nextUrl);
       setIsPublic(Boolean(shareResult?.isPublic));
       setStatus('ready');
+      if (worldId) {
+        trackBoardEvent(worldId, 'share_created', {
+          isPublic: Boolean(shareResult?.isPublic),
+          collaboratorCount,
+        });
+      }
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 429) {
         setErrorText('Too many requests. Try again shortly.');
@@ -55,6 +63,13 @@ export function ShareButton({ worldId, focusNameSignal = 0 }: ShareButtonProps) 
         setErrorText(error.message);
       }
       setStatus('error');
+      if (worldId) {
+        trackBoardEvent(worldId, 'runtime_issue', {
+          area: 'share',
+          code: 'request_failed',
+          recoverable: true,
+        });
+      }
     }
   };
 

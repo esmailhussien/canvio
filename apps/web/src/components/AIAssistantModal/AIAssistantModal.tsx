@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   analyzeGraphWithAIAsync,
   generateSpatialBoardAsync,
@@ -109,6 +109,11 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   const dialogRef = React.useRef<HTMLDivElement>(null);
   useDialogA11y(dialogRef, isOpen, onClose);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    dialogRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const showWorkingStatus = (text: string) => {
@@ -123,7 +128,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   };
 
   const showAIResultStatus = (
-    result: { message?: string; source?: string; provider?: string; model?: string },
+    result: { message?: string; source?: string; provider?: string; model?: string; nodes?: LivingNode[]; relations?: Array<{ id: string }> },
     successText: string,
     autoClose = true
   ) => {
@@ -139,7 +144,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       text: isLocal
         ? `${result.message || 'Server AI was unavailable, so Canvio used local smart mode.'} ${successText}`
         : successText,
-      detail: `${hasBoardContent ? `Read source context: ${boardContextText}` : 'Prompt-only generation'} · Added editable Canvio objects.`,
+      detail: `${hasBoardContent ? `Read source context: ${boardContextText}` : 'Prompt-only generation'} · ${formatGeneratedBoardMix(result.nodes, result.relations)}.`,
       actionLabel: isLocal ? 'View board' : undefined,
     });
     if (autoClose && !isLocal) {
@@ -148,7 +153,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
   };
 
   const closeWithAIStatus = (
-    result: { message?: string; source?: string; provider?: string; model?: string },
+    result: { message?: string; source?: string; provider?: string; model?: string; nodes?: LivingNode[]; relations?: Array<{ id: string }> },
     successText = 'Done. Your board is ready to edit.'
   ) => {
     showAIResultStatus(result, successText);
@@ -598,7 +603,6 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
             <div className="ai-modal__input-wrapper">
               <textarea
                 id="canvio-ai-prompt"
-                autoFocus
                 rows={2}
                 className="ai-modal__input"
                 value={prompt}
@@ -797,7 +801,8 @@ function buildIntentPrompt(intent: AIIntent, prompt: string) {
     return [
       boardInstruction,
       `Requested output language: ${outputLanguage}. All visible board text and relation labels must use this language.`,
-      'Create a learner-friendly visual board with a clear core concept, definitions, examples, common mistakes, practice prompts, review questions, and labeled relations.',
+      'Create a learner-friendly reasoning board, not a stack of generic notes. Include a central concept, accurate foundations, the mechanism or process, a worked example, evidence, a misconception or counterexample, an open question, guided practice, a check-understanding prompt, and a practical next step.',
+      'Connect every content node with short semantic relation labels. Use shapes for structure and decisions, stickies for concise knowledge, a frame for the whole board, and Code or a Living Map only when the topic genuinely benefits from them.',
       prompt,
     ].join('\n\n');
   }
@@ -805,9 +810,25 @@ function buildIntentPrompt(intent: AIIntent, prompt: string) {
   return [
     boardInstruction,
     `Requested output language: ${outputLanguage}. All visible board text and relation labels must use this language.`,
-    'Create a useful visual board with varied element types, readable spacing, semantic relation labels, and a clear editable structure.',
+    'Create a rich reasoning board rather than a collection of generic notes. Include a central question or thesis, foundations, mechanism or process, evidence or a concrete example, application, strongest challenge or failure mode, an open question, and a practical next action.',
+    'Connect every content node into one meaningful graph with short semantic relation labels. Use shapes for structure and decisions, stickies for concise knowledge, text for a short synthesis, a frame for the whole board, and Code or a Living Map only when the topic genuinely benefits from them.',
     prompt,
   ].join('\n\n');
+}
+
+function formatGeneratedBoardMix(nodes?: LivingNode[], relations?: Array<{ id: string }>) {
+  if (!nodes || nodes.length === 0) return 'Added editable Canvio objects';
+  const contentNodes = nodes.filter((node) => node.type !== 'frame');
+  const toolNames = [...new Set(contentNodes.map((node) => {
+    if (node.type === 'sticky') return 'notes';
+    if (node.type === 'shape') return 'shapes';
+    if (node.type === 'text') return 'text';
+    if (node.type === 'code') return 'code';
+    if (node.type === 'map') return 'map';
+    return node.type;
+  }))];
+  const connectionCount = relations?.length || 0;
+  return `Created ${contentNodes.length} editable elements (${toolNames.join(', ')}) and ${connectionCount} labeled ${connectionCount === 1 ? 'connection' : 'connections'}`;
 }
 
 function buildBoardActionPrompt(intent: 'quiz' | 'presentation') {

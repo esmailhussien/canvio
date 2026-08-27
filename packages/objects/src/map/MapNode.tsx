@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { nanoid } from 'nanoid';
-import { LivingNode, Point } from '../types';
+import { LivingNode } from '../types';
+import { WORLD_MAP_CENTER, WORLD_MAP_ZOOM } from './mapPlugin';
+export { mapPlugin } from './mapPlugin';
 import 'leaflet/dist/leaflet.css';
 import './MapNode.css';
 
@@ -17,9 +19,6 @@ let DefaultIcon = L.icon({
     iconAnchor: [12, 41]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
-const WORLD_MAP_CENTER: [number, number] = [20, 0];
-const WORLD_MAP_ZOOM = 2;
-const DEFAULT_MAP_SIZE = { width: 520, height: 340 };
 
 // Modern SVG Icons
 const IconPin: React.FC<{ size?: number }> = ({ size = 16 }) => (
@@ -279,14 +278,24 @@ export const MapNode: React.FC<MapNodeProps> = ({
     interactive: true,
   };
   const layer = (data.tileLayer && TILE_LAYERS[data.tileLayer]) ? data.tileLayer : 'satellite';
+  const reportedTileErrorLayerRef = React.useRef<TileLayerType | null>(null);
   
   // Use a stable key so MapContainer doesn't unmount unless necessary
   const mapKey = useMemo(() => `map-${node.id}`, [node.id]);
 
   const setLayer = (l: TileLayerType) => {
+    reportedTileErrorLayerRef.current = null;
     if (onChange) {
       onChange(node.id, { data: { ...data, tileLayer: l } });
     }
+  };
+
+  const reportTileError = () => {
+    if (reportedTileErrorLayerRef.current === layer) return;
+    reportedTileErrorLayerRef.current = layer;
+    window.dispatchEvent(new CustomEvent('canvio:runtime-issue', {
+      detail: { area: 'map', code: 'tile_load_failed' },
+    }));
   };
 
   const updateMarkers = (markers: MapMarker[]) => {
@@ -435,12 +444,14 @@ export const MapNode: React.FC<MapNodeProps> = ({
               url={TILE_LAYERS[layer].url}
               attribution={TILE_LAYERS[layer].attribution}
               maxZoom={19}
+              eventHandlers={{ tileerror: reportTileError }}
             />
             {layer === 'hybrid' && (
               <TileLayer
                 url={ESRI_REFERENCE_URL}
                 attribution=""
                 maxZoom={19}
+                eventHandlers={{ tileerror: reportTileError }}
               />
             )}
             <MapResizer width={node.size.width} height={node.size.height} />
@@ -542,36 +553,4 @@ export const MapNode: React.FC<MapNodeProps> = ({
       )}
     </div>
   );
-};
-
-export const mapPlugin = {
-  type: 'map',
-  name: 'Map',
-  icon: 'map',
-  category: 'core' as const,
-  defaultSize: DEFAULT_MAP_SIZE,
-  create: (position: Point): LivingNode => ({
-    id: nanoid(),
-    type: 'map',
-    position,
-    size: DEFAULT_MAP_SIZE,
-    rotation: 0,
-    zIndex: 0,
-    locked: false,
-    data: { 
-      center: WORLD_MAP_CENTER,
-      zoom: WORLD_MAP_ZOOM,
-      tileLayer: 'satellite',
-      markers: [],
-      interactive: true
-    },
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  }),
-  getConnectionPorts: () => [
-    { id: 'top', position: 'top' as const },
-    { id: 'right', position: 'right' as const },
-    { id: 'bottom', position: 'bottom' as const },
-    { id: 'left', position: 'left' as const },
-  ],
 };
