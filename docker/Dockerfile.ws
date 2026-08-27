@@ -7,7 +7,7 @@ COPY apps/server apps/server
 
 # Install all dependencies and build server from the lockfile
 RUN npm ci
-RUN npm run build -w @canvio/core
+# @canvio/server prebuild compiles @canvio/core before TypeScript resolves it.
 RUN npm run build -w @canvio/server
 
 FROM node:20-alpine AS runner

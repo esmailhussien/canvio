@@ -7,9 +7,11 @@
     "dev": "concurrently \"tsx watch src/index.ts\" \"tsx watch src/ws-server.ts\"",
     "dev:api": "tsx watch src/index.ts",
     "dev:ws": "tsx watch src/ws-server.ts",
+    "prebuild": "npm run build -w @canvio/core",
     "build": "tsc",
     "start": "concurrently \"node dist/index.js\" \"node dist/ws-server.js\"",
     "start:ws": "node dist/combined-server.js",
+    "pretypecheck": "npm run build -w @canvio/core",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
