@@ -134,6 +134,10 @@ const {
 } = await import('../../apps/web/src/utils/backupSchema');
 const { analyzeGraphStructure } = await import('../../apps/web/src/utils/graphQueries');
 const {
+  generateObstacleAwareRelationPath,
+  placeRelationLabel,
+} = await import('../../apps/web/src/components/RelationRenderer/relationUtils');
+const {
   canOwnerAccessBoard,
   createRateLimitHook,
   getOwnerIdFromHeaders,
@@ -939,6 +943,51 @@ test('graph analysis detects orphans, contradictions, and bounds the health scor
   assert.equal(analysis.contradictions.length, 1);
   assert.equal(analysis.contradictions[0].relationId, 'rel2');
   assert.ok(analysis.metrics.reasoningHealthScore >= 0 && analysis.metrics.reasoningHealthScore <= 100);
+});
+
+test('relation labels move away from node text and occupied labels', () => {
+  const nodeBounds = [{ id: 'note', x: 40, y: 70, width: 140, height: 70 }];
+  const anchor = { x: 110, y: 100 };
+  const first = placeRelationLabel(anchor, 110, 24, nodeBounds, [], 'horizontal');
+  assert.notDeepEqual(first, anchor, 'a label anchored over a node must move clear of its text');
+
+  const second = placeRelationLabel(
+    anchor,
+    110,
+    24,
+    nodeBounds,
+    [{ cx: first.x, cy: first.y, w: 110, h: 24 }],
+    'horizontal'
+  );
+  assert.notDeepEqual(second, first, 'relation labels must not stack on the same free position');
+});
+
+test('curved relations keep their curve when clear and route around blocking nodes', () => {
+  const sourcePort = { x: 100, y: 50, position: 'right' as const };
+  const targetPort = { x: 400, y: 50, position: 'left' as const };
+  const sourceBounds = { id: 'source', x: 0, y: 0, width: 100, height: 100 };
+  const targetBounds = { id: 'target', x: 400, y: 0, width: 100, height: 100 };
+
+  const clear = generateObstacleAwareRelationPath(
+    sourcePort,
+    targetPort,
+    sourceBounds,
+    targetBounds,
+    [sourceBounds, targetBounds],
+    'curved'
+  );
+  assert.match(clear.pathD, / C /, 'an unobstructed curved relation should remain curved');
+
+  const blocked = generateObstacleAwareRelationPath(
+    sourcePort,
+    targetPort,
+    sourceBounds,
+    targetBounds,
+    [sourceBounds, targetBounds, { id: 'middle', x: 220, y: 0, width: 80, height: 120 }],
+    'curved'
+  );
+  assert.doesNotMatch(blocked.pathD, / C /, 'a blocked curve should use the obstacle-aware router');
+  assert.match(blocked.pathD, / Q /, 'the fallback route should retain smooth rounded corners');
 });
 
 test('generated boards get overlapping nodes resolved apart', async () => {

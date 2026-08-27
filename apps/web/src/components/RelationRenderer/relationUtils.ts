@@ -404,6 +404,14 @@ export interface PathResult {
   pathD: string;
   midPoint: Point;
   angle: number;
+  labelAxis?: 'horizontal' | 'vertical';
+}
+
+export interface RelationLabelRect {
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
 }
 
 export interface NodeBounds {
@@ -433,41 +441,23 @@ export function generateRelationPath(
     return {
       pathD: `M ${sx} ${sy} L ${tx} ${ty}`,
       midPoint,
-      angle
+      angle,
+      labelAxis: Math.abs(tx - sx) >= Math.abs(ty - sy) ? 'horizontal' : 'vertical',
     };
   }
 
   if (type === 'curved') {
-    const dist = Math.hypot(tx - sx, ty - sy);
-    const curveOffset = Math.min(150, Math.max(40, dist * 0.4));
-
-    let cp1x = sx;
-    let cp1y = sy;
-    let cp2x = tx;
-    let cp2y = ty;
-
-    // Normal vectors based on source port position
-    if (source.position === 'top') cp1y -= curveOffset;
-    else if (source.position === 'bottom') cp1y += curveOffset;
-    else if (source.position === 'left') cp1x -= curveOffset;
-    else if (source.position === 'right') cp1x += curveOffset;
-    else cp1y -= curveOffset;
-
-    // Normal vectors based on target port position
-    if (target.position === 'top') cp2y -= curveOffset;
-    else if (target.position === 'bottom') cp2y += curveOffset;
-    else if (target.position === 'left') cp2x -= curveOffset;
-    else if (target.position === 'right') cp2x += curveOffset;
-    else cp2y += curveOffset;
+    const { cp1, cp2 } = getCurvedControlPoints(source, target);
 
     // Midpoint for cubic bezier: B(0.5) = 0.125*P0 + 0.375*P1 + 0.375*P2 + 0.125*P3
-    const mx = 0.125 * sx + 0.375 * cp1x + 0.375 * cp2x + 0.125 * tx;
-    const my = 0.125 * sy + 0.375 * cp1y + 0.375 * cp2y + 0.125 * ty;
+    const mx = 0.125 * sx + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * tx;
+    const my = 0.125 * sy + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * ty;
 
     return {
-      pathD: `M ${sx} ${sy} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${tx} ${ty}`,
+      pathD: `M ${sx} ${sy} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${tx} ${ty}`,
       midPoint: { x: mx, y: my },
-      angle: 0
+      angle: Math.atan2(ty - cp2.y, tx - cp2.x) * (180 / Math.PI),
+      labelAxis: Math.abs(tx - sx) >= Math.abs(ty - sy) ? 'horizontal' : 'vertical',
     };
   }
 
@@ -476,32 +466,58 @@ export function generateRelationPath(
   let pathD = '';
   let mx = (sx + tx) / 2;
   let my = (sy + ty) / 2;
+  let lastBeforeTarget = { x: sx, y: sy };
 
   if (source.position === 'left' || source.position === 'right') {
     const midX = (sx + tx) / 2;
     pathD = `M ${sx} ${sy} H ${midX} V ${ty} H ${tx}`;
     mx = midX;
     my = (sy + ty) / 2;
+    lastBeforeTarget = { x: midX, y: ty };
   } else if (source.position === 'top' || source.position === 'bottom') {
     const midY = (sy + ty) / 2;
     pathD = `M ${sx} ${sy} V ${midY} H ${tx} V ${ty}`;
     mx = (sx + tx) / 2;
     my = midY;
+    lastBeforeTarget = { x: tx, y: midY };
   } else if (isHorizontal) {
     const midX = (sx + tx) / 2;
     pathD = `M ${sx} ${sy} H ${midX} V ${ty} H ${tx}`;
     mx = midX;
+    lastBeforeTarget = { x: midX, y: ty };
   } else {
     const midY = (sy + ty) / 2;
     pathD = `M ${sx} ${sy} V ${midY} H ${tx} V ${ty}`;
     my = midY;
+    lastBeforeTarget = { x: tx, y: midY };
   }
 
   return {
     pathD,
     midPoint: { x: mx, y: my },
-    angle: 0
+    angle: Math.atan2(ty - lastBeforeTarget.y, tx - lastBeforeTarget.x) * (180 / Math.PI),
+    labelAxis: isHorizontal ? 'horizontal' : 'vertical',
   };
+}
+
+function getCurvedControlPoints(source: PortPoint, target: PortPoint): { cp1: Point; cp2: Point } {
+  const curveOffset = Math.min(150, Math.max(40, distance(source, target) * 0.4));
+  const cp1 = { x: source.x, y: source.y };
+  const cp2 = { x: target.x, y: target.y };
+
+  if (source.position === 'top') cp1.y -= curveOffset;
+  else if (source.position === 'bottom') cp1.y += curveOffset;
+  else if (source.position === 'left') cp1.x -= curveOffset;
+  else if (source.position === 'right') cp1.x += curveOffset;
+  else cp1.y -= curveOffset;
+
+  if (target.position === 'top') cp2.y -= curveOffset;
+  else if (target.position === 'bottom') cp2.y += curveOffset;
+  else if (target.position === 'left') cp2.x -= curveOffset;
+  else if (target.position === 'right') cp2.x += curveOffset;
+  else cp2.y += curveOffset;
+
+  return { cp1, cp2 };
 }
 
 export function generateSmartRelationPath(
@@ -591,12 +607,144 @@ export function generateSmartRelationPath(
     ? routeOrthogonalAroundObstacles(source, sStub, tStub, target, obstacles, combined)
     : null;
   const finalPoints = routed || best;
+  const labelPlacement = findBestLabelPlacement(finalPoints);
+  const finalApproach = finalPoints.length >= 2
+    ? finalPoints.slice(-2)
+    : [source, target];
 
   return {
     pathD: roundedPolylinePath(finalPoints, 14),
-    midPoint: findBestLabelPoint(finalPoints),
-    angle: 0
+    midPoint: labelPlacement.point,
+    angle: Math.atan2(
+      finalApproach[1].y - finalApproach[0].y,
+      finalApproach[1].x - finalApproach[0].x
+    ) * (180 / Math.PI),
+    labelAxis: labelPlacement.axis,
   };
+}
+
+/**
+ * Keeps a curved relation when its natural route is clear, but falls back to
+ * the obstacle-aware rounded router before the curve can cross another node.
+ */
+export function generateObstacleAwareRelationPath(
+  source: PortPoint,
+  target: PortPoint,
+  sourceBounds: NodeBounds,
+  targetBounds: NodeBounds,
+  allBounds: NodeBounds[],
+  type: 'straight' | 'curved' | 'orthogonal' = 'straight'
+): PathResult {
+  if (type !== 'curved') {
+    return generateSmartRelationPath(source, target, sourceBounds, targetBounds, allBounds);
+  }
+
+  const obstacles = allBounds
+    .filter((bound) => bound.id !== sourceBounds.id && bound.id !== targetBounds.id)
+    .map((bound) => expandBounds(bound, 24));
+  if (!curveHitsObstacles(source, target, obstacles)) {
+    return generateRelationPath(source, target, 'curved');
+  }
+
+  return generateSmartRelationPath(source, target, sourceBounds, targetBounds, allBounds);
+}
+
+function curveHitsObstacles(source: PortPoint, target: PortPoint, obstacles: NodeBounds[]): boolean {
+  if (obstacles.length === 0) return false;
+  const { cp1, cp2 } = getCurvedControlPoints(source, target);
+  let previous: Point = source;
+
+  for (let step = 1; step <= 24; step += 1) {
+    const t = step / 24;
+    const inverse = 1 - t;
+    const current = {
+      x: inverse ** 3 * source.x + 3 * inverse ** 2 * t * cp1.x + 3 * inverse * t ** 2 * cp2.x + t ** 3 * target.x,
+      y: inverse ** 3 * source.y + 3 * inverse ** 2 * t * cp1.y + 3 * inverse * t ** 2 * cp2.y + t ** 3 * target.y,
+    };
+    if (segmentIntersectsAnyBounds(previous, current, obstacles)) return true;
+    previous = current;
+  }
+
+  return false;
+}
+
+/**
+ * Places a relation label near its routed anchor without covering node text or
+ * another relation label. Candidates favor the direction perpendicular to the
+ * path so the semantic pill stays visually attached to its line.
+ */
+export function placeRelationLabel(
+  anchor: Point,
+  width: number,
+  height: number,
+  nodeBounds: NodeBounds[],
+  occupied: RelationLabelRect[] = [],
+  axis: 'horizontal' | 'vertical' = 'horizontal'
+): Point {
+  const nodeGap = 8;
+  const pillGap = 6;
+  const verticalStep = height + 12;
+  const horizontalStep = Math.max(48, width / 2 + 20);
+  const primaryOffsets = axis === 'horizontal'
+    ? [
+        { x: 0, y: -verticalStep },
+        { x: 0, y: verticalStep },
+        { x: -horizontalStep, y: 0 },
+        { x: horizontalStep, y: 0 },
+      ]
+    : [
+        { x: -horizontalStep, y: 0 },
+        { x: horizontalStep, y: 0 },
+        { x: 0, y: -verticalStep },
+        { x: 0, y: verticalStep },
+      ];
+  const candidates: Point[] = [
+    anchor,
+    ...primaryOffsets.map((offset) => ({ x: anchor.x + offset.x, y: anchor.y + offset.y })),
+    { x: anchor.x - horizontalStep, y: anchor.y - verticalStep },
+    { x: anchor.x + horizontalStep, y: anchor.y - verticalStep },
+    { x: anchor.x - horizontalStep, y: anchor.y + verticalStep },
+    { x: anchor.x + horizontalStep, y: anchor.y + verticalStep },
+    { x: anchor.x, y: anchor.y - verticalStep * 2 },
+    { x: anchor.x, y: anchor.y + verticalStep * 2 },
+    { x: anchor.x - horizontalStep * 2, y: anchor.y },
+    { x: anchor.x + horizontalStep * 2, y: anchor.y },
+  ];
+
+  const collisionPenalty = (candidate: Point) => {
+    const rect = centeredRect(candidate, width, height);
+    const nodePenalty = nodeBounds.reduce(
+      (sum, bound) => sum + rectangleOverlapArea(rect, expandBounds(bound, nodeGap)),
+      0
+    );
+    const pillPenalty = occupied.reduce(
+      (sum, item) => sum + rectangleOverlapArea(rect, centeredRect(item, item.w + pillGap * 2, item.h + pillGap * 2)),
+      0
+    );
+    return nodePenalty * 12 + pillPenalty * 8;
+  };
+  const placementPenalty = (candidate: Point) => collisionPenalty(candidate) + distance(anchor, candidate) * 0.08;
+
+  const free = candidates.find((candidate) => collisionPenalty(candidate) < 0.001);
+  if (free) return free;
+  return candidates.reduce((best, candidate) => (
+    placementPenalty(candidate) < placementPenalty(best) ? candidate : best
+  ));
+}
+
+function centeredRect(center: Point | RelationLabelRect, width: number, height: number) {
+  const x = 'cx' in center ? center.cx : center.x;
+  const y = 'cy' in center ? center.cy : center.y;
+  return { x: x - width / 2, y: y - height / 2, width, height };
+}
+
+function rectangleOverlapArea(
+  a: Pick<NodeBounds, 'x' | 'y' | 'width' | 'height'>,
+  b: Pick<NodeBounds, 'x' | 'y' | 'width' | 'height'>
+): number {
+  const overlapWidth = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+  const overlapHeight = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+  return overlapWidth * overlapHeight;
 }
 
 function pushFromPort(port: PortPoint, distance: number): Point {
@@ -951,10 +1099,15 @@ function moveToward(from: Point, to: Point, amount: number): Point {
   };
 }
 
-function findBestLabelPoint(points: Point[]): Point {
-  if (!points || points.length === 0) return { x: 0, y: 0 };
+function findBestLabelPlacement(points: Point[]): { point: Point; axis: 'horizontal' | 'vertical' } {
+  if (!points || points.length === 0) return { point: { x: 0, y: 0 }, axis: 'horizontal' };
   if (points.length <= 2) {
-    return pointAtHalfLength(points);
+    const start = points[0];
+    const end = points[points.length - 1] || start;
+    return {
+      point: pointAtHalfLength(points),
+      axis: Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'horizontal' : 'vertical',
+    };
   }
 
   // Find the longest straight segment in the polyline
@@ -973,12 +1126,15 @@ function findBestLabelPoint(points: Point[]): Point {
     const p1 = points[bestSegIndex - 1];
     const p2 = points[bestSegIndex];
     return {
-      x: (p1.x + p2.x) / 2,
-      y: (p1.y + p2.y) / 2,
+      point: {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      },
+      axis: Math.abs(p2.x - p1.x) >= Math.abs(p2.y - p1.y) ? 'horizontal' : 'vertical',
     };
   }
 
-  return pointAtHalfLength(points);
+  return { point: pointAtHalfLength(points), axis: 'horizontal' };
 }
 
 function pointAtHalfLength(points: Point[]): Point {
@@ -1001,4 +1157,3 @@ function pointAtHalfLength(points: Point[]): Point {
 function distance(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
-

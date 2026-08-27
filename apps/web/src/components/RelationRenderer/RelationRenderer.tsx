@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Relation, LivingNode, useCanvasStore } from '../../store/canvasStore';
-import { generateRelationPath, generateSmartRelationPath, getRelationEndpointLabel, NodeBounds, PathResult, PortPoint, resolveRelationPorts } from './relationUtils';
+import {
+  generateObstacleAwareRelationPath,
+  generateRelationPath,
+  getRelationEndpointLabel,
+  NodeBounds,
+  PathResult,
+  placeRelationLabel,
+  PortPoint,
+  RelationLabelRect,
+  resolveRelationPorts,
+} from './relationUtils';
 import './RelationRenderer.css';
 
 interface Props {
@@ -59,6 +69,11 @@ function getNodeGeoCoords(node: LivingNode, portId?: string): [number, number] |
   }
 
   return null;
+}
+
+function compactRelationLabel(value: string, maxLength: number): string {
+  const clean = value.replace(/\s+/g, ' ').trim();
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 1).trimEnd()}…` : clean;
 }
 
 function renderRelationIconPaths(relType?: string, color: string = 'currentColor') {
@@ -180,8 +195,15 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
 
     const sourceBounds = boundsById.get(rel.sourceId);
     const targetBounds = boundsById.get(rel.targetId);
-    const result = sourceBounds && targetBounds && styleType !== 'curved'
-      ? generateSmartRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds)
+    const result = sourceBounds && targetBounds
+      ? generateObstacleAwareRelationPath(
+          sourcePort,
+          targetPort,
+          sourceBounds,
+          targetBounds,
+          allBounds,
+          (styleType as 'straight' | 'curved' | 'orthogonal') || 'straight'
+        )
       : generateRelationPath(sourcePort, targetPort, (styleType as 'straight' | 'curved' | 'orthogonal') || 'straight');
 
     pathCache.set(cacheKey, result);
@@ -202,7 +224,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
   }, [relations]);
 
   // Pills-layer anti-stack ledger, rebuilt each render in insertion order.
-  const occupiedPillRects: Array<{ cx: number; cy: number; w: number; h: number }> = [];
+  const occupiedPillRects: RelationLabelRect[] = [];
 
   return (
     <svg
@@ -348,14 +370,17 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
         const endpointLabel = source.type === 'map' || target.type === 'map'
           ? `${shortEndpoint(source, rel.sourcePort)} → ${shortEndpoint(target, rel.targetPort)}`
           : '';
-        const rawDisplay = (endpointLabel
+        const rawDisplay = endpointLabel
           ? (baseLabel ? `${baseLabel} • ${endpointLabel}` : endpointLabel)
           : baseLabel && distanceLabel
             ? `${baseLabel} • ${distanceLabel}`
-            : baseLabel || distanceLabel)?.slice(0, 64);
+            : baseLabel || distanceLabel;
 
         const hasIcon = Boolean(rel.relationship && rel.relationship !== 'related_to');
-        const displayText = rawDisplay || (hasIcon ? rel.relationship?.replace('_', ' ') : '');
+        const displayText = compactRelationLabel(
+          rawDisplay || (hasIcon ? rel.relationship?.replace('_', ' ') || '' : ''),
+          isMapRelation ? 48 : 42
+        );
 
         let badgeStroke = 'var(--border-strong)';
         let badgeTint = 'rgba(148, 163, 184, 0.08)';
@@ -398,23 +423,19 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
         const pillHeight = isMapRelation ? 28 : 24;
         const pillRadius = pillHeight / 2;
 
-        // Anti-stack: when several relations share a midpoint (fan-outs from
-        // one node), offset each subsequent pill vertically so labels never
-        // pile on top of each other. Insertion order keeps it deterministic.
-        let pillMidY = pathResult.midPoint.y;
+        // Keep semantic labels clear of both node text and sibling labels.
+        // Insertion order makes fan-out placement deterministic.
+        let pillPoint = pathResult.midPoint;
         if (layer === 'pills') {
-          const collides = (cy: number) =>
-            occupiedPillRects.some(
-              (r) =>
-                Math.abs(pathResult.midPoint.x - r.cx) < (pillWidth + r.w) / 2 &&
-                Math.abs(cy - r.cy) < (pillHeight + r.h) / 2 + 4
-            );
-          const step = pillHeight + 8;
-          for (let attempt = -3; attempt <= 3; attempt += 1) {
-            const candidate = pathResult.midPoint.y + attempt * step;
-            if (!collides(candidate)) { pillMidY = candidate; break; }
-          }
-          occupiedPillRects.push({ cx: pathResult.midPoint.x, cy: pillMidY, w: pillWidth, h: pillHeight });
+          pillPoint = placeRelationLabel(
+            pathResult.midPoint,
+            pillWidth,
+            pillHeight,
+            allBounds,
+            occupiedPillRects,
+            pathResult.labelAxis
+          );
+          occupiedPillRects.push({ cx: pillPoint.x, cy: pillPoint.y, w: pillWidth, h: pillHeight });
         }
 
         const lineWidth = (style.width || 2.5) + (isMapRelation ? 0.45 : 0);
@@ -530,7 +551,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
                 above nodes so text never clips under neighbouring cards. */}
             {layer === 'pills' && (displayText || hasIcon) && (
               <g
-                transform={`translate(${pathResult.midPoint.x}, ${pillMidY})`}
+                transform={`translate(${pillPoint.x}, ${pillPoint.y})`}
                 style={{ pointerEvents: 'none' }}
               >
                 {/* 1. Solid opaque backdrop mask: completely blocks any underlying line/glow from showing through */}

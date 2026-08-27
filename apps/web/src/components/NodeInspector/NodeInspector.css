@@ -434,6 +434,24 @@
 @media (max-width: 520px) {
   .node-inspector {
     max-width: calc(100vw - 12px);
+    gap: 3px;
+    padding: 4px 6px;
+    border-radius: 12px;
+  }
+
+  .node-inspector__color-btn:not(.node-inspector__color-btn--frame) {
+    padding: 6px;
+    background-clip: content-box;
+  }
+
+  .node-inspector__mini-control {
+    min-width: 72px;
+    gap: 4px;
+    padding-inline: 5px;
+  }
+
+  .node-inspector__mini-control input {
+    width: 46px;
   }
 
   .node-inspector__segments--frame .node-inspector__segment span:not(.material-symbols-outlined) {

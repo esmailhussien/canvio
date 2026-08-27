@@ -1,9 +1,15 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import * as Y from 'yjs';
+import { createRequire } from 'node:module';
+import type { Doc } from 'yjs';
 import { ensureDataDir, safeId, writeFileAtomic } from './paths.js';
 
-type SharedDoc = Y.Doc & {
+// y-websocket's production server utilities load Yjs through CommonJS. Reuse
+// that instance so constructor checks and document updates share one runtime.
+const require = createRequire(import.meta.url);
+const Y = require('yjs') as typeof import('yjs');
+
+type SharedDoc = Doc & {
   name?: string;
 };
 
@@ -22,7 +28,7 @@ async function readUpdate(docName: string) {
   }
 }
 
-async function writeSnapshot(docName: string, doc: Y.Doc) {
+async function writeSnapshot(docName: string, doc: Doc) {
   const update = Y.encodeStateAsUpdate(doc);
   await writeFileAtomic(await documentPath(docName), update);
 }
@@ -30,7 +36,7 @@ async function writeSnapshot(docName: string, doc: Y.Doc) {
 export function createFilePersistence() {
   const pendingWrites = new Map<string, NodeJS.Timeout>();
 
-  const scheduleWrite = (docName: string, doc: Y.Doc) => {
+  const scheduleWrite = (docName: string, doc: Doc) => {
     const existing = pendingWrites.get(docName);
     if (existing) clearTimeout(existing);
 

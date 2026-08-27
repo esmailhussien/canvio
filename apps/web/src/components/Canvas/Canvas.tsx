@@ -3,7 +3,7 @@ import { LivingNode, Relation, useCanvasStore } from '../../store/canvasStore';
 import { NodeRenderer } from '../NodeRenderer/NodeRenderer';
 import { MultiSelectionInspector } from '../NodeInspector/MultiSelectionInspector';
 import { RelationRenderer } from '../RelationRenderer/RelationRenderer';
-import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from '../RelationRenderer/relationUtils';
+import { generateObstacleAwareRelationPath, generateRelationPath, NodeBounds, resolveRelationPorts } from '../RelationRenderer/relationUtils';
 import { DrawingLayer } from '../DrawingLayer/DrawingLayer';
 import { FreeInkLayer } from '../FreeInkLayer/FreeInkLayer';
 import { nanoid } from 'nanoid';
@@ -696,7 +696,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
           const targetBounds = snapTarget ? allBounds.find((bound) => bound.id === snapTarget.id) : undefined;
           const pathResult =
             sourceBounds && targetBounds
-              ? generateSmartRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds)
+              ? generateObstacleAwareRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds, 'orthogonal')
               : generateRelationPath(sourcePort, { ...targetPort, x: cursorWorldPos.x, y: cursorWorldPos.y }, 'curved');
           return (
             <svg

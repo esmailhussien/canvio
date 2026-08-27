@@ -1,6 +1,13 @@
 import { getStroke } from 'perfect-freehand';
 import { LivingNode, Relation, useCanvasStore } from '../store/canvasStore';
-import { generateRelationPath, generateSmartRelationPath, NodeBounds, resolveRelationPorts } from '../components/RelationRenderer/relationUtils';
+import {
+  generateObstacleAwareRelationPath,
+  generateRelationPath,
+  NodeBounds,
+  placeRelationLabel,
+  RelationLabelRect,
+  resolveRelationPorts,
+} from '../components/RelationRenderer/relationUtils';
 import { createCanvioBackupDocument } from './backupSchema';
 
 type CanvasContext = CanvasRenderingContext2D;
@@ -597,13 +604,14 @@ async function drawMapNode(ctx: CanvasContext, node: LivingNode, x: number, y: n
 }
 
 function drawRelations(ctx: CanvasContext, relations: Relation[], nodes: Record<string, LivingNode>, minX: number, minY: number, casingColor: string, labelBg: string, labelText: string) {
-  const allBounds: NodeBounds[] = Object.values(nodes).map((node) => ({
+  const allBounds: NodeBounds[] = Object.values(nodes).filter((node) => node.type !== 'frame').map((node) => ({
     id: node.id,
     x: node.position.x,
     y: node.position.y,
     width: node.size.width,
     height: node.size.height,
   }));
+  const occupiedLabels: RelationLabelRect[] = [];
 
   for (const relation of relations) {
     const source = nodes[relation.sourceId];
@@ -614,8 +622,8 @@ function drawRelations(ctx: CanvasContext, relations: Relation[], nodes: Record<
     const style = relation.style || { color: '#94a3b8', width: 2, type: 'straight' };
     const sourceBounds = allBounds.find((bound) => bound.id === source.id);
     const targetBounds = allBounds.find((bound) => bound.id === target.id);
-    const pathResult = sourceBounds && targetBounds && style.type !== 'curved'
-      ? generateSmartRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds)
+    const pathResult = sourceBounds && targetBounds
+      ? generateObstacleAwareRelationPath(sourcePort, targetPort, sourceBounds, targetBounds, allBounds, style.type || 'straight')
       : generateRelationPath(sourcePort, targetPort, style.type || 'straight');
     const path = new Path2D(pathResult.pathD);
 
@@ -634,7 +642,7 @@ function drawRelations(ctx: CanvasContext, relations: Relation[], nodes: Record<
     ctx.stroke(path);
 
     if (style.endArrow === 'arrow' || relation.relationship === 'leads_to') {
-      const angle = Math.atan2(targetPort.y - sourcePort.y, targetPort.x - sourcePort.x);
+      const angle = pathResult.angle * (Math.PI / 180);
       ctx.fillStyle = relationColor;
       ctx.beginPath();
       ctx.moveTo(targetPort.x, targetPort.y);
@@ -647,14 +655,25 @@ function drawRelations(ctx: CanvasContext, relations: Relation[], nodes: Record<
 
     const label = relation.label || (relation.relationship !== 'related_to' ? relation.relationship.replace(/_/g, ' ') : '');
     if (label) {
-      const mx = pathResult.midPoint.x - minX;
-      const my = pathResult.midPoint.y - minY;
       ctx.font = '600 11px Inter, system-ui, sans-serif';
-      const labelWidth = ctx.measureText(label).width + 18;
-      drawCard(ctx, mx - labelWidth / 2, my - 12, labelWidth, 22, labelBg, 'rgba(148,163,184,0.45)');
+      const compactLabel = label.length > 42 ? `${label.slice(0, 41).trimEnd()}…` : label;
+      const labelWidth = ctx.measureText(compactLabel).width + 18;
+      const labelHeight = 22;
+      const labelPoint = placeRelationLabel(
+        pathResult.midPoint,
+        labelWidth,
+        labelHeight,
+        allBounds,
+        occupiedLabels,
+        pathResult.labelAxis
+      );
+      occupiedLabels.push({ cx: labelPoint.x, cy: labelPoint.y, w: labelWidth, h: labelHeight });
+      const mx = labelPoint.x - minX;
+      const my = labelPoint.y - minY;
+      drawCard(ctx, mx - labelWidth / 2, my - 12, labelWidth, labelHeight, labelBg, 'rgba(148,163,184,0.45)');
       ctx.fillStyle = labelText;
       ctx.textAlign = 'center';
-      ctx.fillText(label, mx, my + 4);
+      ctx.fillText(compactLabel, mx, my + 4);
       ctx.textAlign = 'left';
     }
   }

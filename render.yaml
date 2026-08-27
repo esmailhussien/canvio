@@ -7,7 +7,7 @@ services:
     # A persistent disk requires at least the "starter" plan. Set
     # CANVIO_DATA_DIR to the mount path below when enabling it.
     plan: free
-    buildCommand: npm ci && npm -w @canvio/server run build
+    buildCommand: npm ci && npm -w @canvio/core run build && npm -w @canvio/server run build
     startCommand: npm -w @canvio/server run start:ws
     healthCheckPath: /health
     envVars:
