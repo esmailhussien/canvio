@@ -253,6 +253,8 @@ export function WorldPage() {
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const nodeCount = useCanvasStore((s) => Object.keys(s.nodes).length);
   const relationCount = useCanvasStore((s) => Object.keys(s.relations).length);
+  const inkCount = useCanvasStore((s) => s.inkStrokes.length);
+  const isBoardEmpty = nodeCount === 0 && inkCount === 0;
   const canUndo = useCanvasStore((s) => s.canUndo);
   const canRedo = useCanvasStore((s) => s.canRedo);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
@@ -279,6 +281,7 @@ export function WorldPage() {
   const [shareNameFocusSignal, setShareNameFocusSignal] = useState(0);
   const [hasLoadedCoachPreference, setHasLoadedCoachPreference] = useState(false);
   const [isCoachDismissed, setIsCoachDismissed] = useState(false);
+  const [isManuallyOpenedCoach, setIsManuallyOpenedCoach] = useState(false);
   const [autoShapeEnabled, setAutoShapeEnabled] = useState(false);
   const [isPresenting, setIsPresenting] = useState(false);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
@@ -516,6 +519,7 @@ export function WorldPage() {
 
   const handleDismissCoach = () => {
     setIsCoachDismissed(true);
+    setIsManuallyOpenedCoach(false);
     try {
       window.localStorage.setItem(COACH_DISMISS_KEY, '1');
     } catch {
@@ -525,6 +529,7 @@ export function WorldPage() {
 
   const handleShowCoach = () => {
     setIsCoachDismissed(false);
+    setIsManuallyOpenedCoach(true);
     dismissStarter();
     setIsCanvioMenuOpen(false);
     setIsExportMenuOpen(false);
@@ -753,7 +758,7 @@ export function WorldPage() {
   const { connected, connectionIssue, users, persistenceState, retryConnection } = useCollaboration(worldId || '');
   const isDemoWorld = Boolean(worldId?.startsWith(DEMO_BOARD_PREFIX));
   const toolGuidance = TOOL_GUIDANCE[activeTool] || TOOL_GUIDANCE.select;
-  const showStarter = nodeCount === 0 && !isStarterDismissed && !isPresenting;
+  const showStarter = isBoardEmpty && !isStarterDismissed && !isPresenting;
 
   useEffect(() => {
     if (!worldId || telemetryOpenedWorldRef.current === worldId) return;
@@ -864,7 +869,7 @@ export function WorldPage() {
     relationCount,
     selectedCount: selectedNodeIds.length,
   });
-  const showCoach = hasLoadedCoachPreference && !isCoachDismissed && !showStarter && !isPresenting && !isDemoWorld;
+  const showCoach = hasLoadedCoachPreference && !isCoachDismissed && !showStarter && !isPresenting && !isDemoWorld && (isBoardEmpty || isManuallyOpenedCoach);
   const saveLabel = persistenceState === 'loading'
     ? 'Restoring board'
     : persistenceState === 'saving'
@@ -1029,7 +1034,7 @@ export function WorldPage() {
         </div>
       )}
 
-      {!showStarter && nodeCount === 0 && !isPresenting && !isDemoWorld && !showCoach && persistenceState !== 'loading' && (
+      {!showStarter && isBoardEmpty && !isPresenting && !isDemoWorld && !showCoach && persistenceState !== 'loading' && (
         <div className="world-page__empty-hint" role="status" aria-live="polite">
           <span>Board is empty —</span>
           <button type="button" onClick={() => setActiveTool('sticky')}>

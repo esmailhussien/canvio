@@ -47,21 +47,36 @@ export async function getBoard(id: string) {
   }
 }
 
+const inFlightUpserts = new Map<string, Promise<BoardRecord>>();
+
 export async function upsertBoard(id: string, title = `Board ${id}`, ownerId?: string) {
-  const existing = await getBoard(id);
-  const now = new Date().toISOString();
+  const existingPromise = inFlightUpserts.get(id);
+  if (existingPromise) return existingPromise;
 
-  if (existing) {
-    return saveBoard({ ...existing, updatedAt: now });
+  const promise = (async () => {
+    const existing = await getBoard(id);
+    const now = new Date().toISOString();
+
+    if (existing) {
+      return existing;
+    }
+
+    return saveBoard({
+      id,
+      title,
+      ownerId,
+      isPublic: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  })();
+
+  inFlightUpserts.set(id, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlightUpserts.delete(id);
   }
-
-  return saveBoard({
-    id,
-    title,
-    ownerId,
-    createdAt: now,
-    updatedAt: now,
-  });
 }
 
 export async function listBoards() {

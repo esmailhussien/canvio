@@ -39,7 +39,19 @@ export async function writeFileAtomic(filePath: string, contents: Uint8Array | s
   const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   try {
     await fs.writeFile(tmpPath, contents);
-    await fs.rename(tmpPath, filePath);
+    let attempts = 0;
+    while (true) {
+      try {
+        await fs.rename(tmpPath, filePath);
+        break;
+      } catch (err: any) {
+        attempts++;
+        if (attempts >= 20 || (err.code !== 'EPERM' && err.code !== 'EBUSY')) {
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, 25 * attempts));
+      }
+    }
   } catch (error) {
     await fs.rm(tmpPath, { force: true }).catch(() => {});
     throw error;

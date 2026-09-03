@@ -1,0 +1,20 @@
+services:
+  canvio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: canvio:latest
+    container_name: canvio-app
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - CANVIO_DATA_DIR=/app/data
+      - CANVIO_ALLOW_LOCAL_ORIGINS=true
+    volumes:
+      - canvio_data:/app/data
+
+volumes:
+  canvio_data:

@@ -263,6 +263,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
     [
       activeTool,
       createNodeFromPlugin,
+      eraseInkAt,
       isInkTool,
       presentationMode,
       pinchStateRef,
@@ -337,10 +338,12 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       isMarqueeActive,
       isPanning,
       activeTool,
+      eraseInkAt,
       lastMousePosRef,
       pinchStateRef,
       queuePan,
       radialMenu,
+      relationSourceId,
       screenToWorld,
       setLastMousePos,
       updateMarquee,
@@ -537,7 +540,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      if (!e.clientX && !e.clientY) return;
+      if (typeof e.clientX !== 'number' || typeof e.clientY !== 'number') return;
       const worldPos = screenToWorld(e.clientX, e.clientY);
       setRadialMenu({ screenX: e.clientX, screenY: e.clientY, worldPos });
     },

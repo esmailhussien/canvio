@@ -333,16 +333,24 @@ export async function socraticInquiryAI(request: {
   return postAI<AISocraticResponse>('/api/ai/socratic', request);
 }
 
-async function postAI<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(apiUrl(path), {
-    method: 'POST',
-    headers: requestHeaders(true),
-    body: JSON.stringify(body),
-  });
+async function postAI<T>(path: string, body: unknown, timeoutMs = 45_000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    throw await createApiRequestError(response, 'AI request failed');
+  try {
+    const response = await fetch(apiUrl(path), {
+      method: 'POST',
+      headers: requestHeaders(true),
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw await createApiRequestError(response, 'AI request failed');
+    }
+
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return response.json() as Promise<T>;
 }

@@ -653,7 +653,7 @@ function drawRelations(ctx: CanvasContext, relations: Relation[], nodes: Record<
     }
     ctx.restore();
 
-    const label = relation.label || (relation.relationship !== 'related_to' ? relation.relationship.replace(/_/g, ' ') : '');
+    const label = relation.label || (relation.relationship && relation.relationship !== 'related_to' ? relation.relationship.replace(/_/g, ' ') : '');
     if (label) {
       ctx.font = '600 11px Inter, system-ui, sans-serif';
       const compactLabel = label.length > 42 ? `${label.slice(0, 41).trimEnd()}…` : label;

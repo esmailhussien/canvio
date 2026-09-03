@@ -885,7 +885,7 @@
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s ease, z-index 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .presence-avatar:first-child {
@@ -1070,7 +1070,7 @@ button.presence-avatar--self:focus-visible {
 
 .header-icon-btn:hover,
 .header-icon-btn:hover * {
-  color: #ffffff !important;
+  color: var(--text-primary, #ffffff) !important;
 }
 
 .header-icon-btn {
@@ -1836,4 +1836,15 @@ button.presence-avatar--self:focus-visible {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

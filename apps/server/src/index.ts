@@ -6,7 +6,7 @@ import { aiRoutes } from './routes/ai.js';
 import { telemetryRoutes } from './routes/telemetry.js';
 import { ALLOWED_CORS_HEADERS, createCorsOriginGuard } from './security.js';
 import { FASTIFY_OPTIONS, registerErrorHandler, registerSecurityHeaders } from './http.js';
-import { getReadiness } from './health.js';
+import { registerHealthRoutes } from './health.js';
 
 dotenv.config();
 
@@ -28,22 +28,13 @@ app.get('/', async () => {
       boards: '/api/boards',
       ai: '/api/ai',
       telemetry: '/api/telemetry/events',
+      health: '/health',
+      apiHealth: '/api/health',
     },
   };
 });
 
-app.get('/health', async () => {
-  return { status: 'healthy', timestamp: new Date().toISOString() };
-});
-
-app.get('/health/ready', async (_request, reply) => {
-  try {
-    return await getReadiness();
-  } catch (error) {
-    app.log.error({ err: error }, 'Readiness check failed');
-    return reply.code(503).send({ status: 'not_ready', storage: 'unavailable' });
-  }
-});
+registerHealthRoutes(app);
 
 app.register(boardRoutes, { prefix: '/api/boards' });
 app.register(aiRoutes, { prefix: '/api/ai' });

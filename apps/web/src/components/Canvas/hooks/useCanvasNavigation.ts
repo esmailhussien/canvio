@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Viewport } from '@canvio/core';
 import { useCanvasStore } from '../../../store/canvasStore';
 
@@ -18,6 +18,16 @@ export function useCanvasNavigation({ canvasRef, viewport }: UseCanvasNavigation
   }, []);
 
   const pinchStateRef = useRef<{ distance: number; midpoint: { x: number; y: number } } | null>(null);
+  const pendingPanRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const rafIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
 
   // Screen to world coordinate conversion
   const screenToWorld = useCallback(
@@ -32,7 +42,7 @@ export function useCanvasNavigation({ canvasRef, viewport }: UseCanvasNavigation
     [canvasRef, viewport]
   );
 
-  // Wheel zoom & pan
+  // Wheel zoom & pan with RAF batching for 60fps throughput
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -53,7 +63,20 @@ export function useCanvasNavigation({ canvasRef, viewport }: UseCanvasNavigation
           true
         );
       } else {
-        panBy(-e.deltaX / viewport.zoom, -e.deltaY / viewport.zoom);
+        // Accumulate pan deltas for 60fps RAF batching
+        pendingPanRef.current.dx -= e.deltaX / viewport.zoom;
+        pendingPanRef.current.dy -= e.deltaY / viewport.zoom;
+
+        if (rafIdRef.current === null) {
+          rafIdRef.current = requestAnimationFrame(() => {
+            rafIdRef.current = null;
+            const { dx, dy } = pendingPanRef.current;
+            if (dx !== 0 || dy !== 0) {
+              pendingPanRef.current = { dx: 0, dy: 0 };
+              panBy(dx, dy);
+            }
+          });
+        }
       }
     },
     [canvasRef, panBy, zoomAtPoint, viewport.zoom]

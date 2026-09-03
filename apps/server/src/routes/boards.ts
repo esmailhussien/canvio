@@ -33,7 +33,11 @@ export async function boardRoutes(fastify: FastifyInstance) {
 
   fastify.get('/public', async () => {
     const boards = await listBoards();
-    return { boards: boards.filter((board) => Boolean(board.isPublic)) };
+    return {
+      boards: boards
+        .filter((board) => Boolean(board.isPublic))
+        .map(({ shareToken: _shareToken, ...rest }) => rest),
+    };
   });
 
   fastify.post('/', async (request: FastifyRequest<{ Body?: { id?: string; title?: string } }>, reply: FastifyReply) => {
@@ -47,12 +51,15 @@ export async function boardRoutes(fastify: FastifyInstance) {
     const id = requestedId || nanoid(10);
     const existing = await getBoard(id);
     if (existing) {
+      if (!canAccessBoard(existing.ownerId, request, existing.shareToken)) {
+        return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
+      }
       return { url: '/w/' + id, ...existing };
     }
     const now = new Date().toISOString();
     const board = {
       id,
-      title: (typeof request.body?.title === 'string' && request.body.title.trim()) || 'New Board',
+      title: (typeof request.body?.title === 'string' && request.body.title.trim().slice(0, 200)) || 'New Board',
       ownerId: getRequestOwnerId(request),
       createdAt: now,
       updatedAt: now,
@@ -164,6 +171,14 @@ export async function boardRoutes(fastify: FastifyInstance) {
     if (!existing.isPublic && !canAccessBoard(existing.ownerId, request, existing.shareToken)) {
       return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
     }
+
+    // Only return the shareToken to the board owner; non-owner collaborators
+    // and public viewers do not receive administrative tokens.
+    const isOwner = Boolean(existing.ownerId && existing.ownerId === getRequestOwnerId(request));
+    if (!isOwner && existing.shareToken) {
+      const { shareToken: _token, ...sanitized } = existing;
+      return sanitized;
+    }
     return existing;
   });
 
@@ -171,7 +186,9 @@ export async function boardRoutes(fastify: FastifyInstance) {
     Params: { id: string };
     Body: { title?: string; isPublic?: boolean; appearance?: { theme?: 'dark' | 'light'; canvasBackground?: string | null } };
   }>, reply: FastifyReply) => {
-    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH', allowShareToken: true })) {
+    // Share tokens allow canvas collaboration, not board administration.
+    // Only API key holders or authenticated owners can modify board properties.
+    if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
     }
 
@@ -180,12 +197,16 @@ export async function boardRoutes(fastify: FastifyInstance) {
 
     const { id } = request.params;
     const existing = await getBoard(id);
-    if (existing && !canAccessBoard(existing.ownerId, request, existing.shareToken)) {
+    const ownerId = getRequestOwnerId(request);
+
+    // If the board already exists and has an owner, only that owner can modify it.
+    if (existing && existing.ownerId && existing.ownerId !== ownerId) {
       return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
     }
-    const board = existing || await upsertBoard(id, `Board ${id}`, getRequestOwnerId(request));
+
+    const board = existing || await upsertBoard(id, `Board ${id}`, ownerId);
     const title = typeof request.body?.title === 'string' && request.body.title.trim()
-      ? request.body.title.trim()
+      ? request.body.title.trim().slice(0, 200)
       : board.title;
     const isPublic = typeof request.body?.isPublic === 'boolean'
       ? request.body.isPublic

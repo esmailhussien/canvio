@@ -65,33 +65,35 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
 
   const contentRef = useRef(content);
   contentRef.current = content;
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   // Debounced auto-save so text changes propagate without requiring blur
   useEffect(() => {
     if (!isEditing) return;
     const timer = setTimeout(() => {
-      if (onChange && content !== data.content) {
-        onChange(node.id, { data: { ...data, content } });
+      if (onChange && content !== dataRef.current.content) {
+        onChange(node.id, { data: { ...dataRef.current, content } });
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [content, isEditing, node.id, data, onChange]);
+  }, [content, isEditing, node.id, onChange]);
 
   // Flush pending edits on beforeunload or unmount so tab close never loses typed text
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isEditing && onChange && contentRef.current !== data.content) {
-        onChange(node.id, { data: { ...data, content: contentRef.current } });
+      if (isEditing && onChange && contentRef.current !== dataRef.current.content) {
+        onChange(node.id, { data: { ...dataRef.current, content: contentRef.current } });
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (isEditing && onChange && contentRef.current !== data.content) {
-        onChange(node.id, { data: { ...data, content: contentRef.current } });
+      if (isEditing && onChange && contentRef.current !== dataRef.current.content) {
+        onChange(node.id, { data: { ...dataRef.current, content: contentRef.current } });
       }
     };
-  }, [isEditing, node.id, data, onChange]);
+  }, [isEditing, node.id, onChange]);
 
   const handleDoubleClick = () => {
     setIsEditing(true);
@@ -99,21 +101,22 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
 
   const handleBlur = () => {
     setIsEditing(false);
-    if (onChange) {
-      const actualHeight = textRef.current ? Math.max(56, textRef.current.scrollHeight + 4) : Math.max(56, node.size.height || 56);
+    if (onChange && content !== dataRef.current.content) {
+      onChange(node.id, { data: { ...dataRef.current, content } });
+    }
+    // Auto-adjust height to content on blur
+    if (textRef.current) {
+      const actualHeight = Math.max(56, textRef.current.scrollHeight + 4);
       if (Math.abs((node.size.height || 56) - actualHeight) > 4) {
-        onChange(node.id, { 
-          size: { ...node.size, height: actualHeight },
-          data: { ...data, content } 
-        });
-      } else {
-        onChange(node.id, { data: { ...data, content } });
+        onChange?.(node.id, { size: { width: node.size.width, height: actualHeight } });
       }
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    e.stopPropagation(); // prevent canvas keyboard shortcuts
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      setIsEditing(false);
+    }
   };
 
   return (
@@ -136,6 +139,8 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
           onChange={(e) => setContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           dir={data.direction || 'ltr'}
           placeholder="Type something..."
         />

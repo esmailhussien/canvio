@@ -68,32 +68,35 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     }
   }, [data.text, isEditing]);
 
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
   // Debounced auto-save so typing updates store/Yjs without cursor jumping
   useEffect(() => {
     if (!isEditing) return;
     const timer = setTimeout(() => {
-      if (onChange && text !== data.text) {
-        onChange(node.id, { data: { ...data, text } });
+      if (onChange && text !== dataRef.current.text) {
+        onChange(node.id, { data: { ...dataRef.current, text } });
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [text, isEditing, node.id, data, onChange]);
+  }, [text, isEditing, node.id, onChange]);
 
   // Flush pending edits on beforeunload or unmount so tab close never loses typed text
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isEditing && onChange && textValRef.current !== data.text) {
-        onChange(node.id, { data: { ...data, text: textValRef.current } });
+      if (isEditing && onChange && textValRef.current !== dataRef.current.text) {
+        onChange(node.id, { data: { ...dataRef.current, text: textValRef.current } });
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (isEditing && onChange && textValRef.current !== data.text) {
-        onChange(node.id, { data: { ...data, text: textValRef.current } });
+      if (isEditing && onChange && textValRef.current !== dataRef.current.text) {
+        onChange(node.id, { data: { ...dataRef.current, text: textValRef.current } });
       }
     };
-  }, [isEditing, node.id, data, onChange]);
+  }, [isEditing, node.id, onChange]);
 
   useEffect(() => {
     const handleEditRequest = (event: Event) => {

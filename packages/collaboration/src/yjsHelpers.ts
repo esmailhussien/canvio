@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
 import type { LivingNode, Relation } from '@canvio/core';
 
-const COLLABORATIVE_TEXT_DATA_KEYS = new Set(['code', 'filename', 'label', 'text', 'title']);
+const COLLABORATIVE_TEXT_DATA_KEYS = new Set(['code', 'content', 'filename', 'label', 'text', 'title']);
 
 // Viewport-derived UI state must not enter the collaborative document: it is
 // meaningless to other peers, churns the CRDT on every pan/zoom, and bloats

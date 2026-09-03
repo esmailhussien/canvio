@@ -47,11 +47,16 @@ function getShareTokenFromHeaders(headers: IncomingHttpHeaders, url?: string) {
   return getQueryValue(url, 'share') || '';
 }
 
+let cachedTokens: string[] | null = null;
+
 function getConfiguredTokens() {
-  return [
-    ...envList('CANVIO_API_TOKENS'),
-    ...envList('CANVIO_API_TOKEN'),
-  ];
+  if (cachedTokens === null || process.env.NODE_ENV !== 'production') {
+    cachedTokens = [
+      ...envList('CANVIO_API_TOKENS'),
+      ...envList('CANVIO_API_TOKEN'),
+    ];
+  }
+  return cachedTokens;
 }
 
 function getClientIp(request: FastifyRequest) {
@@ -74,6 +79,11 @@ export function createCorsOriginGuard() {
   };
 }
 
+/**
+ * Checks whether an HTTP Origin is permitted.
+ * Note: Requests with no Origin header (e.g. server-to-server, curl, mobile apps)
+ * are allowed by standard CORS semantics since CORS is a browser-enforced security mechanism.
+ */
 export function isOriginAllowed(origin: string | undefined) {
   const allowedOrigins = new Set([
     'https://canvio.space',
@@ -125,13 +135,37 @@ export function createRateLimitHook(options: {
 }
 
 // Identity-independent backstop: even if per-identity keys are spoofed, this
-// caps total abuse per process within each window.
+// caps total abuse across the entire process within each window.
 export function createGlobalRateLimitHook(options: {
   namespace: string;
   windowMs: number;
   max: number;
 }) {
-  return createRateLimitHook(options);
+  return async (_request: FastifyRequest, reply: FastifyReply) => {
+    const key = `global:${options.namespace}`;
+    const now = Date.now();
+
+    if (!rateBuckets.has(key) && rateBuckets.size >= 20_000) {
+      const oldestKey = rateBuckets.keys().next().value as string | undefined;
+      if (oldestKey) rateBuckets.delete(oldestKey);
+    }
+
+    const bucket = rateBuckets.get(key);
+
+    if (!bucket || bucket.resetAt <= now) {
+      rateBuckets.set(key, { count: 1, resetAt: now + options.windowMs });
+      return;
+    }
+
+    bucket.count += 1;
+    if (bucket.count <= options.max) return;
+
+    const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+    return reply
+      .header('Retry-After', String(retryAfterSeconds))
+      .code(429)
+      .send({ error: 'RATE_LIMITED', retryAfterSeconds });
+  };
 }
 
 export function readPositiveIntEnv(name: string, fallback: number, min = 1, max = 1_000_000) {
@@ -188,17 +222,19 @@ export function getShareTokenFromRequestHeaders(headers: IncomingHttpHeaders, ur
   return getShareTokenFromHeaders(headers, url);
 }
 
-export function canAccessBoard(boardOwnerId: string | undefined, request: FastifyRequest, boardShareToken?: string) {
-  return canOwnerAccessBoard(boardOwnerId, getRequestOwnerId(request), boardShareToken, getRequestShareToken(request));
+export function canAccessBoard(boardOwnerId: string | undefined, request: FastifyRequest, boardShareToken?: string, isPublic?: boolean) {
+  return canOwnerAccessBoard(boardOwnerId, getRequestOwnerId(request), boardShareToken, getRequestShareToken(request), isPublic);
 }
 
 export function canOwnerAccessBoard(
   boardOwnerId: string | undefined,
   ownerId: string,
   boardShareToken?: string,
-  requestShareToken?: string
+  requestShareToken?: string,
+  isPublic?: boolean
 ) {
   if (!boardOwnerId) return true;
+  if (isPublic) return true;
   if (boardOwnerId === ownerId) return true;
   return Boolean(
     boardShareToken &&

@@ -262,7 +262,7 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
       dragStartRef.current = { x: e.clientX, y: e.clientY };
       originalNodePosRef.current = { x: node.position.x, y: node.position.y };
     }
-  }, [node.id, node.locked, selectNode, node.type, node.data?.interactive, activeTool, relationSourceId, relationTargetId, relationTargetPort, getNearestEdgePort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode, snapshot, node.position, presentationMode]);
+  }, [node.id, node.locked, selectNode, node.type, activeTool, relationSourceId, relationTargetId, relationTargetPort, getNearestEdgePort, setRelationSourceId, setRelationSource, completeRelationTo, removeNode, snapshot, node.position.x, node.position.y, presentationMode]);
 
   const rafIdRef = useRef<number | null>(null);
 
@@ -381,7 +381,7 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
         }
       });
     }
-  }, [isDragging, node.id, node.size.width, node.size.height, node.type, node.position.x, node.position.y, updateNode, updateNodePositions]);
+  }, [isDragging, node.id, node.size.width, node.size.height, node.type, updateNode, updateNodePositions]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);

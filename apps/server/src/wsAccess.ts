@@ -39,10 +39,9 @@ export async function authorizeWebSocketBoard(req: IncomingMessage, boardId: str
   const existing = await getBoard(boardId);
 
   if (existing) {
-    if (!canOwnerAccessBoard(existing.ownerId, ownerId, existing.shareToken, shareToken)) {
+    if (!canOwnerAccessBoard(existing.ownerId, ownerId, existing.shareToken, shareToken, existing.isPublic)) {
       return { ok: false as const, code: 1008, reason: 'Board access denied' };
     }
-    await saveBoard({ ...existing, updatedAt: new Date().toISOString() });
     return { ok: true as const, ownerId };
   }
 

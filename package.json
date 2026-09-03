@@ -10,7 +10,9 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test:unit": "tsx scripts/unit/run-unit-tests.ts",
+    "test:stress": "tsx scripts/stress-websocket.ts",
     "smoke": "node scripts/smoke-check.mjs",
+    "benchmark:canvas": "node scripts/benchmark-canvas.mjs",
     "e2e:smoke": "npm run build && node scripts/e2e-smoke.mjs",
     "og": "node scripts/generate-og-image.mjs",
     "clean": "turbo clean"

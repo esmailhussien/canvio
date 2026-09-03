@@ -1,0 +1,41 @@
+# Dependencies & Package manager
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Build & Tool caches
+.turbo
+.cache
+dist
+build
+out
+
+# Test & Coverage artifacts
+coverage
+.nyc_output
+scratch
+test-results
+playwright-report
+
+# Agent & AI artifacts
+.agents
+.gemini
+
+# Local persistence & environments
+data
+*.tmp*
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS metadata
+.DS_Store
+Thumbs.db

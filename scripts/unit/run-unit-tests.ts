@@ -143,6 +143,18 @@ const {
   getOwnerIdFromHeaders,
 } = await import('../../apps/server/src/security');
 const { isSafeBoardId, safeId } = await import('../../apps/server/src/storage/paths');
+const {
+  checkStorageHealth,
+  formatUptime,
+  getHealthReport,
+  getMemoryStats,
+  getReadiness,
+  registerHealthRoutes,
+} = await import('../../apps/server/src/health');
+const { createFilePersistence } = await import('../../apps/server/src/storage/yPersistence');
+const { ensureDataDir } = await import('../../apps/server/src/storage/paths');
+const fsPromises = (await import('node:fs')).promises;
+const pathModule = await import('node:path');
 const Y = await import('yjs');
 
 function resetStore(): void {
@@ -404,7 +416,7 @@ test('layout slice aligns selected nodes without touching unselected nodes', () 
 
 test('Yjs node maps keep collaborative text fields granular and readable', () => {
   const node = makeNode('node-1', {
-    data: { text: 'Original note', title: 'Card title', color: 'yellow' },
+    data: { text: 'Original note', title: 'Card title', color: 'yellow', content: 'Original text content' },
   });
 
   const doc = new Y.Doc();
@@ -416,18 +428,24 @@ test('Yjs node maps keep collaborative text fields granular and readable', () =>
   const ytext = collaborativeData.get('text') as { toString: () => string };
   assert.equal(typeof ytext.toString, 'function');
   assert.equal(ytext.toString(), 'Original note');
+  const ycontent = collaborativeData.get('content') as { toString: () => string };
+  assert.equal(typeof ycontent.toString, 'function');
+  assert.equal(ycontent.toString(), 'Original text content');
 
   syncNodeToYMap(ymap, {
     ...node,
-    data: { text: 'Original better note', title: 'Card title', color: 'blue' },
+    data: { text: 'Original better note', title: 'Card title', color: 'blue', content: 'Updated text content' },
   });
 
   assert.equal(collaborativeData.get('text'), ytext);
   assert.equal(ytext.toString(), 'Original better note');
+  assert.equal(collaborativeData.get('content'), ycontent);
+  assert.equal(ycontent.toString(), 'Updated text content');
   assert.deepEqual(yMapToNode(ymap).data, {
     text: 'Original better note',
     title: 'Card title',
     color: 'blue',
+    content: 'Updated text content',
   });
 });
 
@@ -1038,6 +1056,175 @@ test('frame refits to wrap its content after overlap resolution', async () => {
     });
   assert.equal(inside, true, 'frame must wrap all originally contained nodes after resolution');
   assert.ok(fit.size.width >= 320 && fit.size.height >= 220, 'frame keeps sane minimum size');
+});
+
+test('formatUptime correctly formats seconds across zero, minute, hour, and day boundaries', () => {
+  assert.equal(formatUptime(0), '0s');
+  assert.equal(formatUptime(45), '45s');
+  assert.equal(formatUptime(60), '1m 0s');
+  assert.equal(formatUptime(345), '5m 45s');
+  assert.equal(formatUptime(3600), '1h 0s');
+  assert.equal(formatUptime(3665), '1h 1m 5s');
+  assert.equal(formatUptime(86400), '1d 0s');
+  assert.equal(formatUptime(90061), '1d 1h 1m 1s');
+  assert.equal(formatUptime(-10), '0s');
+  assert.equal(formatUptime(Number.NaN), '0s');
+});
+
+test('getMemoryStats returns positive byte and megabyte metrics', () => {
+  const mem = getMemoryStats();
+  assert.equal(typeof mem.rss, 'number');
+  assert.equal(typeof mem.heapTotal, 'number');
+  assert.equal(typeof mem.heapUsed, 'number');
+  assert.equal(typeof mem.external, 'number');
+  assert.equal(typeof mem.arrayBuffers, 'number');
+  assert.equal(typeof mem.rssMb, 'number');
+  assert.equal(typeof mem.heapTotalMb, 'number');
+  assert.equal(typeof mem.heapUsedMb, 'number');
+
+  assert.ok(mem.rss > 0, 'rss should be positive');
+  assert.ok(mem.heapTotal > 0, 'heapTotal should be positive');
+  assert.ok(mem.heapUsed > 0, 'heapUsed should be positive');
+  assert.ok(mem.rssMb > 0, 'rssMb should be positive');
+  assert.ok(mem.heapTotalMb > 0, 'heapTotalMb should be positive');
+  assert.ok(mem.heapUsedMb > 0, 'heapUsedMb should be positive');
+
+  const expectedRssMb = Math.round((mem.rss / (1024 * 1024)) * 100) / 100;
+  assert.equal(mem.rssMb, expectedRssMb);
+});
+
+test('checkStorageHealth verifies both boards and ydocs directories', async () => {
+  const storage = await checkStorageHealth();
+  assert.equal(storage.status, 'ok');
+  assert.equal(storage.accessible, true);
+  assert.equal(storage.writable, true);
+  assert.equal(typeof storage.dataDir, 'string');
+  assert.ok(storage.boardsDir && storage.boardsDir.includes('boards'), 'boardsDir must contain boards');
+  assert.ok(storage.ydocsDir && storage.ydocsDir.includes('ydocs'), 'ydocsDir must contain ydocs');
+  assert.equal(storage.error, undefined);
+});
+
+test('getHealthReport integrates connection hooks, process diagnostics, and storage status', async () => {
+  const reportWithHooks = await getHealthReport({
+    getActiveConnections: () => 24,
+    getActiveDocs: () => 5,
+    getMaxConnections: () => 200,
+  });
+
+  assert.equal(reportWithHooks.status, 'healthy');
+  assert.equal(reportWithHooks.version, '0.1.0');
+  assert.equal(typeof reportWithHooks.timestamp, 'string');
+  assert.equal(typeof reportWithHooks.uptime, 'number');
+  assert.equal(typeof reportWithHooks.uptimeFormatted, 'string');
+
+  const proc = reportWithHooks.process as Record<string, unknown>;
+  assert.equal(typeof proc.pid, 'number');
+  assert.equal(typeof proc.nodeVersion, 'string');
+  assert.equal(typeof proc.platform, 'string');
+
+  const conns = reportWithHooks.connections as Record<string, number>;
+  assert.equal(conns.activeWebSocket, 24);
+  assert.equal(conns.activeDocuments, 5);
+  assert.equal(conns.maxConnections, 200);
+
+  const stor = reportWithHooks.storage as Record<string, unknown>;
+  assert.equal(stor.status, 'ok');
+  assert.equal(stor.accessible, true);
+  assert.equal(stor.writable, true);
+  assert.equal(stor.type, 'filesystem');
+
+  const defaultReport = await getHealthReport();
+  const defaultConns = defaultReport.connections as Record<string, number>;
+  assert.equal(defaultConns.activeWebSocket, 0);
+  assert.equal(defaultConns.activeDocuments, 0);
+  assert.equal(defaultConns.maxConnections, 0);
+
+  const readiness = await getReadiness();
+  assert.equal(readiness.status, 'ready');
+  assert.equal(typeof readiness.uptime, 'number');
+  const readStor = readiness.storage as Record<string, unknown>;
+  assert.equal(readStor.status, 'ok');
+  assert.equal(readStor.writable, true);
+});
+
+test('registerHealthRoutes mounts /health, /api/health, and readiness endpoints with accurate responses', async () => {
+  const app = Fastify({ logger: false });
+  registerHealthRoutes(app, {
+    getActiveConnections: () => 8,
+    getActiveDocs: () => 3,
+    getMaxConnections: () => 100,
+  });
+
+  // 1. GET /health
+  const resLiveness = await app.inject({ method: 'GET', url: '/health' });
+  assert.equal(resLiveness.statusCode, 200);
+  assert.match(resLiveness.headers['content-type'] || '', /application\/json/);
+  const liveBody = JSON.parse(resLiveness.payload);
+  assert.equal(liveBody.status, 'healthy');
+  assert.equal(liveBody.connections.activeWebSocket, 8);
+  assert.equal(liveBody.connections.activeDocuments, 3);
+  assert.equal(liveBody.connections.maxConnections, 100);
+  assert.equal(liveBody.storage.status, 'ok');
+
+  // 2. GET /api/health (alias)
+  const resApiLiveness = await app.inject({ method: 'GET', url: '/api/health' });
+  assert.equal(resApiLiveness.statusCode, 200);
+  const apiLiveBody = JSON.parse(resApiLiveness.payload);
+  assert.equal(apiLiveBody.status, 'healthy');
+  assert.equal(apiLiveBody.connections.activeWebSocket, 8);
+
+  // 3. GET /health/ready
+  const resReadiness = await app.inject({ method: 'GET', url: '/health/ready' });
+  assert.equal(resReadiness.statusCode, 200);
+  const readyBody = JSON.parse(resReadiness.payload);
+  assert.equal(readyBody.status, 'ready');
+  assert.equal(readyBody.storage.accessible, true);
+  assert.equal(readyBody.storage.writable, true);
+
+  // 4. GET /api/health/ready (alias)
+  const resApiReadiness = await app.inject({ method: 'GET', url: '/api/health/ready' });
+  assert.equal(resApiReadiness.statusCode, 200);
+  const apiReadyBody = JSON.parse(resApiReadiness.payload);
+  assert.equal(apiReadyBody.status, 'ready');
+
+  await app.close();
+});
+
+test('yPersistence tracks active docs, debounces writes, and flushes on demand', async () => {
+  const persistence = createFilePersistence();
+  const testDoc1Name = `test-unit-flush-1-${Date.now()}`;
+  const testDoc2Name = `test-unit-flush-2-${Date.now()}`;
+
+  const doc1 = new Y.Doc();
+  const doc2 = new Y.Doc();
+
+  // 1. Verify active doc tracking on bindState
+  await persistence.bindState(testDoc1Name, doc1 as any);
+  await persistence.bindState(testDoc2Name, doc2 as any);
+  assert.equal(persistence.getActiveDocs(), 2, 'Active docs count should be 2 after bindState');
+
+  // 2. Mutate documents and verify pending write timer scheduling
+  doc1.getText('test').insert(0, 'Hello Canvio');
+  assert.equal(persistence.getPendingWritesCount() >= 1, true, 'Pending write timer should be scheduled');
+
+  // 3. Trigger flushAll() immediately and assert pending timers are cleared
+  await persistence.flushAll();
+  assert.equal(persistence.getPendingWritesCount(), 0, 'Pending writes count must be 0 after flushAll()');
+
+  // 4. Verify persisted content on disk
+  const ydocsDir = await ensureDataDir('ydocs');
+  const file1Path = pathModule.join(ydocsDir, `${testDoc1Name}.bin`);
+  const file1Exists = await fsPromises.access(file1Path).then(() => true).catch(() => false);
+  assert.equal(file1Exists, true, 'Flushed document file must exist on disk');
+
+  // 5. Verify cleanup on document destroy
+  doc1.destroy();
+  assert.equal(persistence.getActiveDocs(), 1, 'Active docs count should decrement on destroy');
+  doc2.destroy();
+  assert.equal(persistence.getActiveDocs(), 0, 'Active docs count should be 0 when all destroyed');
+
+  // Clean up test files
+  await fsPromises.rm(file1Path, { force: true });
 });
 
 let passed = 0;

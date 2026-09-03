@@ -360,7 +360,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
 
 
 
-        const baseLabel = rel.label || (rel.relationship && rel.relationship !== 'related_to' ? rel.relationship.replace('_', ' ') : '');
+        const baseLabel = rel.label || (rel.relationship && rel.relationship !== 'related_to' ? rel.relationship.replace(/_/g, ' ') : '');
         // Keep map-relation pills compact: full sticky text as an endpoint
         // name used to produce ~90-char pills that overlapped neighbouring nodes.
         const shortEndpoint = (node: LivingNode, port?: string) => {
@@ -378,7 +378,7 @@ export function RelationRenderer({ relations, nodes, presentationMode = false, f
 
         const hasIcon = Boolean(rel.relationship && rel.relationship !== 'related_to');
         const displayText = compactRelationLabel(
-          rawDisplay || (hasIcon ? rel.relationship?.replace('_', ' ') || '' : ''),
+          rawDisplay || (hasIcon ? rel.relationship?.replace(/_/g, ' ') || '' : ''),
           isMapRelation ? 48 : 42
         );
 

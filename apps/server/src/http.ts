@@ -37,17 +37,32 @@ export const FASTIFY_OPTIONS = {
   trustProxy: process.env.NODE_ENV === 'production' ? TRUST_PROXY_HOPS : false,
 };
 
+const API_CSP = "default-src 'none'; frame-ancestors 'none'; form-action 'none'";
+
+const WEB_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com https://quickchart.io",
+  "font-src 'self' data:",
+  "connect-src 'self' ws: wss: https:",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+].join('; ');
+
 export function registerSecurityHeaders(app: FastifyInstance) {
-  app.addHook('onRequest', async (_request, reply) => {
+  app.addHook('onRequest', async (request, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
     reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    reply.header(
-      'Content-Security-Policy',
-      "default-src 'none'; frame-ancestors 'none'; form-action 'none'"
-    );
+
+    const pathname = (request.url || '').split('?')[0];
+    const isApi = pathname === '/api' || pathname.startsWith('/api/');
+
+    reply.header('Content-Security-Policy', isApi ? API_CSP : WEB_CSP);
+
     if (process.env.NODE_ENV === 'production') {
       reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
