@@ -263,7 +263,6 @@ export function WorldPage() {
   const setThemePreference = useCanvasStore((s) => s.setThemePreference);
   const canvasBackground = useCanvasStore((s) => s.canvasBackground);
   const setCanvasBackground = useCanvasStore((s) => s.setCanvasBackground);
-  const setAppearance = useCanvasStore((s) => s.setAppearance);
   const replaceWorld = useCanvasStore((s) => s.replaceWorld);
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
   const branchSelectionAsExperiment = useCanvasStore((s) => s.branchSelectionAsExperiment);
@@ -272,7 +271,6 @@ export function WorldPage() {
   const isAIOpen = useCanvasStore((s) => s.isAIAssistantOpen);
   const setIsAIOpen = useCanvasStore((s) => s.setAIAssistantOpen);
   const [isReasoningOpen, setIsReasoningOpen] = useState(false);
-  const [boardRecord, setBoardRecord] = useState<BoardRecord | null>(null);
   const [isForking, setIsForking] = useState(false);
   const [isCanvioMenuOpen, setIsCanvioMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
@@ -487,7 +485,7 @@ export function WorldPage() {
 
   const handleNewBlankBoard = () => {
     const newId = nanoid(10);
-    createBoard().catch(() => {});
+    createBoard(newId).catch(() => {});
     setIsCanvioMenuOpen(false);
     // Explicit "new board" intent re-arms the starter so the goal picker is
     // reachable again. Matches HomePage's Start-a-blank-board behavior.

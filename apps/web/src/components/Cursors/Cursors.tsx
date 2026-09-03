@@ -26,7 +26,9 @@ export const Cursors: React.FC<CursorsProps> = ({ users }) => {
             key={user.id}
             className="remote-cursor"
             style={{
-              transform: `translate(calc(50vw + ${screenX}px), calc(50vh + ${screenY}px))`,
+              left: '50%',
+              top: '50%',
+              transform: `translate(${screenX}px, ${screenY}px)`,
             }}
           >
             {/* SVG Cursor Pointer with user color */}

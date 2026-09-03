@@ -39,6 +39,10 @@
   cursor: cell;
 }
 
+.world-page[data-tool="relation"] {
+  cursor: crosshair;
+}
+
 .world-page__empty-launcher {
   position: fixed;
   inset: 0;

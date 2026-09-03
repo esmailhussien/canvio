@@ -33,6 +33,16 @@ async function writeSnapshot(docName: string, doc: Doc) {
   await writeFileAtomic(await documentPath(docName), update);
 }
 
+/**
+ * Copies a persisted Yjs document binary from one board to another.
+ * Used during board forking so the fork preserves all canvas content.
+ */
+export async function copyYDoc(sourceDocName: string, targetDocName: string): Promise<void> {
+  const sourcePath = await documentPath(sourceDocName);
+  const targetPath = await documentPath(targetDocName);
+  await fs.copyFile(sourcePath, targetPath);
+}
+
 export function createFilePersistence() {
   const pendingWrites = new Map<string, NodeJS.Timeout>();
 

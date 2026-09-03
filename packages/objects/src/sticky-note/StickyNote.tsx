@@ -27,6 +27,15 @@ function getRotationOffset(id: string) {
   return (normalized * 3) - 1.5; // -1.5 to +1.5 degrees
 }
 
+const STICKY_COLORS = [
+  { id: 'yellow', hex: '#fef08a', name: 'Yellow' },
+  { id: 'pink', hex: '#fbcfe8', name: 'Pink' },
+  { id: 'blue', hex: '#bfdbfe', name: 'Blue' },
+  { id: 'green', hex: '#bbf7d0', name: 'Green' },
+  { id: 'purple', hex: '#e9d5ff', name: 'Purple' },
+  { id: 'orange', hex: '#fed7aa', name: 'Orange' },
+];
+
 export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange }) => {
   const rawData = node.data as Partial<StickyData>;
   const data: StickyData = {
@@ -36,21 +45,61 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
     direction: rawData.direction === 'rtl' || rawData.direction === 'auto' ? rawData.direction : 'ltr',
     textAlign: rawData.textAlign === 'center' || rawData.textAlign === 'right' ? rawData.textAlign : 'left',
   };
+  const [text, setText] = useState(data.text || '');
+  const [isEditing, setIsEditing] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const textValRef = useRef(text);
+  textValRef.current = text;
   const lastPointerTypeRef = useRef<string>('mouse');
 
   const baseRotation = useMemo(() => getRotationOffset(node.id), [node.id]);
 
   useEffect(() => {
     if (!data.text && Date.now() - node.createdAt < 1000 && textRef.current) {
+      setIsEditing(true);
       textRef.current.focus();
     }
   }, [data.text, node.createdAt]);
+
+  // Sync from props when not actively editing
+  useEffect(() => {
+    if (!isEditing) {
+      setText(data.text || '');
+    }
+  }, [data.text, isEditing]);
+
+  // Debounced auto-save so typing updates store/Yjs without cursor jumping
+  useEffect(() => {
+    if (!isEditing) return;
+    const timer = setTimeout(() => {
+      if (onChange && text !== data.text) {
+        onChange(node.id, { data: { ...data, text } });
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [text, isEditing, node.id, data, onChange]);
+
+  // Flush pending edits on beforeunload or unmount so tab close never loses typed text
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isEditing && onChange && textValRef.current !== data.text) {
+        onChange(node.id, { data: { ...data, text: textValRef.current } });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (isEditing && onChange && textValRef.current !== data.text) {
+        onChange(node.id, { data: { ...data, text: textValRef.current } });
+      }
+    };
+  }, [isEditing, node.id, data, onChange]);
 
   useEffect(() => {
     const handleEditRequest = (event: Event) => {
       const detail = (event as CustomEvent<{ nodeId?: string }>).detail;
       if (detail?.nodeId === node.id) {
+        setIsEditing(true);
         textRef.current?.focus();
       }
     };
@@ -59,9 +108,13 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
   }, [node.id]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newText = e.target.value;
-    if (onChange) {
-      onChange(node.id, { data: { ...data, text: newText } });
+    setText(e.target.value);
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    if (onChange && text !== data.text) {
+      onChange(node.id, { data: { ...data, text } });
     }
   };
 
@@ -128,8 +181,10 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
       <textarea
         ref={textRef}
         className="sticky-note__textarea"
-        value={data.text || ''}
+        value={text}
         onChange={handleTextChange}
+        onFocus={() => setIsEditing(true)}
+        onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onMouseDown={handleMouseDown}
@@ -140,6 +195,25 @@ export const StickyNote: React.FC<StickyNoteProps> = ({ node, selected, onChange
         }}
         placeholder="Type something..."
       />
+      {selected && (
+        <div
+          className="sticky-note__toolbar"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {STICKY_COLORS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`sticky-note__color-btn ${data.color === c.id ? 'active' : ''}`}
+              style={{ backgroundColor: c.hex }}
+              title={c.name}
+              onClick={() => onChange?.(node.id, { data: { ...data, color: c.id } })}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -136,7 +136,11 @@ export const DrawingNode: React.FC<DrawingNodeProps> = ({ node }) => {
   };
   const strokes = data.strokes || [];
   const markerId = `drawing-arrowhead-${node.id}`;
-  const arrowPoints = data.arrow?.points?.length ? data.arrow.points : data.arrow ? [data.arrow.start, data.arrow.end] : [];
+  const arrowPoints = data.arrow?.points?.length
+    ? data.arrow.points
+    : (data.arrow && Array.isArray(data.arrow.start) && Array.isArray(data.arrow.end))
+      ? [data.arrow.start, data.arrow.end]
+      : [];
   const arrowPath = getSmoothPathFromPoints(arrowPoints);
   const arrowWidth = data.arrow?.width ?? 3;
   const arrowHeadSize = Math.max(10, Math.min(18, arrowWidth * 3.2));

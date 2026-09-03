@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { nanoid } from 'nanoid';
 import { getBoard, listBoards, saveBoard, upsertBoard } from '../storage/boards.js';
 import { isSafeBoardId } from '../storage/paths.js';
+import { copyYDoc } from '../storage/yPersistence.js';
 import { canAccessBoard, createRateLimitHook, getRequestOwnerId, isRequestAuthorized, readPositiveIntEnv } from '../security.js';
 
 export async function boardRoutes(fastify: FastifyInstance) {
@@ -23,8 +24,11 @@ export async function boardRoutes(fastify: FastifyInstance) {
       return { boards: [] };
     }
     const ownerId = getRequestOwnerId(request);
+    if (!ownerId) {
+      return { boards: [] };
+    }
     const boards = await listBoards();
-    return { boards: boards.filter((board) => !board.ownerId || board.ownerId === ownerId) };
+    return { boards: boards.filter((board) => board.ownerId === ownerId) };
   });
 
   fastify.get('/public', async () => {
@@ -32,15 +36,23 @@ export async function boardRoutes(fastify: FastifyInstance) {
     return { boards: boards.filter((board) => Boolean(board.isPublic)) };
   });
 
-  fastify.post('/', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/', async (request: FastifyRequest<{ Body?: { id?: string; title?: string } }>, reply: FastifyReply) => {
     if (!isRequestAuthorized(request, { requiredEnv: 'CANVIO_REQUIRE_BOARD_AUTH' })) {
       return reply.code(401).send({ error: 'AUTH_REQUIRED' });
     }
-    const id = nanoid(10);
+    const requestedId = request.body?.id;
+    if (requestedId && !isSafeBoardId(requestedId)) {
+      return reply.code(400).send({ error: 'INVALID_BOARD_ID' });
+    }
+    const id = requestedId || nanoid(10);
+    const existing = await getBoard(id);
+    if (existing) {
+      return { url: '/w/' + id, ...existing };
+    }
     const now = new Date().toISOString();
     const board = {
       id,
-      title: 'New Board',
+      title: (typeof request.body?.title === 'string' && request.body.title.trim()) || 'New Board',
       ownerId: getRequestOwnerId(request),
       createdAt: now,
       updatedAt: now,
@@ -89,6 +101,18 @@ export async function boardRoutes(fastify: FastifyInstance) {
       updatedAt: now,
     };
     await saveBoard(forkedBoard);
+
+    // Copy the Yjs canvas document so the fork preserves all nodes, relations,
+    // drawings, and other canvas content from the source board.
+    try {
+      await copyYDoc(sourceBoard.id, newId);
+    } catch (err) {
+      // Non-fatal: the fork metadata was saved successfully.  The canvas will
+      // simply start empty if the Yjs binary is missing (e.g. the source board
+      // was never persisted to disk yet).
+      fastify.log.warn({ err, sourceId: sourceBoard.id, newId }, 'Failed to copy Yjs document during fork');
+    }
+
     return { url: '/w/' + newId, ...forkedBoard };
   });
 
@@ -134,14 +158,13 @@ export async function boardRoutes(fastify: FastifyInstance) {
 
     const { id } = request.params;
     const existing = await getBoard(id);
-    if (existing) {
-      if (!existing.isPublic && !canAccessBoard(existing.ownerId, request, existing.shareToken)) {
-        return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
-      }
-      return saveBoard({ ...existing, updatedAt: new Date().toISOString() });
+    if (!existing) {
+      return reply.code(404).send({ error: 'BOARD_NOT_FOUND' });
     }
-
-    return upsertBoard(id, `Board ${id}`, getRequestOwnerId(request));
+    if (!existing.isPublic && !canAccessBoard(existing.ownerId, request, existing.shareToken)) {
+      return reply.code(403).send({ error: 'BOARD_FORBIDDEN' });
+    }
+    return existing;
   });
 
   fastify.patch('/:id', async (request: FastifyRequest<{

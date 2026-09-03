@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { boardRoutes } from './routes/boards.js';
 import { aiRoutes } from './routes/ai.js';
 import { telemetryRoutes } from './routes/telemetry.js';
-import { createCorsOriginGuard } from './security.js';
+import { ALLOWED_CORS_HEADERS, createCorsOriginGuard } from './security.js';
 import { FASTIFY_OPTIONS, registerErrorHandler, registerSecurityHeaders } from './http.js';
 import { getReadiness } from './health.js';
 
@@ -16,6 +16,7 @@ registerSecurityHeaders(app);
 
 app.register(cors, {
   origin: createCorsOriginGuard(),
+  allowedHeaders: ALLOWED_CORS_HEADERS,
 });
 
 app.get('/', async () => {

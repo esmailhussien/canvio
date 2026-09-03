@@ -49,7 +49,7 @@ export function HomePage() {
     if (isCreating) return;
     setIsCreating(true);
     const newId = nanoid(10);
-    createBoard().catch(() => {});
+    createBoard(newId).catch(() => {});
     // Explicit "new board" intent re-arms the starter so both entry points
     // (home + workspace menu) behave identically.
     try {

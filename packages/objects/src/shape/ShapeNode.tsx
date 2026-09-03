@@ -22,6 +22,23 @@ interface ShapeNodeProps {
   onChange?: (id: string, updates: Partial<LivingNode>) => void;
 }
 
+const SHAPE_OPTIONS: { id: ShapeType; label: string; icon: string }[] = [
+  { id: 'rectangle', label: 'Rectangle', icon: 'crop_square' },
+  { id: 'circle', label: 'Circle', icon: 'radio_button_unchecked' },
+  { id: 'diamond', label: 'Diamond', icon: 'diamond' },
+  { id: 'triangle', label: 'Triangle', icon: 'change_history' },
+  { id: 'hexagon', label: 'Hexagon', icon: 'hexagon' },
+];
+
+const COLOR_PRESETS = [
+  { stroke: '#6366f1', fill: 'rgba(99, 102, 241, 0.15)', name: 'Indigo' },
+  { stroke: '#10b981', fill: 'rgba(16, 185, 129, 0.15)', name: 'Emerald' },
+  { stroke: '#f59e0b', fill: 'rgba(245, 158, 11, 0.15)', name: 'Amber' },
+  { stroke: '#f43f5e', fill: 'rgba(244, 63, 94, 0.15)', name: 'Rose' },
+  { stroke: '#0ea5e9', fill: 'rgba(14, 165, 233, 0.15)', name: 'Sky' },
+  { stroke: '#8b5cf6', fill: 'rgba(139, 92, 246, 0.15)', name: 'Purple' },
+];
+
 function getShapeSVG(shape: ShapeType, w: number, h: number, fill: string, stroke: string, strokeWidth: number, opacity: number): React.ReactNode {
   const pad = strokeWidth;
   const iw = Math.max(10, w - pad * 2);
@@ -194,6 +211,41 @@ export const ShapeNode: React.FC<ShapeNodeProps> = ({ node, selected, onChange }
           }}
         >
           {label || (selected ? 'Type text...' : '')}
+        </div>
+      )}
+      {selected && !isEditing && (
+        <div
+          className="shape-node__toolbar"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="shape-node__toolbar-group">
+            {SHAPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`shape-node__tool-btn ${shape === opt.id ? 'active' : ''}`}
+                title={opt.label}
+                onClick={() => onChange?.(node.id, { data: { ...data, shape: opt.id } })}
+              >
+                <span className="material-symbols-outlined">{opt.icon}</span>
+              </button>
+            ))}
+          </div>
+          <div className="shape-node__toolbar-divider" />
+          <div className="shape-node__toolbar-group">
+            {COLOR_PRESETS.map((preset) => (
+              <button
+                key={preset.name}
+                type="button"
+                className={`shape-node__color-btn ${stroke === preset.stroke ? 'active' : ''}`}
+                style={{ backgroundColor: preset.stroke }}
+                title={preset.name}
+                onClick={() => onChange?.(node.id, { data: { ...data, stroke: preset.stroke, fill: preset.fill } })}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

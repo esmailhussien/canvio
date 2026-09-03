@@ -343,15 +343,20 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
 
         if (node.type === 'frame') {
           const allNodes = store.nodes;
-          const fx1 = node.position.x;
-          const fy1 = node.position.y;
-          const fx2 = node.position.x + node.size.width;
-          const fy2 = node.position.y + node.size.height;
+          // Use the ORIGINAL frame position (captured at pointerdown) for both
+          // containment checks and delta computation.  Using the live
+          // `node.position` here would read the already-mutated value from the
+          // previous animation frame, producing a compounding displacement that
+          // sends children flying off the canvas.
+          const origX = originalNodePosRef.current!.x;
+          const origY = originalNodePosRef.current!.y;
+          const fx1 = origX;
+          const fy1 = origY;
+          const fx2 = origX + node.size.width;
+          const fy2 = origY + node.size.height;
 
-          // Note: using incremental dx/dy here for children since it's easier, 
-          // but computing it from current position vs last position
-          const dx = targetX - node.position.x;
-          const dy = targetY - node.position.y;
+          const dx = targetX - origX;
+          const dy = targetY - origY;
 
           // One transaction for the frame and all contained children.
           const moves: Array<{ id: string; position: { x: number; y: number } }> = [
@@ -580,12 +585,24 @@ function NodeRendererComponent({ node, presentationMode = false, focusNodeId = n
       } else {
         setRelationTarget(null);
       }
+
+      // Update cursor world position for live arrow rendering
+      const state = useCanvasStore.getState();
+      const canvasEl = document.querySelector('.canvas') as HTMLElement | null;
+      if (canvasEl) {
+        const rect = canvasEl.getBoundingClientRect();
+        const viewport = state.viewport;
+        const worldX = (moveEv.clientX - rect.left - rect.width / 2) / viewport.zoom - viewport.x;
+        const worldY = (moveEv.clientY - rect.top - rect.height / 2) / viewport.zoom - viewport.y;
+        window.dispatchEvent(new CustomEvent('canvio:cursor-world-pos', { detail: { x: worldX, y: worldY } }));
+      }
     };
 
     const handleWindowPointerUp = (upEv: PointerEvent) => {
       window.removeEventListener('pointermove', handleWindowPointerMove);
       window.removeEventListener('pointerup', handleWindowPointerUp);
       window.removeEventListener('pointercancel', handleWindowPointerUp);
+      window.dispatchEvent(new CustomEvent('canvio:cursor-world-pos', { detail: null }));
 
       const state = useCanvasStore.getState();
       const currentTargetId = state.relationTargetId;

@@ -63,6 +63,36 @@ export const TextNode: React.FC<TextNodeProps> = ({ node, selected, onChange }) 
     return () => window.removeEventListener('canvio:edit-node', handleEditRequest);
   }, [node.id]);
 
+  const contentRef = useRef(content);
+  contentRef.current = content;
+
+  // Debounced auto-save so text changes propagate without requiring blur
+  useEffect(() => {
+    if (!isEditing) return;
+    const timer = setTimeout(() => {
+      if (onChange && content !== data.content) {
+        onChange(node.id, { data: { ...data, content } });
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [content, isEditing, node.id, data, onChange]);
+
+  // Flush pending edits on beforeunload or unmount so tab close never loses typed text
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isEditing && onChange && contentRef.current !== data.content) {
+        onChange(node.id, { data: { ...data, content: contentRef.current } });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (isEditing && onChange && contentRef.current !== data.content) {
+        onChange(node.id, { data: { ...data, content: contentRef.current } });
+      }
+    };
+  }, [isEditing, node.id, data, onChange]);
+
   const handleDoubleClick = () => {
     setIsEditing(true);
   };

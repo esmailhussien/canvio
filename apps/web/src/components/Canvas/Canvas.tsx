@@ -285,7 +285,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
       if (!isActiveDrawingPointer && (!e.isPrimary || pinchStateRef.current)) return;
       const worldPos = screenToWorld(e.clientX, e.clientY);
       cursorWorldPosRef.current = worldPos;
-      if (activeTool === 'relation') setCursorWorldPos(worldPos);
+      if (activeTool === 'relation' || relationSourceId) setCursorWorldPos(worldPos);
 
       const lastMousePos = lastMousePosRef.current;
       if (isPanning && lastMousePos) {
@@ -605,6 +605,16 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
     return () => window.removeEventListener('pointermove', handleLaserPointerMove);
   }, [activeTool]);
 
+  useEffect(() => {
+    const handleCursorPos = (e: Event) => {
+      const pos = (e as CustomEvent<{ x: number; y: number } | null>).detail;
+      cursorWorldPosRef.current = pos;
+      setCursorWorldPos(pos);
+    };
+    window.addEventListener('canvio:cursor-world-pos', handleCursorPos);
+    return () => window.removeEventListener('canvio:cursor-world-pos', handleCursorPos);
+  }, []);
+
   const transform = `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})`;
   const relationStateClass =
     !presentationMode && activeTool === 'relation'
@@ -626,6 +636,7 @@ export function Canvas({ worldId, autoShapeEnabled = false, presentationMode = f
   return (
     <div
       ref={canvasRef}
+      data-world-id={worldId}
       className={`canvas ${relationStateClass} ${activeTool === 'laser' ? 'canvas--laser' : ''} ${isInkTool ? 'canvas--inking' : ''} ${isPanning ? 'canvas--panning' : ''} ${presentationMode ? 'canvas--presenting' : ''} ${focusNodeId ? 'canvas--focus-active' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

@@ -60,10 +60,17 @@ function getClientIp(request: FastifyRequest) {
   return request.ip || 'unknown';
 }
 
+export const ALLOWED_CORS_HEADERS = [
+  'Content-Type',
+  'Authorization',
+  'x-canvio-api-key',
+  'x-canvio-client-id',
+  'x-canvio-share-token',
+];
+
 export function createCorsOriginGuard() {
   return async (origin: string | undefined) => {
-    if (isOriginAllowed(origin)) return true;
-    throw new Error('Origin is not allowed by CANVIO_ALLOWED_ORIGINS');
+    return isOriginAllowed(origin);
   };
 }
 

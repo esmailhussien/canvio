@@ -212,15 +212,20 @@ export function relationToYMap(relation: Relation): Y.Map<unknown> {
  * Deserializes a Y.Map back to a Relation.
  */
 export function yMapToRelation(ymap: Y.Map<unknown>): Relation {
-  const obj = ymap.toJSON() as any;
-  if (typeof obj.style === 'string') {
-    try {
-      obj.style = JSON.parse(obj.style);
-    } catch {
-      obj.style = {};
+  const obj = ymap.toJSON() as Record<string, unknown>;
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+      try {
+        obj[key] = JSON.parse(value);
+      } catch {
+        // Keep original string if not valid JSON
+      }
     }
   }
-  return obj as Relation;
+  if (!obj.style || typeof obj.style !== 'object') {
+    obj.style = {};
+  }
+  return obj as unknown as Relation;
 }
 
 export const ANIMALS = ['Fox', 'Owl', 'Bear', 'Wolf', 'Eagle', 'Dolphin', 'Panda', 'Tiger', 'Falcon', 'Lynx'];

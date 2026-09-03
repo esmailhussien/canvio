@@ -213,10 +213,11 @@ async function createApiRequestError(response: Response, fallback: string) {
   );
 }
 
-export async function createBoard() {
+export async function createBoard(id?: string, title?: string) {
   const response = await fetch(apiUrl('/api/boards'), {
     method: 'POST',
-    headers: requestHeaders(),
+    headers: requestHeaders(Boolean(id || title)),
+    body: id || title ? JSON.stringify({ id, title }) : undefined,
   });
   if (!response.ok) throw await createApiRequestError(response, 'Failed to create board');
   return response.json() as Promise<BoardRecord>;

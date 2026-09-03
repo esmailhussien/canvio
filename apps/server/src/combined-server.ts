@@ -13,7 +13,7 @@ import { boardRoutes } from './routes/boards.js';
 import { aiRoutes } from './routes/ai.js';
 import { telemetryRoutes } from './routes/telemetry.js';
 import { createFilePersistence } from './storage/yPersistence.js';
-import { createCorsOriginGuard, readPositiveIntEnv } from './security.js';
+import { ALLOWED_CORS_HEADERS, createCorsOriginGuard, readPositiveIntEnv } from './security.js';
 import { authorizeWebSocketBoard, getBoardIdFromWsRequest } from './wsAccess.js';
 import { FASTIFY_OPTIONS, registerErrorHandler, registerSecurityHeaders } from './http.js';
 import { getReadiness } from './health.js';
@@ -31,7 +31,7 @@ registerSecurityHeaders(app);
 
 app.register(cors, {
   origin: createCorsOriginGuard(),
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-canvio-api-key', 'x-canvio-client-id', 'x-canvio-share-token'],
+  allowedHeaders: ALLOWED_CORS_HEADERS,
 });
 
 app.get('/', async () => ({

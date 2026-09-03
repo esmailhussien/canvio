@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { nanoid } from 'nanoid';
 import { LivingNode } from '../types';
@@ -7,18 +7,20 @@ export { mapPlugin } from './mapPlugin';
 import 'leaflet/dist/leaflet.css';
 import './MapNode.css';
 
-// Fix for default Leaflet marker icons in React
+// Fix for default Leaflet marker icons in React (safely guarded for SSR/Node)
 import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-let DefaultIcon = L.icon({
+if (typeof window !== 'undefined' && typeof L !== 'undefined' && L.Marker?.prototype?.options) {
+  const DefaultIcon = L.icon({
     iconUrl: icon,
     shadowUrl: iconShadow,
     iconSize: [25, 41],
-    iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+    iconAnchor: [12, 41],
+  });
+  L.Marker.prototype.options.icon = DefaultIcon;
+}
 
 // Modern SVG Icons
 const IconPin: React.FC<{ size?: number }> = ({ size = 16 }) => (
@@ -33,20 +35,6 @@ const IconLayers: React.FC<{ size?: number }> = ({ size = 16 }) => (
     <polygon points="12 2 2 7 12 12 22 7 12 2" />
     <polyline points="2 17 12 22 22 17" />
     <polyline points="2 12 12 17 22 12" />
-  </svg>
-);
-
-const IconLock: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-);
-
-const IconUnlock: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
   </svg>
 );
 
@@ -154,23 +142,20 @@ const MapController: React.FC<{
   onChangeCenterZoom: (center: [number, number], zoom: number) => void;
 }> = ({ center, zoom, markers, onChangeCenterZoom }) => {
   const map = useMap();
-  const lastMarkerSignatureRef = React.useRef('');
+  const lastMarkerCountRef = React.useRef(markers.length);
 
   React.useEffect(() => {
-    const markerSignature = markers
-      .map((marker) => `${marker.id}:${marker.position[0].toFixed(5)},${marker.position[1].toFixed(5)}`)
-      .join('|');
-
-    if (markers.length > 1 && markerSignature !== lastMarkerSignatureRef.current) {
-      lastMarkerSignatureRef.current = markerSignature;
+    // Only auto-fit bounds if marker count changed (markers added or deleted),
+    // not on every render or internal state change which would override user manual zoom
+    if (markers.length > 1 && markers.length !== lastMarkerCountRef.current) {
+      lastMarkerCountRef.current = markers.length;
       const bounds = L.latLngBounds(markers.map((marker) => marker.position));
       if (bounds.isValid()) {
         map.fitBounds(bounds.pad(0.2), { animate: false, maxZoom: Math.max(zoom, 14) });
         return;
       }
     }
-
-    lastMarkerSignatureRef.current = markerSignature;
+    lastMarkerCountRef.current = markers.length;
 
     const currentCenter = map.getCenter();
     const currentZoom = map.getZoom();
@@ -213,44 +198,61 @@ const MarkerAnchorTracker: React.FC<{
   onAnchorsChange: (anchors: Record<string, MapMarkerAnchor>) => void;
 }> = ({ markers, onAnchorsChange }) => {
   const map = useMap();
-  const frameRef = React.useRef<number | null>(null);
+  const throttleTimerRef = React.useRef<number | null>(null);
   const lastSignatureRef = React.useRef('');
 
   React.useEffect(() => {
-    const publishAnchors = () => {
-      if (frameRef.current !== null) return;
-      frameRef.current = window.requestAnimationFrame(() => {
-        frameRef.current = null;
-        const size = map.getSize();
-        const anchors = Object.fromEntries(markers.map((marker) => {
-          const point = map.latLngToContainerPoint(marker.position);
-          const container = map.getContainer();
-          const mapNode = container.closest('.map-node') as HTMLElement | null;
-          const containerRect = container.getBoundingClientRect();
-          const nodeRect = mapNode?.getBoundingClientRect();
-          const offsetX = nodeRect ? containerRect.left - nodeRect.left : 0;
-          const offsetY = nodeRect ? containerRect.top - nodeRect.top : 0;
-          return [marker.id, {
-            x: offsetX + point.x,
-            y: offsetY + point.y,
-            visible: point.x >= 0 && point.y >= 0 && point.x <= size.x && point.y <= size.y,
-          }];
-        }));
-        const signature = JSON.stringify(anchors);
-        if (signature !== lastSignatureRef.current) {
-          lastSignatureRef.current = signature;
-          onAnchorsChange(anchors);
-        }
-      });
+    const computeAndPublish = () => {
+      const size = map.getSize();
+      const anchors = Object.fromEntries(markers.map((marker) => {
+        const point = map.latLngToContainerPoint(marker.position);
+        const container = map.getContainer();
+        const mapNode = container.closest('.map-node') as HTMLElement | null;
+        const containerRect = container.getBoundingClientRect();
+        const nodeRect = mapNode?.getBoundingClientRect();
+        const offsetX = nodeRect ? containerRect.left - nodeRect.left : 0;
+        const offsetY = nodeRect ? containerRect.top - nodeRect.top : 0;
+        return [marker.id, {
+          x: offsetX + point.x,
+          y: offsetY + point.y,
+          visible: point.x >= 0 && point.y >= 0 && point.x <= size.x && point.y <= size.y,
+        }];
+      }));
+      const signature = JSON.stringify(anchors);
+      if (signature !== lastSignatureRef.current) {
+        lastSignatureRef.current = signature;
+        onAnchorsChange(anchors);
+      }
     };
 
-    publishAnchors();
-    map.on('move zoom resize viewreset', publishAnchors);
+    const schedulePublish = (immediate = false) => {
+      if (immediate) {
+        if (throttleTimerRef.current !== null) {
+          window.clearTimeout(throttleTimerRef.current);
+          throttleTimerRef.current = null;
+        }
+        computeAndPublish();
+        return;
+      }
+      if (throttleTimerRef.current !== null) return;
+      throttleTimerRef.current = window.setTimeout(() => {
+        throttleTimerRef.current = null;
+        computeAndPublish();
+      }, 100);
+    };
+
+    schedulePublish(true);
+    const onMove = () => schedulePublish(false);
+    const onMoveEnd = () => schedulePublish(true);
+
+    map.on('move', onMove);
+    map.on('zoom moveend zoomend resize viewreset', onMoveEnd);
     return () => {
-      map.off('move zoom resize viewreset', publishAnchors);
-      if (frameRef.current !== null) {
-        window.cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
+      map.off('move', onMove);
+      map.off('zoom moveend zoomend resize viewreset', onMoveEnd);
+      if (throttleTimerRef.current !== null) {
+        window.clearTimeout(throttleTimerRef.current);
+        throttleTimerRef.current = null;
       }
     };
   }, [map, markers, onAnchorsChange]);
